@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.decomposition import PCA
 
-def PCA_with_features(features, selected_features, version):
+def PCA_with_features(features, selected_features, dataset_version):
   features = features[features['valid_occasion'] == 1]
   X = features[selected_features]
   y = features['condition']

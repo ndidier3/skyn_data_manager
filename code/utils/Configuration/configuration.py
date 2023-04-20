@@ -9,12 +9,16 @@ import numpy as np
 def update_column_names(df):
     df.rename(columns = {
             'device timestamp': 'datetime',
-            'firmware version': 'Firmware_Version',
-            'Firmware Version': 'Firmware_Version',
+            'Timestamp': 'datetime',
+            'Device Serial Number': 'device_id',
+            'firmware dataset_version': 'Firmware_dataset_version',
+            'Firmware dataset_version': 'Firmware_dataset_version',
             'tac (ug/L)': 'TAC ug/L(air)',
             'temperature (C)': 'Temperature_C',
             'Temperature C': 'Temperature_C',
+            'Temperature LSB': 'Temperature_C',
             'motion (g)': 'Motion',
+            'Motion LSB': 'Motion',
             'device id': 'device_id'
         }, 
             inplace=True,
@@ -85,7 +89,6 @@ def get_time_elapsed(df):
             df.loc[lower_index:higher_index:,'time_elapsed_hours'] = ((df.loc[lower_index:higher_index, 'datetime'] - df.loc[lower_index, 'datetime']).dt.seconds / 60 / 60) + (24*(i-1)) + first_day_duration
 
     df.reset_index(inplace=True)
-    df.to_excel('C:/Users/ndidier/Desktop/test_7001.xlsx')
     return df, new_day_index_list, mode(intervals)
 
 def remove_junk_columns(df):
@@ -104,19 +107,37 @@ def remove_junk_columns(df):
     #df.drop('bac_level', axis=1, inplace=True, errors='ignore')
     return df
 
-def get_subid_from_path(path):
-    subid_index = path.index('#') + 1
-    subid = int(path[subid_index:subid_index+4])
-    return subid
+def get_string_from_path(path, search_substring, range):
+    """
+    search_substring is the substring that comes either before or after the desired string (e.g. SubID).
+    range is the number of characters after (a positive range) or before (a negative range) the search
+    """
+    if range < 0:
+        string_start = path.index(search_substring) + range
+        string_end = path.index(search_substring)
+    if range > 0:
+        string_start = path.index(search_substring) + len(search_substring)
+        string_end = path.index(search_substring) + range + len(search_substring)
+    string = path[string_start:string_end]
+    return string
 
-def get_condition_from_path(path):
-    condition_index = path.index('.') - 3
-    condition = path[condition_index:condition_index+3]
-    return condition
+def is_data_croppable(subid, condition, sub_condition, metadata):
+    if sub_condition == '':
+        return ((metadata['Use_Data']=='Y') & (metadata['SubID']==subid) & (metadata['Condition']==condition)).any()
+    else: 
+        return ((metadata['Use_Data']=='Y') & (metadata['SubID']==subid) & (metadata['Condition']==condition) & (metadata['Sub_Condition']==sub_condition)).any()
 
-def get_drink_count(drink_counts_df, subid, condition):
-    print(subid)
-    if condition == 'Alc':
-        return drink_counts_df[drink_counts_df['SubID']==subid]['TotalDrks'].tolist()[0]
+def get_drink_count(metadata, subid, condition, sub_condition):
+    print(metadata)
+    print('condition', condition)
+    print(sub_condition)
+    if sub_condition == '':
+        return metadata[(metadata['SubID']==subid) & (metadata['Condition'] == condition)]['TotalDrks'].tolist()[0]
     else:
-        return 0
+        return metadata[(metadata['SubID']==subid) & (metadata['Condition'] == condition) & (metadata['Sub_Condition'] == sub_condition)]['TotalDrks'].tolist()[0]
+
+def baseline_correct_tac(tac_column):
+    if tac_column.min() < 0:
+        return tac_column - tac_column.min()
+    else:
+        return tac_column

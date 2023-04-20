@@ -29,14 +29,18 @@ def get_peak_index(df, variable):
   tac = df[variable]
   return df.index[df[variable]==tac.max()].tolist()[0]
 
-def get_baseline_mean_stdev(df, variable, baseline_value_count=10):
+def get_baseline_mean_stdev(df, variable, baseline_count=10):
   tac = df[variable]
-  baseline_values = tac.loc[0:baseline_value_count]
-  return baseline_values.mean(), baseline_values.std()
+  baseline_values = tac.loc[0:baseline_count]
+  baseline_mean = baseline_values.mean()
+  baseline_stdev = baseline_values.std()
+  return baseline_mean, baseline_stdev
 
 def get_rise_duration(df, variable, time_variable, peak_index):
   base_mean, base_stdev = get_baseline_mean_stdev(df, variable)
+
   baseline_threshold = base_mean + base_stdev
+
   baseline_threshold_reached = False
   index_count = 1
   while not baseline_threshold_reached:

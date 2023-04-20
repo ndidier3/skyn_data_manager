@@ -5,8 +5,14 @@ from utils.Machine_Learning.cv_custom import cv_custom
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
 
-def cv_with_rf(features, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak']):
-  
+def cv_with_rf(features, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent']):
+  print(features.columns)
+  print(predictors)
+  if 'major_outlier_N' in features.columns:
+    predictors.extend(['major_outlier_N', 'minor_outlier_N'])
+  else:
+    predictors = [predictor for predictor in predictors if predictor not in ['major_outlier_N', 'minor_outlier_N']]
+  print(predictors)
   features = features[features['valid_occasion'] == 1]
   groups = features['subid'].tolist()
   splits = len(features['subid'].unique())
@@ -25,12 +31,13 @@ def cv_with_rf(features, predictors = ['curve_auc', 'rise_rate', 'fall_duration'
   cv_results, cv_stats = cv_custom(rf_optimal.best_estimator_, features, X, y)
   
   #incorrect ROC AUC
-  #roc_auc = roc_auc_score(y, rf_optimal.best_estimator_.predict_proba(X)[:, 1])
+  #roc_auc = roc_auc_score(y, rf_optimal.best_estimator_.predict_proba(X))
 
   columns = ['subid', 'condition'] + predictors
   incorrect = features[features['condition']!=predictions][columns]
   correct = features[features['condition']==predictions][columns]
   cv_stats['accuracy_sklearn'] = len(correct) / len(predictions)
-  cv_stats['auc_roc_sklearn'] = 'NA'
+  cv_stats['auc_roc'] = roc_auc_score(y, probs[:, 1])
+  print(incorrect)
 
-  return cv_stats, cv_results, incorrect, correct, predictors, splits
+  return cv_stats, cv_results, incorrect, correct, predictors, splits, rf_optimal.best_estimator_

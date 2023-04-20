@@ -1,7 +1,9 @@
 import pandas as pd
 import pickle
+from datetime import date
+import xlsxwriter
 
-def export_skyn_workbook(cleaned_dataset, subid, condition, excel_path, plot_paths):
+def export_skyn_workbook(cleaned_dataset, subid, condition, sub_condition, excel_path, simple_plot_paths, complex_plot_paths):
   variable_key = pd.DataFrame({'Variable/Descriptor':
       ['datetime / device timestamp', 'Time', 'time_elapsed_hours', 'potential_artifact', 'TAC', 'Cleaned', 'Greedy', 'Smooth_XYZ', 'TAC_change', 'Motion', 'Temperature C', 'device_id', 'FOR MORE INFORMATION:'],
   'Explanation':
@@ -19,35 +21,64 @@ def export_skyn_workbook(cleaned_dataset, subid, condition, excel_path, plot_pat
       'Device ID',
       'See Word document saved here: Z:\Groups\King\ MARS 2\ 06) Data Management\ 3) Skyn']})
     
-  writer = pd.ExcelWriter(f'{excel_path}/skyn_{subid}_{condition}.xlsx', engine='xlsxwriter')
+  writer = pd.ExcelWriter(f'{excel_path}/skyn_{subid}_{condition}{sub_condition}.xlsx', engine='xlsxwriter')
 
   cleaned_dataset.to_excel(writer, sheet_name='Data', index=False)
   variable_key.to_excel(writer, sheet_name='Variable Key', index=False)
 
   workbook = writer.book
-  worksheet = workbook.add_worksheet('Graphs')
-
+  worksheet = workbook.add_worksheet('Signal Processing Visuals')
+  worksheet.set_default_row(20)
   row_index = 1
-  counter = 0
-  column_indices = ['A', 'K', 'U']
-  for plot_path in plot_paths:
-    if ((counter+3)%3) == 0:
-      if counter != 0:
-        row_index += 24
-    column_index = column_indices[(counter+3)%3]
-    image_start_cell = column_index + str(row_index)
+  for plot_path in complex_plot_paths:
+    image_start_cell = 'B' + str(row_index)
     worksheet.insert_image(image_start_cell, (plot_path))
-    counter += 1
+    row_index += 30
+
+  workbook = writer.book
+  worksheet = workbook.add_worksheet('Motion & Temp Graphs')
+  row_index = 1
+  for plot_path in simple_plot_paths:
+    image_start_cell = 'B' + str(row_index)
+    worksheet.insert_image(image_start_cell, (plot_path))
+    row_index += 20
+
   writer.save()
 
-def save(object, folder, filename):
-  out = open(f'{folder}/{filename}.pickle', "wb")
+def save(object, filename, folder = './processed_data_and_plots/data_manager_exports'):
+  today = date.today()
+  today_date = today.strftime("%m.%d.%Y")
+
+  out = open(f'{folder}/{filename} {today_date}.pickle', "wb")
   pickle.dump(object, out)
   out.close()
   print('SAVE SUCCESSFUL')
 
-def load(folder, filename):
-  pickle_in = open(f'{folder}/{filename}.pickle', "rb") 
+def load(date_string, name, folder='./processed_data_and_plots/data_manager_exports'):
+  pickle_in = open(f'{folder}/{name} {date_string}.pickle', "rb") 
   object = pickle.load(pickle_in)
   pickle_in.close()
   return object
+
+def export_variable_key(writer, new_model_development = True):
+  variable_key = pd.read_excel('resources/FeatureKey.xlsx', index_col='Variable Name')
+  if new_model_development:
+    variable_key.drop('prediction', inplace=True)
+    variable_key.rename(index = {'correct': 'cv_<model-type>'}, inplace=True)
+  else:
+    variable_key = variable_key[:40]
+  variable_key.to_excel(writer, sheet_name='KEY')
+
+def get_model_summary_sheet_name(model_name, data_version):
+  model_name_new = model_name.split('_')[0][0].upper() + model_name.split('_')[0][1:] + ' ' + model_name.split('_')[1][0].upper() + model_name.split('_')[1][1:]
+  return f'{model_name_new} - {data_version}'
+
+def reorder_tabs(analyses_out_folder, cohort_name):
+  workbook = xlsxwriter.Workbook(f'{analyses_out_folder}/skyn_report_{cohort_name}.xlsx')
+
+  sheetlist = workbook.worksheets._name
+  print(sheetlist)
+  sheetlist.insert(1, sheetlist.pop(len(sheetlist) - 1))
+
+  workbook.worksheets_objs.sort(key=lambda x: sheetlist.index(x.name))
+  workbook.close()

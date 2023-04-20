@@ -1,4 +1,3 @@
-from utils.Reporting.model_visualization import *
 from sklearn.utils import resample
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
@@ -19,7 +18,7 @@ def create_optimal_rf(cv_method = 3):
   # max_depth.append(None)
   distributions = {
     'n_estimators': [100],
-    'max_features': ['sqrt'],
+    'max_features': ["auto", "sqrt", "log2"],
     'max_depth': max_depth,
     'min_samples_split': [2],
     'min_samples_leaf': [1],
@@ -31,7 +30,7 @@ def create_optimal_rf(cv_method = 3):
 
 def create_optimal_lr(cv_method=3):
   lr = LogisticRegression(solver='liblinear', random_state=13)
-  distributions = dict(C=[0.001,0.01,0.1,1,10,100,1000], penalty=['l2', 'l1'])
+  distributions = dict(C=[0.001,0.01,0.1,1,10,100,1000], penalty=['l1', 'l2'])
   lr_optimal = GridSearchCV(estimator = lr, scoring='accuracy', param_grid = distributions, cv=cv_method, n_jobs = -1)
   return lr_optimal
 
@@ -48,7 +47,7 @@ def test_rf_model(X_train, y_train, X_test, y_test, verbose=False):
     print('roc_auc = {:0.2f}'.format(roc_auc))
   return model, predictions, roc_auc, accuracy
 
-# def holdout_with_resampling(features, test_size, resample_features = True, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak'], split=True):
+# def holdout_with_resampling(features, test_size, resample_features = True, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent'], split=True):
 #   features = features[features['valid_occasion'] == 1]
 #   X = features[predictors]
 #   y = features['condition']
@@ -74,12 +73,12 @@ def test_rf_model(X_train, y_train, X_test, y_test, verbose=False):
 #   roc_auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
 
   # return model, roc_auc, accuracy
-# def ML_with_rf(all_features, version, feature_visuals_path, test_size, selected_features = ['curve_auc', 'rise_rate', 'fall_duration', 'peak']):
+# def ML_with_rf(all_features, dataset_version, feature_visuals_path, test_size, selected_features = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent']):
 #   X_train, X_test, y_train, y_test = holdout_with_resampling(all_features, test_size, resample_features=True)
 #   model, roc_auc, accuracy = build_and_test_model('rf', X_train, X_test, y_train, y_test)
 #   print(roc_auc, accuracy)
-#   plot_rf_feature_importances(model, selected_features, version, feature_visuals_path)
-#   plot_rf_tree(model, selected_features, y_test.unique().tolist(), version, feature_visuals_path)
+#   plot_rf_feature_importances(model, selected_features, dataset_version, feature_visuals_path)
+#   plot_rf_tree(model, selected_features, y_test.unique().tolist(), dataset_version, feature_visuals_path)
 #   return model, roc_auc, accuracy
 
 # def ML_with_lr(features, test_size, selected_features):
@@ -87,7 +86,7 @@ def test_rf_model(X_train, y_train, X_test, y_test, verbose=False):
 #   model, roc_auc, accuracy = build_and_test_model('lr', X_train, X_test, y_train, y_test)
 #   return model, roc_auc, accuracy
 
-# def cross_validate_with_pairs(features, model, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak']):
+# def cross_validate_with_pairs(features, model, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent']):
 #   print(features)
 #   features = features[features['valid_occasion'] == 1]
 #   groups = features['subid'].tolist()
