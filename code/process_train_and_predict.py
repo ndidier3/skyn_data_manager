@@ -40,7 +40,8 @@ if run_procedure:
         sub_condition_range=sub_condition_search_length,
         metadata_path=metadata,
         episode_start_timestamps_path=timestamps,
-        max_episode_duration=max_episode_duration
+        max_episode_duration=max_episode_duration,
+        skyn_download_timezone=skyn_download_timezone
       )
       #signal processing on all datasets
       skyn_dataset.load_bulk_skyn_occasions(make_plots=True, export_python_object=True)

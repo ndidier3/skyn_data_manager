@@ -29,13 +29,11 @@ def get_valid_session_info(metadata):
 
   return subid_condition_list
 
-def get_best_output_column_name(best_output):
-    
-    output_column_key = {'greedy' : 'TAC_cleaned_greedy',
-                        'cleaned': 'TAC_cleaned',
-                        'raw': 'TAC'}
-    
-    return output_column_key[best_output]
+def is_date_column_DMY_format(date_column):
+  for row in date_column.tolist():
+    if int(row.split('/')[0]) > 12:
+      return True
+  return False
 
 def get_session_time_range(session_timestamp, max_duration):
   time_begin_drinking = str(session_timestamp.loc[0, 'Start Time'])
@@ -50,10 +48,13 @@ def make_date_column(timestamps):
   #convert Submitted Date/Time column to datetime type
   timestamps.loc[:, 'Start Date'] = pd.to_datetime(timestamps.loc[:, 'Start Date'])
 
-  #Make a new column Date in dd/mm/yyyy format
-  timestamps['Date'] = timestamps['Start Date'].dt.strftime('%d/%m/%Y')
+  #standardize column format
+  if is_date_column_DMY_format(timestamps['Start Date']):
+    timestamps['Date'] = timestamps['Start Date'].dt.strftime('%d/%m/%Y')
+  else:
+    timestamps['Date'] = timestamps['Start Date'].dt.strftime('%m/%d/%Y')
 
-  #convert Date column to datetime type
+  #convert Date string column to datetime type
   timestamps.loc[:, 'Date'] = pd.to_datetime(timestamps.loc[:, 'Date'])
 
   #convert date format to yyyy/mm/dd
@@ -64,7 +65,7 @@ def make_date_column(timestamps):
   
   return timestamps
 
-def crop_using_timestamp(subid, condition, sub_condition, dataset, metadata, timestamp_data, plot_directory, max_duration):
+def crop_using_timestamp(subid, condition, sub_condition, dataset, metadata, timestamp_data, plot_directory, max_duration, skyn_download_timezone):
   start_date, start_time = get_session_start_date_and_time(dataset)
   valid_session_info = get_valid_session_info(metadata)
   timestamps = make_date_column(timestamp_data)
@@ -81,10 +82,9 @@ def crop_using_timestamp(subid, condition, sub_condition, dataset, metadata, tim
       hour_condataset_version = 0
     else:
       pass_test[Subid_condition] = 1
-      time_zone_code = int(session_timestamp.loc[0, 'Time Zone'].split(':')[0])
-      hour_condataset_version = time_zone_code + 5
+      time_zone_code = int(session_timestamp.loc[0, 'Time Zone'].split(':')[0]) if session_timestamp.loc[0, 'Time Zone'] else skyn_download_timezone
+      hour_condataset_version = time_zone_code - (skyn_download_timezone)
 
-      
 
       dataset['Time_Adjusted'] = dataset['datetime'] + pd.Timedelta(hours=hour_condataset_version)
       datetime_begin_drinking, datetime_end_episode = get_session_time_range(session_timestamp, max_duration)

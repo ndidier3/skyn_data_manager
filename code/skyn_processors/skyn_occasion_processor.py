@@ -9,7 +9,7 @@ from utils.Reporting.stats import *
 from utils.Reporting.export import *
 
 class skynOccasionProcessor:
-  def __init__(self, path, data_out_folder, graphs_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None):
+  def __init__(self, path, data_out_folder, graphs_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None, skyn_download_timezone = -5):
     self.path = path
     self.subid_search = subid_search
     self.subid_range = subid_range
@@ -26,6 +26,7 @@ class skynOccasionProcessor:
     self.study_title = None
     self.metadata = pd.read_excel(metadata_path) if metadata_path != None else pd.DataFrame(columns=['SubID', 'Condition', 'Sub_Condition','Use_Data'])
     self.timestamps = pd.read_excel(episode_start_timestamps_path) if episode_start_timestamps_path != None else pd.DataFrame(columns = ['SubID', 'Start Date', 'Start Time', 'Time Zone'])
+    self.skyn_download_timezone = skyn_download_timezone
     self.data_out_folder = data_out_folder
     self.plot_folder = graphs_out_folder
     self.simple_plot_paths = []
@@ -158,9 +159,9 @@ class skynOccasionProcessor:
 
   def crop_dataset_with_timestamps(self, data_clean=False):
     if data_clean:
-        self.cleaned_dataset, cropped_plot_path = crop_using_timestamp(self.subid, self.condition, self.sub_condition, self.cleaned_dataset, self.metadata, self.timestamps, self.condition_plot_folder, self.max_duration)
+        self.cleaned_dataset, cropped_plot_path = crop_using_timestamp(self.subid, self.condition, self.sub_condition, self.cleaned_dataset, self.metadata, self.timestamps, self.condition_plot_folder, self.max_duration, self.skyn_download_timezone)
     else:
-      self.raw_dataset, cropped_plot_path = crop_using_timestamp(self.subid, self.condition, self.sub_condition, self.raw_dataset, self.metadata, self.timestamps, self.condition_plot_folder, self.max_duration)
+      self.raw_dataset, cropped_plot_path = crop_using_timestamp(self.subid, self.condition, self.sub_condition, self.raw_dataset, self.metadata, self.timestamps, self.condition_plot_folder, self.max_duration, self.skyn_download_timezone)
 
     self.complex_plot_paths.append(cropped_plot_path)
     self.time_variable = 'time_elapsed_hours_adjusted'

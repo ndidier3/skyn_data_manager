@@ -6,7 +6,7 @@ import xlsxwriter
 import numpy as np
 
 class skynCohortTester:
-  def __init__(self, models, folder_path, cohort_name, data_out_folder, graphs_out_folder, analyses_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None, max_episode_duration = 18):
+  def __init__(self, models, folder_path, cohort_name, data_out_folder, graphs_out_folder, analyses_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None, max_episode_duration = 18, skyn_download_timezone = -5):
     self.models = models
     self.data_folder = folder_path
     self.cohort_name = cohort_name
@@ -24,6 +24,7 @@ class skynCohortTester:
     self.occasion_paths = glob.glob(f'{folder_path}*')
     self.occasions = []
     self.max_episode_duration = max_episode_duration
+    self.skyn_download_timezone = skyn_download_timezone
     self.predictions = {}
     self.stats = {
       'Cleaned': pd.DataFrame(),
@@ -36,7 +37,7 @@ class skynCohortTester:
   def process_and_make_predictions(self, export_python_object=True):
     for path in self.occasion_paths:
       print(path)
-      occasion = skynOccasionProcessor(path, self.data_out_folder, self.graphs_out_folder, self.subid_search, self.subid_range, self.condition_search, self.condition_range, self.sub_condition_search, self.sub_condition_range, metadata_path=self.metadata_path, episode_start_timestamps_path=self.timestamps_path)
+      occasion = skynOccasionProcessor(path, self.data_out_folder, self.graphs_out_folder, self.subid_search, self.subid_range, self.condition_search, self.condition_range, self.sub_condition_search, self.sub_condition_range, metadata_path=self.metadata_path, episode_start_timestamps_path=self.timestamps_path, skyn_download_timezone = self.skyn_download_timezone)
       occasion.max_duration = self.max_episode_duration
       occasion.process_with_default_settings(make_plots=True)
       occasion.plot_column('Motion')

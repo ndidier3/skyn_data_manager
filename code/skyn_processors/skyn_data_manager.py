@@ -11,7 +11,7 @@ from utils.Machine_Learning.cv_with_lr import cv_with_lr
 import xlsxwriter
 
 class skynDataManager:
-  def __init__(self, folder_path, cohort_name, data_out_folder, graphs_out_folder, analyses_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None, max_episode_duration = 18):
+  def __init__(self, folder_path, cohort_name, data_out_folder, graphs_out_folder, analyses_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None, max_episode_duration = 18, skyn_timestamps_timezone = -5):
     self.data_folder = folder_path
     self.cohort_name = cohort_name
     self.data_out_folder = data_out_folder
@@ -32,6 +32,7 @@ class skynDataManager:
     self.max_episode_duration = max_episode_duration
     self.metadata_path = metadata_path
     self.timestamps_path = episode_start_timestamps_path
+    self.skyn_timestamps_timezone = skyn_timestamps_timezone
     self.merged_raw = None
     self.merged_clean = None
     self.stats = {
@@ -53,7 +54,7 @@ class skynDataManager:
     for path in self.occasion_paths:
       print(path)
       
-      occasion = skynOccasionProcessor(path, self.data_out_folder, self.graphs_out_folder, self.subid_search, self.subid_range, self.condition_search, self.condition_range, self.sub_condition_search, self.sub_condition_range, self.metadata_path, self.timestamps_path)
+      occasion = skynOccasionProcessor(path, self.data_out_folder, self.graphs_out_folder, self.subid_search, self.subid_range, self.condition_search, self.condition_range, self.sub_condition_search, self.sub_condition_range, self.metadata_path, self.timestamps_path, self.skyn_timestamps_timezone)
       occasion.max_duration = self.max_episode_duration
       for dataset_version in ['Raw', 'Cleaned']:
         print(occasion.condition_range)

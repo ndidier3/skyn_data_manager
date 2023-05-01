@@ -9,11 +9,7 @@ import traceback
 #Parameters that NEED MODIFICATION
 cohort_name = 'TestData'
 data_in = 'raw/TestData/'
-metadata = 'resources/Test/Skyn Quality Assessment TEST.xlsx'
-
-#If timestamps for cropping datasets are available, replace "None" with filepath to timestamps
-#If timestamps are not available, keep "timestamps = None"
-timestamps = None
+metadata = 'resources/Test/Cohort Metadata TEST.xlsx'
 
 #Parameters that MIGHT NEED MODIFICATION
 subid_search_character = '#'
@@ -23,6 +19,11 @@ condition_search_length = 3
 sub_condition_search_character = '^'
 sub_condition_search_length = 3
 max_episode_duration = 18
+skyn_download_timezone = -5
+
+#If timestamps for cropping datasets are available, replace "None" with filepath to timestamps
+#If timestamps are not available, keep "timestamps = None"
+timestamps = None
 
 #Constant Parameters (do not modify unless certain)
 data_out = f'processed_data_and_plots/data_{cohort_name}'
@@ -40,7 +41,6 @@ run_procedure = messagebox.askyesno("Skyn Data Manager", "Would you like to proc
 
 if run_procedure:
   try:
-    
     if repeat_processing:
       skyn_dataset = skynCohortTester(
           built_in_models,
@@ -57,7 +57,8 @@ if run_procedure:
           sub_condition_search_length,
           metadata_path = metadata,
           episode_start_timestamps_path=timestamps,
-          max_episode_duration=max_episode_duration
+          max_episode_duration=max_episode_duration,
+          skyn_download_timezone=skyn_download_timezone
         )
       skyn_dataset.process_and_make_predictions(export_python_object=True)
 

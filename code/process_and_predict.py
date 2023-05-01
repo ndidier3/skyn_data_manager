@@ -34,7 +34,6 @@ if run_procedure:
     if export_report_from_previous_cohort:
       skyn_dataset = load(date_of_processing, cohort_name)
       skyn_dataset.create_report()
-
     else:
       skyn_dataset = skynCohortTester(
         built_in_models,
@@ -51,7 +50,8 @@ if run_procedure:
         sub_condition_search_length,
         metadata_path = metadata,
         episode_start_timestamps_path=timestamps,
-        max_episode_duration=max_episode_duration
+        max_episode_duration=max_episode_duration,
+        skyn_download_timezone=skyn_download_timezone
       )
 
       skyn_dataset.process_and_make_predictions(export_python_object=True)
