@@ -5,6 +5,7 @@ from tkinter import messagebox
 import traceback
 
 #SUMMARY: Replicate signal processing and model testing described in Didier et al., under review. 
+#IF YOU WOULD LIKE RAW DATA USED FOR THIS PUBLICATION, PLEASE EMAIL: ndidier@bsd.uchicago.edu 
 
 #setup parameters (do not change)
 data_in = 'raw/MARS/'
