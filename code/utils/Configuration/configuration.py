@@ -47,7 +47,7 @@ def get_time_elapsed(df):
         df.loc[:, "datetime"] = pd.to_datetime(df.loc[:, "datetime"])
     if 'device time zone' in df.columns.tolist():
         if df['device time zone'].mode().tolist()[0] == 'UTC':
-            df['datetime'] = df['datetime'] - timedelta(hours=6)
+            df[:, 'datetime'] = df['datetime'] - timedelta(hours=6)
 
     df = df.sort_values(by="datetime", ignore_index=True)
     df.reset_index(inplace=True, drop=True)
@@ -116,6 +116,8 @@ def get_string_from_path(path, search_substring, range):
         string_start = path.index(search_substring) + range
         string_end = path.index(search_substring)
     if range > 0:
+        print(path)
+        print(search_substring)
         string_start = path.index(search_substring) + len(search_substring)
         string_end = path.index(search_substring) + range + len(search_substring)
     string = path[string_start:string_end]
@@ -128,9 +130,6 @@ def is_data_croppable(subid, condition, sub_condition, metadata):
         return ((metadata['Use_Data']=='Y') & (metadata['SubID']==subid) & (metadata['Condition']==condition) & (metadata['Sub_Condition']==sub_condition)).any()
 
 def get_drink_count(metadata, subid, condition, sub_condition):
-    print(metadata)
-    print('condition', condition)
-    print(sub_condition)
     if sub_condition == '':
         return metadata[(metadata['SubID']==subid) & (metadata['Condition'] == condition)]['TotalDrks'].tolist()[0]
     else:

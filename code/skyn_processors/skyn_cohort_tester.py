@@ -6,7 +6,7 @@ import xlsxwriter
 import numpy as np
 
 class skynCohortTester:
-  def __init__(self, models, folder_path, cohort_name, data_out_folder, graphs_out_folder, analyses_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None, max_episode_duration = 18, skyn_download_timezone = -5):
+  def __init__(self, models, folder_path, cohort_name, data_out_folder, graphs_out_folder, analyses_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, merge_variables = {}, episode_start_timestamps_path = None, max_episode_duration = 18, skyn_download_timezone = -5):
     self.models = models
     self.data_folder = folder_path
     self.cohort_name = cohort_name
@@ -20,6 +20,7 @@ class skynCohortTester:
     self.sub_condition_search = sub_condition_search
     self.sub_condition_range = sub_condition_range
     self.metadata_path = metadata_path
+    self.merge_variables = merge_variables
     self.timestamps_path = episode_start_timestamps_path
     self.occasion_paths = glob.glob(f'{folder_path}*')
     self.occasions = []
@@ -39,16 +40,20 @@ class skynCohortTester:
       print(path)
       occasion = skynOccasionProcessor(path, self.data_out_folder, self.graphs_out_folder, self.subid_search, self.subid_range, self.condition_search, self.condition_range, self.sub_condition_search, self.sub_condition_range, metadata_path=self.metadata_path, episode_start_timestamps_path=self.timestamps_path, skyn_download_timezone = self.skyn_download_timezone)
       occasion.max_duration = self.max_episode_duration
-      occasion.process_with_default_settings(make_plots=True)
-      occasion.plot_column('Motion')
-      occasion.plot_column('Temperature_C')
-      occasion.plot_tac_and_temp()
-      occasion.plot_temp_cleaning()
-      occasion.plot_cleaning_comparison()
-      self.occasions.append(occasion)
-      occasion.export_workbook()
+      metadata = pd.read_excel(self.metadata_path)
+      if ((metadata['Use_Data']=='Y') & (metadata['SubID']==occasion.subid) & (metadata['Condition']==occasion.condition)).any():
+        occasion.process_with_default_settings(make_plots=True)
+        occasion.plot_column('Motion')
+        occasion.plot_column('Temperature_C')
+        occasion.plot_tac_and_temp()
+        occasion.plot_temp_cleaning()
+        occasion.plot_cleaning_comparison()
+        self.occasions.append(occasion)
+        occasion.export_workbook()
     self.load_stats()
     self.stats['Cleaned'].to_excel(f'{self.data_out_folder}/Cleaned_test_stats.xlsx')
+    if export_python_object:
+      save(self, self.cohort_name, './processed_data_and_plots/data_manager_exports')
     for version in ['Cleaned', 'Raw']:
       predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent']
       model = self.models[version]['random_forest']
@@ -63,7 +68,6 @@ class skynCohortTester:
       save(self, self.cohort_name, './processed_data_and_plots/data_manager_exports')
   
   def load_stats(self, force_refresh=False):
-    print('reached export')
     data = {
       'Cleaned': {
         'subid': [],
@@ -104,6 +108,7 @@ class skynCohortTester:
       cols.insert(3, cols.pop(len(cols)-1))
       cols.insert(3, cols.pop(len(cols)-1))
       to_export = to_export[cols]
+      to_export = merge_using_subid(to_export, self.merge_variables)
       to_export.to_excel(writer, index=False, sheet_name=f'Features - {version}')
 
     export_variable_key(writer, new_model_development=False)

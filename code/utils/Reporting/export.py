@@ -73,11 +73,18 @@ def get_model_summary_sheet_name(model_name, data_version):
   model_name_new = model_name.split('_')[0][0].upper() + model_name.split('_')[0][1:] + ' ' + model_name.split('_')[1][0].upper() + model_name.split('_')[1][1:]
   return f'{model_name_new} - {data_version}'
 
+def merge_using_subid(data, files_and_variables):
+  for filepath, variables in files_and_variables.items():
+    to_be_merged = pd.read_excel(filepath)
+    if 'subid' not in variables:
+      variables.append('subid')
+    data = data.merge(to_be_merged[variables], on="subid", how='left')
+  return data
+
 def reorder_tabs(analyses_out_folder, cohort_name):
   workbook = xlsxwriter.Workbook(f'{analyses_out_folder}/skyn_report_{cohort_name}.xlsx')
 
   sheetlist = workbook.worksheets._name
-  print(sheetlist)
   sheetlist.insert(1, sheetlist.pop(len(sheetlist) - 1))
 
   workbook.worksheets_objs.sort(key=lambda x: sheetlist.index(x.name))

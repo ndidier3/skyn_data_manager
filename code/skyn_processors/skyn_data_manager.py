@@ -6,35 +6,67 @@ from utils.Reporting.plotting import *
 from utils.Reporting.export import *
 from utils.Machine_Learning.model_testing import *
 from utils.Machine_Learning.pca import *
-from utils.Machine_Learning.cv_with_rf import cv_with_rf
-from utils.Machine_Learning.cv_with_lr import cv_with_lr
+from utils.Stats.stats import *
+from utils.Machine_Learning.RF_model_dev import RF_CV_alc_vs_non, RF_CV_worn_vs_removed
+from utils.Machine_Learning.LR_model_dev import LR_CV_alc_vs_non, LR_CV_worn_vs_removed
 import xlsxwriter
 
 class skynDataManager:
-  def __init__(self, folder_path, cohort_name, data_out_folder, graphs_out_folder, analyses_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None, max_episode_duration = 18, skyn_timestamps_timezone = -5):
+  def __init__(self,
+      #data in: tac data, metadata, redcap data, etc.
+      folder_path, #path to datasets to be analyzed
+      metadata_path = None, #path to find metadata
+      cohort_name = None, #give a name to this collection  of datasets
+      merge_variables = {}, 
+      episode_start_timestamps_path = None, 
+
+      #export settings
+      data_out_folder = None, #folder to save processed data
+      graphs_out_folder = None, #folder to save graphs
+      analyses_out_folder = None, #folder to save features and model results
+
+      #configuring how to identify a file's subid, condition and - if needed - a sub_condition
+      subid_search = '#', #character (string) to indicate where subid begins
+      subid_range = 4, #length (integer) of full subid - length of subid must be same for all filenames
+      condition_search = '.', #character (string) to indicate where condition begins within a filename
+      condition_range = -3, #length (integer) of condition label - length of condition must be same for all filenames
+      sub_condition_search = None, #character (numeric string, e.g., 001, 002, 003) to distinguish between subids with repeated conditions
+      sub_condition_range = None,  #length (integer) of sub_condition label - length of sub_condition must be same for all filenames
+      
+      #signal processing customization
+      max_episode_duration = 18, 
+      skyn_timestamps_timezone = -5):
+    
+    #data in: tac data, metadata, redcap data, etc.
     self.data_folder = folder_path
     self.cohort_name = cohort_name
+    self.metadata_path = metadata_path
+    self.merge_variables = merge_variables
+    self.timestamps_path = episode_start_timestamps_path
+    self.occasion_paths = glob.glob(f'{folder_path}*')
+    self.subids = []
+    self.occasions = []
+
+    #export settings
     self.data_out_folder = data_out_folder
     self.graphs_out_folder = graphs_out_folder
     self.analyses_out_folder = analyses_out_folder
     self.model_figures_folder = self.analyses_out_folder + 'figures/'
+
+    #configuring how to identify a file's subid, condition and - if needed - a sub_condition
     self.subid_search = subid_search
     self.subid_range = subid_range
     self.condition_search = condition_search
     self.condition_range = condition_range
     self.sub_condition_search = sub_condition_search
     self.sub_condition_range = sub_condition_range
-    self.occasion_paths = glob.glob(f'{folder_path}*')
-    self.cohort = 'Skyn Cohort'
-    self.subids = []
-    self.doses = {}
-    self.occasions = []
+
+    #signal processing customization
     self.max_episode_duration = max_episode_duration
-    self.metadata_path = metadata_path
-    self.timestamps_path = episode_start_timestamps_path
     self.skyn_timestamps_timezone = skyn_timestamps_timezone
-    self.merged_raw = None
-    self.merged_clean = None
+
+    #results
+    self.master_dataset = pd.DataFrame()
     self.stats = {
       'Cleaned': pd.DataFrame(),
       'Raw': pd.DataFrame(),
@@ -51,26 +83,29 @@ class skynDataManager:
     }
 
   def load_bulk_skyn_occasions(self, make_plots=True, force_refresh=False, export_python_object=False):
-    for path in self.occasion_paths:
+    for i, path in enumerate(self.occasion_paths):
       print(path)
-      
       occasion = skynOccasionProcessor(path, self.data_out_folder, self.graphs_out_folder, self.subid_search, self.subid_range, self.condition_search, self.condition_range, self.sub_condition_search, self.sub_condition_range, self.metadata_path, self.timestamps_path, self.skyn_timestamps_timezone)
+      metadata = pd.read_excel(self.metadata_path)
       occasion.max_duration = self.max_episode_duration
-      for dataset_version in ['Raw', 'Cleaned']:
-        print(occasion.condition_range)
-        print(occasion.condition_search)
-        print(occasion.condition)
-        occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.sub_condition)
-      if (path not in [occasion.path for occasion in self.occasions]) or (force_refresh):
-
-        occasion.process_with_default_settings(make_plots=True)
-        occasion.plot_column('Motion')
-        occasion.plot_column('Temperature_C')
-        occasion.plot_tac_and_temp()
-        occasion.plot_temp_cleaning()
-        occasion.plot_cleaning_comparison()
-        self.occasions.append(occasion)
-        occasion.export_workbook()
+      if ((metadata['Use_Data']=='Y') & (metadata['SubID']==occasion.subid) & (metadata['Condition']==occasion.condition)).any():
+        for dataset_version in ['Raw', 'Cleaned']:
+          occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.sub_condition)
+        if (path not in [occasion.path for occasion in self.occasions]) or (force_refresh):
+          occasion.process_with_default_settings(make_plots=True)
+          occasion.plot_column('Motion')
+          occasion.plot_column('Temperature_C')
+          occasion.plot_tac_and_temp()
+          occasion.plot_temp_cleaning()
+          occasion.plot_cleaning_comparison()
+          self.occasions.append(occasion)
+          occasion.export_workbook()
+        occasion.cleaned_dataset['dataset_id'] = str(occasion.subid) + occasion.condition + occasion.sub_condition if occasion.sub_condition else str(occasion.subid) + occasion.condition
+      if len(self.master_dataset) == 0:
+        self.master_dataset = occasion.cleaned_dataset
+      else:
+        self.master_dataset = self.master_dataset.append(occasion.cleaned_dataset)
+    
     if export_python_object:
       save(self, self.cohort_name, './processed_data_and_plots/data_manager_exports')
     
@@ -81,10 +116,11 @@ class skynDataManager:
     self.export_feature_plots(dataset_versions=['Cleaned', 'Raw'])
     for dataset_version in ['Cleaned', 'Raw']:
       for model_name in ['random_forest', 'logistic_regression']:
-        self.cross_validation(dataset_version, model_name)
+        self.cross_validation(dataset_version, model_name, 'alc_vs_non')
     self.export_stats()
     self.principal_component_analysis('Cleaned')
     self.principal_component_analysis('Raw')
+    save(self, self.cohort_name, './processed_data_and_plots/data_manager_exports')
     """
     THIS REPORT BUILDING NEEDS TO OCCUR EALIRER
     """
@@ -94,7 +130,6 @@ class skynDataManager:
     #   print('exporting not complete')
 
   def export_stats(self, force_refresh=False):
-    print('reached export')
     data = {
       'Cleaned': {
         'subid': [],
@@ -111,8 +146,6 @@ class skynDataManager:
     }
     for dataset_version in ['Raw', 'Cleaned']:
       for occasion in self.occasions:
-        print(occasion.subid)
-        print(occasion.stats[dataset_version])
         data[dataset_version]['subid'].append(occasion.subid)
         data[dataset_version]['condition'].append(occasion.condition)
         data[dataset_version]['sub_condition'].append(occasion.sub_condition)
@@ -124,10 +157,6 @@ class skynDataManager:
               data[dataset_version][key].append(value)
             else:
               data[dataset_version][key].append(value)
-      print(data[dataset_version])
-      for key, value in data[dataset_version].items():
-        print(key)
-        print(len(value))
       if len(self.stats[dataset_version]) > 0:
         self.stats[dataset_version] = self.stats[dataset_version].merge(pd.DataFrame(data[dataset_version]))
       else:
@@ -142,13 +171,20 @@ class skynDataManager:
     explained_variances = PCA_with_features(self.stats[dataset_version], selected_features, dataset_version)
     self.stats['PCA'][f'PCA with {dataset_version} Data'] = explained_variances
 
-  def cross_validation(self, dataset_version, model_name):
+  def cross_validation(self, dataset_version, model_name, prediction_type):
     if model_name not in self.cv_results[dataset_version].keys():
       self.cv_results[dataset_version][model_name] = {}
-    if model_name == 'random_forest':
-      cv_stats, cv_results, incorrect, correct, predictors, splits, model = cv_with_rf(self.stats[dataset_version])
-    if model_name == 'logistic_regression':
-      cv_stats, cv_results, incorrect, correct, predictors, splits, model = cv_with_lr(self.stats[dataset_version])
+    if prediction_type == 'alc_vs_non':
+      if model_name == 'random_forest':
+        cv_stats, cv_results, incorrect, correct, predictors, splits, model = RF_CV_alc_vs_non(self.stats[dataset_version])
+      if model_name == 'logistic_regression':
+        cv_stats, cv_results, incorrect, correct, predictors, splits, model = LR_CV_alc_vs_non(self.stats[dataset_version])
+    if prediction_type == 'worn_vs_removed':
+      if model_name == 'random_forest':
+        cv_stats, cv_results, incorrect, correct, predictors, splits, model = RF_CV_worn_vs_removed(self.master_dataset)
+      if model_name == 'logistic_regression':
+        cv_stats, cv_results, incorrect, correct, predictors, splits, model = LR_CV_worn_vs_removed(self.master_dataset)
+
     self.cv_results[dataset_version][model_name]['cv_stats'] = cv_stats
     self.cv_results[dataset_version][model_name]['cv_results'] = cv_results
     self.cv_results[dataset_version][model_name]['incorrect'] = incorrect
@@ -166,7 +202,8 @@ class skynDataManager:
         occasion.stats[dataset_version][f'cv_{model_name}'] = 'excluded'
     self.models[dataset_version][model_name] = model
     if model_name == 'random_forest':
-      plot_rf_feature_importances(model, predictors, dataset_version, self.cohort_name, self.model_figures_folder)
+      feature_importance = plot_rf_feature_importances(model, predictors, dataset_version, self.cohort_name, self.model_figures_folder)
+      feature_importance.to_excel(f'{self.analyses_out_folder}/feature_importance_{self.cohort_name}_{dataset_version}.xlsx')
       plot_rf_tree(model, predictors, dataset_version, self.cohort_name, self.model_figures_folder)
 
   def create_report(self):
@@ -252,8 +289,26 @@ class skynDataManager:
         cols.insert(3, cols.pop(len(cols)-1))
         cols.insert(3, cols.pop(len(cols)-1))
         to_export = to_export[cols]
+        to_export = merge_using_subid(to_export, self.merge_variables)
         to_export.to_excel(writer, index=False, sheet_name=f'Features - {dataset_version}')
         for model_name in ['random_forest', 'logistic_regression']:
           self.stats['Model_Results'][f'{model_name} - {dataset_version}'].to_excel(writer, index=False, sheet_name=get_model_summary_sheet_name(model_name, dataset_version))
 
     writer.save()
+  
+  def iterative_near_real_time_testing(self):
+  
+    features = pd.DataFrame(columns=['subid', 'condition', 'curve_duration', 'peak', 'rise_rate', 'fall_rate', 'rise_duration', 'fall_duration', 'avg_tac_diff'])
+    for i in range(5, 120, 5):
+      features['curve_duration'].append()
+      for occasion in self.occasions:
+
+        baseline_mean, baseline_sd = get_baseline_mean_stdev(occasion.cleaned_dataset, 'TAC_imputed_smooth_101')
+        peak_index = get_peak_index(occasion.dataset, 'TAC_imputed_smooth_101')
+        rise_duration, curve_beginning = get_rise_duration(occasion.cleaned_dataset, 'TAC_imputed_smooth_101', occasion.time_variable, peak_index)
+        data = occasion.cleaned_dataset.iloc[curve_beginning: curve_beginning + i]
+        print(occasion.subid)
+        #find beginning of curve index
+        
+        #crop dataset from here to i
+        #calculate rise rate, peak, fall rate, rise duration, fall duration, duration, average tac change

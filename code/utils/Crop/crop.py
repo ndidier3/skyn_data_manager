@@ -29,11 +29,11 @@ def get_valid_session_info(metadata):
 
   return subid_condition_list
 
-def is_date_column_DMY_format(date_column):
-  for row in date_column.tolist():
-    if int(row.split('/')[0]) > 12:
-      return True
-  return False
+# def is_date_column_DMY_format(date_column):
+#   for row in date_column.tolist():
+#     if int(str(row).split('/')[0]) > 12:
+#       return True
+#   return False
 
 def get_session_time_range(session_timestamp, max_duration):
   time_begin_drinking = str(session_timestamp.loc[0, 'Start Time'])
@@ -49,10 +49,10 @@ def make_date_column(timestamps):
   timestamps.loc[:, 'Start Date'] = pd.to_datetime(timestamps.loc[:, 'Start Date'])
 
   #standardize column format
-  if is_date_column_DMY_format(timestamps['Start Date']):
-    timestamps['Date'] = timestamps['Start Date'].dt.strftime('%d/%m/%Y')
-  else:
-    timestamps['Date'] = timestamps['Start Date'].dt.strftime('%m/%d/%Y')
+  #if is_date_column_DMY_format(timestamps['Start Date']):
+  timestamps['Date'] = timestamps['Start Date'].dt.strftime('%d/%m/%Y')
+  #else:
+   # timestamps['Date'] = timestamps['Start Date'].dt.strftime('%m/%d/%Y')
 
   #convert Date string column to datetime type
   timestamps.loc[:, 'Date'] = pd.to_datetime(timestamps.loc[:, 'Date'])
@@ -73,22 +73,18 @@ def crop_using_timestamp(subid, condition, sub_condition, dataset, metadata, tim
 
   Subid_condition = str(subid) + '_' + condition + sub_condition
   if Subid_condition in valid_session_info:
-    print('REACHED1')
     session_timestamp = timestamps[(timestamps['SubID']==subid)]
     session_timestamp = session_timestamp[session_timestamp['Date']==start_date]
     session_timestamp.reset_index(inplace=True, drop=True)
     if len(session_timestamp) == 0:
       pass_test[Subid_condition] = 0
-      hour_condataset_version = 0
+      hour_adjustment = 0
     else:
       pass_test[Subid_condition] = 1
       time_zone_code = int(session_timestamp.loc[0, 'Time Zone'].split(':')[0]) if session_timestamp.loc[0, 'Time Zone'] else skyn_download_timezone
-      hour_condataset_version = time_zone_code - (skyn_download_timezone)
-
-
-      dataset['Time_Adjusted'] = dataset['datetime'] + pd.Timedelta(hours=hour_condataset_version)
+      hour_adjustment = time_zone_code - (skyn_download_timezone)
+      dataset.loc[:, 'Time_Adjusted'] = dataset.loc[:, 'datetime'] + pd.Timedelta(hours=hour_adjustment)
       datetime_begin_drinking, datetime_end_episode = get_session_time_range(session_timestamp, max_duration)
-      print(datetime_begin_drinking, Subid_condition)
       cropped_plot_path = plot_cropping(dataset, datetime_begin_drinking, datetime_end_episode, subid, condition, sub_condition, plot_directory, max_duration)
       cropped_clean_dataset = dataset[(dataset['Time_Adjusted'] > datetime_begin_drinking) & (dataset['Time_Adjusted'] < datetime_end_episode)]
       cropped_clean_dataset.reset_index(drop=True, inplace=True)
@@ -105,6 +101,8 @@ def crop_device_off_end(df):
     while temp_below_28:
       index = len(df) - counter
       if df.loc[index, 'Temperature_C'] > 28:
+        temp_below_28 = False
+      if counter == len(df) - 6:
         temp_below_28 = False
       counter += 1
     return df.loc[:index], counter

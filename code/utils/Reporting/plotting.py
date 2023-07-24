@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from utils.Configuration.configuration import normalize_column
+from utils.Stats.get_feature_importances import get_feature_importances
 import numpy as np
 from sklearn.metrics import plot_roc_curve
 from sklearn.tree import plot_tree
@@ -19,6 +20,7 @@ def plot_column(df, plot_folder, subid, condition, sub_condition, y_variable, ti
             os.mkdir(folder)
       full_path = f'{folder}/{y_variable} - {subid} - {condition}{sub_condition}.png'
       fig.savefig(full_path)
+      plt.close()
       return full_path
 
 def plot_TAC_curve(df, plot_folder, subid, condition, sub_condition, tac_variable, time_variable, ylabel="TAC ug/L", xlabel="Time (hours)"):
@@ -38,6 +40,7 @@ def plot_TAC_curve(df, plot_folder, subid, condition, sub_condition, tac_variabl
 
       full_path = f'{folder}/{tac_variable} - {subid} - {condition}{sub_condition}.png'
       fig.savefig(full_path)
+      plt.close()
       return full_path
 
 def plot_overlaid_TAC_curves(df, plot_folder, subid, condition, sub_condition, tac_variables, time_variable, plot_name, ylabel="TAC ug/L", xlabel="Time (hours)"):
@@ -51,6 +54,7 @@ def plot_overlaid_TAC_curves(df, plot_folder, subid, condition, sub_condition, t
 
       full_path = f'{folder}/{plot_name} - {subid} - {condition}{sub_condition}.png'
       fig.savefig(full_path)
+      plt.close()
       return full_path
 
 def plot_overlaid_with_normalization(df_prior, plot_folder, subid, condition, sub_condition, variables, time_variable, plot_name):
@@ -61,7 +65,7 @@ def plot_overlaid_with_normalization(df_prior, plot_folder, subid, condition, su
       colors = ['b', 'c', 'g', 'r']
       markers = ['o', 's', 'v', 'x']
       for i, variable in enumerate(variables):
-            df[variable] = normalize_column(df[variable])
+            df[:, variable] = normalize_column(df[variable])
             ax1.scatter(y=df[variable], x=df[time_variable], s=10, c=colors[i], marker=markers[i], label=variable)
 
       plot = df.plot(y=variables, x=time_variable, title=title, ylabel='Norm Variables', xlabel='Time (hrs)')
@@ -73,6 +77,7 @@ def plot_overlaid_with_normalization(df_prior, plot_folder, subid, condition, su
             
       full_path = f'{folder}/{plot_name} - {subid} - {condition}{sub_condition}.png'
       fig.savefig(full_path, bbox_inches='tight')
+      plt.close()
       return full_path
 
 def plot_tac_and_temp(df, plot_folder, subid, condition, sub_condition, tac_variable, temp_variable, time_variable, plot_title = "TAC and Temperature"):
@@ -82,6 +87,7 @@ def plot_tac_and_temp(df, plot_folder, subid, condition, sub_condition, tac_vari
       fig.suptitle(plot_title, fontsize=14)
       path = f'{plot_folder}/{subid}/{condition}/tac_and_temp_plot_{subid}_{condition}{sub_condition}.png'
       fig.savefig(path)
+      plt.close()
 
       return path
 
@@ -200,9 +206,9 @@ def plot_cleaning_comparison(occasion, df, df_raw, time_variable, add_color = Fa
 
 def plot_smoothed_curve(df, plot_folder, subid, condition, sub_condition, time_variable, peak, baseline_cutoff, curve_begins, curve_ends, title = "TAC Curve"):
       peak_time = df.loc[df['TAC_imputed_smooth_101']==peak, time_variable]
-      graph_cutoff = curve_ends + ((len(df) - curve_ends)*0.25)
-      df = df.loc[:graph_cutoff]
-      
+      # graph_cutoff = curve_ends + ((len(df) - curve_ends)*0.25)
+      # df = df.loc[:graph_cutoff]
+         
       fig, ax = plt.subplots(figsize = (16, 7))
       ax.plot(df[time_variable].tolist(), df['TAC_imputed_smooth_101'].tolist(), c='black')
       ax.vlines(peak_time, ymin=baseline_cutoff, ymax=peak, color='black', linestyle='--')
@@ -238,6 +244,7 @@ def create_temp_histogram(self):
     plt.xticks([20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40])
     plt.yticks(ticks = [2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000, 18000], labels=[2, 4, 6, 8, 10, 12, 14, 16, 18])
     plt.savefig(f'{self.analyses_out_folder}/temperature_histogram.png')
+    plt.close()
 
 def plot_box_whisker(stats, variables, group_variable, plot_folder, dataset_version, cohort_name):
       data = {}
@@ -266,16 +273,16 @@ def plot_box_whisker(stats, variables, group_variable, plot_folder, dataset_vers
             
       full_path = f'{plot_folder}{dataset_version}_features_{cohort_name}_box_whisker.png'
       figure.savefig(full_path, bbox_inches='tight')
+      plt.close()
 
 
 def plot_rf_feature_importances(model, features, dataset_version, cohort_name, model_figures_folder):
-  #std = np.std([model.feature_importances_ for tree in model.estimators_], axis=0)
-  forest_importance = pd.DataFrame(model.feature_importances_, index=features, columns=['feature importance']).sort_values('feature importance', ascending=False)
-  print(forest_importance)
+  forest_importance = get_feature_importances(model, features)
   fig, ax = plt.subplots()
-  forest_importance.plot.barh(ax=ax)
-  ax.set_title(f'Comparison of Feature Importance - Random Forest')
-  ax.set_xlabel("Mean Decrease in Impurity")
+  ax.grid(True, axis = 'x')
+  forest_importance.plot.barh(ax=ax, color='dimgray')
+  ax.set_title(f'Feature Importance - Random Forest', fontdict={'weight': 'bold', 'size': 15})
+  ax.set_xlabel("Mean Decrease in Impurity", fontdict={'size': 13})
   ax.get_legend().remove()
   fig.tight_layout()
 
@@ -288,4 +295,5 @@ def plot_rf_tree(rf, feature_names, dataset_version, cohort_name, model_figures_
     feature_names=feature_names, class_names=['Alc', 'Non'], 
     filled=True, impurity=True, rounded=True)
   fig.savefig(f'{model_figures_folder}/Random Forest - {cohort_name} - {dataset_version} - Decision Tree.png')
+  plt.close()
 

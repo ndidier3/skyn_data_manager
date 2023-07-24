@@ -5,11 +5,11 @@ from utils.Crop.crop import *
 from utils.Signal_Processing.smooth_signal import *
 from utils.Signal_Processing.remove_outliers import *
 from utils.Reporting.plotting import *
-from utils.Reporting.stats import *
+from utils.Stats.stats import *
 from utils.Reporting.export import *
 
 class skynOccasionProcessor:
-  def __init__(self, path, data_out_folder, graphs_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None, skyn_download_timezone = -5):
+  def __init__(self, path, data_out_folder, graphs_out_folder, subid_search, subid_range, condition_search, condition_range, sub_condition_search = None, sub_condition_range = None, metadata_path = None, episode_start_timestamps_path = None, skyn_download_timezone = -5, max_duration = 18):
     self.path = path
     self.subid_search = subid_search
     self.subid_range = subid_range
@@ -35,7 +35,7 @@ class skynOccasionProcessor:
     self.condition_plot_folder = None
     self.stats = {'temp_cropped_count': 0, 'Cleaned': {}, 'Raw': {}}
     self.croppable = is_data_croppable(self.subid, self.condition, self.sub_condition, self.metadata) if len(self.timestamps) != 0 else False
-    self.max_duration = 18
+    self.max_duration = max_duration
     self.data_cropped = False
     self.info_repository = {
       'raw': None,
@@ -47,7 +47,6 @@ class skynOccasionProcessor:
 
 
   def initialize_data(self):
-    
     print(f'initializing {self.subid} {self.condition} {self.sub_condition}')
     if self.path[-3:] == 'csv':
       df_raw = pd.read_csv(self.path, index_col=False)
@@ -92,12 +91,12 @@ class skynOccasionProcessor:
         self.data_cropped = True
       self.info_repository['raw'] = df_raw['TAC'].tolist()
     else:
-      print(f'Duplicate Device IDs detected within single dataset {self.subid} {self.condition}{self.sub_condition}')
+      print(f'Multiple Device IDs detected within single dataset {self.subid} {self.condition}{self.sub_condition}')
       return False
     
   def process_with_default_settings(self, make_plots=False):
     self.initialize_data()
-    self.apply_basic_cleaning(15, major_threshold=0.70, minor_threshold=0.50)
+    self.apply_basic_cleaning(15)
     self.apply_smoothing([51, 101], 3, ['TAC', 'TAC_cleaned', 'TAC_imputed'])
     if make_plots:
       self.plot_tac_and_temp()
@@ -106,7 +105,7 @@ class skynOccasionProcessor:
     self.get_stats()
     self.temp_validity_check()
 
-  def apply_basic_cleaning(self, test_range, major_threshold, minor_threshold):
+  def apply_basic_cleaning(self, test_range, major_threshold=0.75, minor_threshold=0.50):
     df = self.raw_dataset.copy()
     imputed_TAC, cleaned_TAC, major_outliers, minor_outliers = find_and_replace_outliers(df, test_range, self.time_variable, major_threshold, minor_threshold)
 
@@ -168,7 +167,7 @@ class skynOccasionProcessor:
   
   def temp_validity_check(self):
     for dataset_version, df in {'Cleaned': self.cleaned_dataset, 'Raw': self.raw_dataset}.items():
-      df['Below_28_C'] = df.apply(lambda row: 0 if row.Temperature_C > 28 else 1, axis=1)
+      df.loc[:, 'Below_28_C'] = df.apply(lambda row: 0 if row.Temperature_C > 28 else 1, axis=1)
       counts = df['Below_28_C'].value_counts()
       if 1 in counts.index.tolist():
         self.stats[dataset_version]['not_worn_percent'] = counts.loc[1] / (counts.loc[0] + counts.loc[1])
@@ -179,7 +178,7 @@ class skynOccasionProcessor:
       
       self.stats[dataset_version]['valid_duration'] = self.stats[dataset_version]['duration'] - self.stats[dataset_version]['not_worn_duration']
       self.stats[dataset_version]['valid_duration_percent'] = self.stats[dataset_version]['valid_duration'] / self.stats[dataset_version]['duration']
-      self.stats[dataset_version]['valid_occasion'] = 1 if (self.stats[dataset_version]['valid_duration_percent'] > 0.9) and (self.stats[dataset_version]['valid_duration'] > 2) else 0
+      self.stats[dataset_version]['valid_occasion'] = 1 if (self.stats[dataset_version]['valid_duration_percent'] > 0.5) and (self.stats[dataset_version]['valid_duration'] > 2) else 0
 
   def export_workbook(self):
     export_skyn_workbook(self.cleaned_dataset, self.subid, self.condition, self.sub_condition, self.data_out_folder, self.simple_plot_paths, self.complex_plot_paths)
@@ -201,9 +200,10 @@ class skynOccasionProcessor:
       peak_index = get_peak_index(df, tac_variable)
       self.stats[dataset_version]['baseline_mean'], self.stats[dataset_version]['baseline_stdev'] = get_baseline_mean_stdev(df, tac_variable)
       self.stats[dataset_version]['rise_duration'], curve_begins_index = get_rise_duration(df, tac_variable, self.time_variable, peak_index)
+      
       self.stats[dataset_version]['fall_duration'], curve_ends_index = get_fall_duration(df, tac_variable, self.time_variable, peak_index)
       self.stats[dataset_version]['rise_rate'] = get_rise_rate(self.stats[dataset_version]['rise_duration'], self.stats[dataset_version]['peak'])
-      self.stats[dataset_version]['fall_rate'] = get_rise_rate(self.stats[dataset_version]['fall_duration'], self.stats[dataset_version]['peak'])
+      self.stats[dataset_version]['fall_rate'] = get_fall_rate(self.stats[dataset_version]['fall_duration'], self.stats[dataset_version]['peak'])
       self.stats[dataset_version]['duration'] = df[self.time_variable].max()
       self.stats[dataset_version]['curve_duration'] = get_curve_duration(self.stats[dataset_version]['rise_duration'], self.stats[dataset_version]['fall_duration'])
       self.stats[dataset_version]['curve_auc'] = get_curve_auc(df, tac_variable, curve_begins_index, curve_ends_index)

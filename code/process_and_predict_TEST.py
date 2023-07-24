@@ -4,7 +4,13 @@ import tkinter
 from tkinter import messagebox
 import traceback
 
-#Process a cohort of data, generate features for each dataset, and make predictions whether alcohol was consumed by using built-in model
+#THIS SCRIPT IS DESIGNED AS A TEST
+#SUMMARY: 
+  # Clean a cohort of test data, 
+  # generate features for each dataset,
+  # make predictions whether alcohol was consumed by using built-in model
+  # generate individual processed datasets
+  # generate summary file with graphs and prediction results
 
 #Parameters that NEED MODIFICATION
 cohort_name = 'TestData'
@@ -23,15 +29,16 @@ skyn_download_timezone = -5
 
 #If timestamps for cropping datasets are available, replace "None" with filepath to timestamps
 #If timestamps are not available, keep "timestamps = None"
+
 timestamps = None
 
 #Constant Parameters (do not modify unless certain)
 data_out = f'processed_data_and_plots/data_{cohort_name}'
 graphs_out = f'processed_data_and_plots/tac_curves_{cohort_name}'
 analyses_out = 'features_and_model_results/'
-original = load('04.19.2023', 'skyn_original_model')
+original = load('07.17.2023', 'Original Model') #UPDATE
 built_in_models = original.models
-repeat_processing = True
+load_previous_processing = False
 
 #~~~~~~~~~~~~~~~~~~~ THE PROCEDURE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -41,7 +48,9 @@ run_procedure = messagebox.askyesno("Skyn Data Manager", "Would you like to proc
 
 if run_procedure:
   try:
-    if repeat_processing:
+    if load_previous_processing:
+      skyn_dataset = load('04.20.2023', cohort_name) #UPDATE
+    else:
       skyn_dataset = skynCohortTester(
           built_in_models,
           data_in,
@@ -61,9 +70,6 @@ if run_procedure:
           skyn_download_timezone=skyn_download_timezone
         )
       skyn_dataset.process_and_make_predictions(export_python_object=True)
-
-    else:
-      skyn_dataset = load('04.20.2023', cohort_name)
 
     skyn_dataset.create_report()
 

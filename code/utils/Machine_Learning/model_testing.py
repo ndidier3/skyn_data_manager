@@ -14,8 +14,6 @@ import numpy as np
 def create_optimal_rf(cv_method = 3):
   rf = RandomForestClassifier()
   max_depth = [int(x) for x in np.linspace(10, 50, num = 11)]
-  print(len(max_depth))
-  # max_depth.append(None)
   distributions = {
     'n_estimators': [100],
     'max_features': ["auto", "sqrt", "log2"],
@@ -25,7 +23,6 @@ def create_optimal_rf(cv_method = 3):
     'bootstrap': [True]
   }
   rf_optimal = GridSearchCV(estimator = rf, scoring='accuracy', param_grid = distributions, cv = cv_method, n_jobs = -1)
-  print('reached optimal end')
   return rf_optimal
 
 def create_optimal_lr(cv_method=3):

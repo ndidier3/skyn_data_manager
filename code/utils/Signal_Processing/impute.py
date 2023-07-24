@@ -1,7 +1,7 @@
 from bdb import Breakpoint
 import pandas as pd
 import numpy as np
-from utils.Reporting.stats import *
+from utils.Stats.stats import *
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
 import scipy.interpolate
@@ -16,7 +16,7 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
   missing_idx = [i for (i, tac) in enumerate(tac_list) if np.isnan([tac])]
 
   #artifact gap cannot take more than 20% of dataset
-  gap_limit = len(df) * 0.20
+  gap_limit = len(df) * 0.40
 
   #create a list of each gap
   gaps = [[]]
@@ -31,9 +31,11 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
   if len(missing_idx) > 0:
     for gap in gaps:
       if len(gap) < gap_limit:
-
-        gap_index_check_count = {k: index_check_count[k] for k in gap}
-        max_impute_attempts = max(gap_index_check_count.values())
+        if len(index_check_count) > 0:
+          gap_index_check_count = {k: index_check_count[k] for k in gap}
+          max_impute_attempts = max(gap_index_check_count.values())
+        else:
+          max_impute_attempts = 0
 
         #how many data points to use for building spline? X % of the dataset.
         #for front of gap
@@ -75,7 +77,6 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
                 if (local_peak > 1) and (tac_difference > 1):
                   if ((np.log(tac_difference) / (np.log(local_peak) + 0.0001)) > threshold) and (local_peak > 3):
                     outlier_indices[position].append(i)
-    
         data_before_gap.loc[outlier_indices['before'], 'TAC'] = np.nan
         data_after_gap.loc[outlier_indices['after'], 'TAC'] = np.nan
         data_around_gap = pd.concat([data_before_gap, data_after_gap])
@@ -95,8 +96,7 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
         if max_impute_attempts == 1:
           model = GaussianProcessRegressor(kernel=DotProduct(), random_state=0).fit(x.to_numpy().reshape(-1, 1), y)
           predictions = model.predict(x_with_gap.to_numpy().reshape(-1, 1))
-          # print('predictions', predictions)
-          # print('front_ticker', front_ticker)
+
           data_to_insert = predictions[front_ticker:front_ticker+(last_missing_id-first_missing_id+1)]
           tac_list[first_missing_id:last_missing_id+1] = data_to_insert
         elif max_impute_attempts in [2, 3]:

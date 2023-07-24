@@ -22,7 +22,7 @@ condition_range = -3
 cohort_name = 'MARS'
 
 #Do you want to re-run signal cleaning for each dataset? This takes 15+ minutes.
-repeat_signal_processing = False #If False, model training and testing with still be conducted
+load_previous_processing = True #If True, model training and testing will still be conducted
 
 #~~~~~~~~~~~~~~~~~~~ THE PROCEDURE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -32,27 +32,27 @@ run_procedure = messagebox.askyesno("Skyn Data Manager", "Would you like to repl
 
 if run_procedure:
   try:
-    if repeat_signal_processing:
+    if load_previous_processing:
+      skyn_dataset = load('07.17.2023', 'Original Model') #UPDATE
+    else:
       #create skyn data manager
       skyn_dataset = skynDataManager(
         data_in,
-        cohort_name, 
-        data_out,
-        graphs_out,
-        analyses_out,
+        metadata_path=metadata,
+        cohort_name = cohort_name,
+        merge_variables = {},
+        episode_start_timestamps_path=timestamps,
+        data_out_folder=data_out,
+        graphs_out_folder=graphs_out,
+        analyses_out_folder=analyses_out,
         subid_search=subid_search,
         subid_range=subid_range, 
         condition_search=condition_search, 
         condition_range=condition_range,
-        metadata_path=metadata,
-        episode_start_timestamps_path=timestamps,
         max_episode_duration=max_episode_duration
       )
       #signal processing on all datasets
       skyn_dataset.load_bulk_skyn_occasions(make_plots=True, export_python_object=True)
-
-    else:
-      skyn_dataset = load('04.20.2023', cohort_name)
 
     #train models and run cross validation
     skyn_dataset.run_analyses()

@@ -4,17 +4,13 @@ import tkinter
 from tkinter import messagebox
 import traceback
 
-#import params information needed for processing
+#import params information needed for processing - MAKE SURE PARAMS.PY FILE IS UPDATED
 from params import *
 
 #Constant Parameters (do not modify unless certain)
 data_out = f'processed_data_and_plots/data_{cohort_name}'
 graphs_out = f'processed_data_and_plots/tac_curves_{cohort_name}'
 analyses_out = 'features_and_model_results/'
-original = load('04.19.2023', 'skyn_original_model')
-built_in_models = original.models
-repeat_signal_processing = False
-date_of_processing = 'dd.mm.yyyy'
 
 #~~~~~~~~~~~~~~~~~~~ THE PROCEDURE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -24,9 +20,11 @@ run_procedure = messagebox.askyesno("Skyn Data Manager", "Would you like to proc
 
 if run_procedure:
   try:
-    if repeat_signal_processing:
+    if load_previous_processing:
+      skyn_datasets = load('04.20.2023', cohort_name)
+    else:
       #create skyn data manager
-      skyn_dataset = skynDataManager(
+      skyn_datasets = skynDataManager(
         data_in,
         cohort_name, 
         data_out,
@@ -44,16 +42,14 @@ if run_procedure:
         skyn_download_timezone=skyn_download_timezone
       )
       #signal processing on all datasets
-      skyn_dataset.load_bulk_skyn_occasions(make_plots=True, export_python_object=True)
-
-    else:
-      skyn_dataset = load('04.20.2023', cohort_name)
+      skyn_datasets.load_bulk_skyn_occasions(make_plots=True, export_python_object=True)
+      
 
     #train models and run cross validation
-    skyn_dataset.run_analyses()
+    skyn_datasets.run_analyses()
 
     #create excel workbook report
-    skyn_dataset.create_report()
+    skyn_datasets.create_report()
 
     root = tkinter.Tk()
     root.withdraw()
