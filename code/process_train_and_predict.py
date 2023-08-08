@@ -21,27 +21,26 @@ run_procedure = messagebox.askyesno("Skyn Data Manager", "Would you like to proc
 if run_procedure:
   try:
     if load_previous_processing:
-      skyn_datasets = load('04.20.2023', cohort_name)
+      skyn_datasets = load(date_of_processing, cohort_name)
     else:
       #create skyn data manager
       skyn_datasets = skynDataManager(
         data_in,
-        cohort_name, 
-        data_out,
-        graphs_out,
-        analyses_out,
+        metadata_path=metadata,
+        cohort_name = cohort_name,
+        merge_variables = {},
+        episode_start_timestamps_path=timestamps,
+        data_out_folder=data_out,
+        graphs_out_folder=graphs_out,
+        analyses_out_folder=analyses_out,
         subid_search=subid_search_character,
         subid_range=subid_search_length, 
         condition_search=condition_search_character, 
         condition_range=condition_search_length,
-        sub_condition_search=sub_condition_search_character,
-        sub_condition_range=sub_condition_search_length,
-        metadata_path=metadata,
-        episode_start_timestamps_path=timestamps,
-        max_episode_duration=max_episode_duration,
-        skyn_download_timezone=skyn_download_timezone
+        max_episode_duration=max_episode_duration
       )
       #signal processing on all datasets
+      print('reached')
       skyn_datasets.load_bulk_skyn_occasions(make_plots=True, export_python_object=True)
       
 

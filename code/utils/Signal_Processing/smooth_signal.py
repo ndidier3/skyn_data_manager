@@ -12,7 +12,7 @@ def smooth_signals(df_prior, window_lengths, polyorder, variables, time_variable
   smoothed_tac_variables = {}
   for variable in variables:
     for window_length in window_lengths:
-      smoothed = savgol_filter(df[variable], window_length = window_length, polyorder = polyorder, mode='mirror')
+      smoothed = savgol_filter(df[variable], window_length = window_length, polyorder = polyorder, mode='nearest')
       TAC_smoothed = pd.Series(smoothed)
       smoothed_tac_variables[f'{variable}_{window_length}'] = TAC_smoothed
 
