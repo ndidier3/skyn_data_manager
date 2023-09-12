@@ -7,7 +7,7 @@ Resources/C4Field Metadata.xlsx
 Resources/C4Lab Metadata.xlsx
 Resources/C4 Measures/
 
-Results/*
+/Results/*
 dist/
 build/
 App/SDM.egg-info/
