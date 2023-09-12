@@ -6,8 +6,8 @@ Raw/on_hold/
 Resources/C4Field Metadata.xlsx
 Resources/C4Lab Metadata.xlsx
 Resources/C4 Measures/
-features_and_model_results/
-Results/
+
+Results/*
 dist/
 build/
 App/SDM.egg-info/
