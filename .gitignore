@@ -2,10 +2,12 @@ Raw/MARS/
 Raw/C4_errors/
 Raw/C4_field/
 Raw/C4_lab/
+Raw/MARS - Copy/
 Raw/on_hold/
 Resources/C4Field Metadata.xlsx
 Resources/C4Lab Metadata.xlsx
 Resources/C4 Measures/
+resources/*
 
 /Results/*
 dist/

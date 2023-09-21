@@ -6,7 +6,9 @@ from SDM.User_Interface.Frames.optional_settings_frame import OptionalSettingsFr
 from SDM.User_Interface.Frames.data_selection_method_frame import DataSelectionMethodFrame
 from SDM.User_Interface.Frames.program_selection_frame import ProgramSelectionFrame
 from SDM.User_Interface.Sub_Windows.create_metadata_window import CreateMetadataWindow
-from SDM.User_Interface.Sub_Windows.data_configuration_window import DataConfigurationWindow
+from SDM.User_Interface.Sub_Windows.filenames_confirmation_window import FilenamesConfirmationWindow
+from SDM.User_Interface.Sub_Windows.rename_files_window import RenameFilesWindow
+from SDM.User_Interface.Utils.filename_tools import *
 from SDM.User_Interface.Utils.get_sdm_run_settings import get_sdm_run_settings
 from tkinter import *
 from tkinter import filedialog, ttk
@@ -73,40 +75,34 @@ class SkynDataManagerApp(Tk):
     self.createMetaselectDataLabel = Label(self.data_loading_frame, text = self.createMetaselectDataLabelText)
     self.createMetadataButton = Button(self.data_loading_frame, text='Create metadata (.xlsx)', command=self.open_metadata_creator)
 
-
     self.runProgramButton = Button(self, text='RUN PROGRAM', fg='blue', command=self.run)
-    self.cohortNameEntry.bind("<FocusOut>", self.showRunButton())
+    self.cohortNameEntry.bind("<FocusOut>", self.show_run_button())
 
     #LOAD FILE DIRECTLY
     
     self.OptionsFrame = None
 
-    self.files_to_merge = {}
-    self.previous_processor = None
     self.models = {}
-    self.timestamps_filename = None
+    self.files_to_merge = {}
     self.data_download_timezone = -5
+    self.timestamps_filename = None
     self.max_dataset_duration = 24
+
+    self.previous_processor = None
     self.subid_i_start = None
     self.subid_i_end = None
     self.condition_i_start = None
     self.condition_i_end = None
     self.episode_identifier_i_start = None
     self.episode_identifer_i_end = None
+    self.episode_identifiers_required = False
 
-    self.defaults = {
-      'files_to_merge': {},
-      'previous_processor': None,
+    self.defaults_options = {
       'models': {},
-      'timestamps_filename': None,
+      'files_to_merge': {},
       'data_download_timezone': -5,
+      'timestamps_filename': None,
       'max_dataset_duration': 24,
-      'subid_i_start': None,
-      'subid_i_end': None,
-      'condition_i_start': None,
-      'condition_i_end': None,
-      'episode_identifier_i_start': None,
-      'episode_identifer_i_end': None,
     }
 
     self.update_idletasks()
@@ -119,28 +115,29 @@ class SkynDataManagerApp(Tk):
         self.unload_optional_settings()
     self.data_selection_method = selection
     self.program_selection_frame.grid_forget()
-    self.program_selection_frame = ProgramSelectionFrame(self.required_inputs_frame, self)
-    self.program_selection_frame.grid(row=2, column=1, padx=5, pady=(0, 15), sticky='w')
-    self.x_separator_mid.grid(row=3, column=1, columnspan=2, sticky='ew')
+    if self.data_selection_method != 'Processor':
+      self.program_selection_frame = ProgramSelectionFrame(self.required_inputs_frame, self)
+      self.program_selection_frame.grid(row=2, column=1, padx=5, pady=(0, 15), sticky='w')
+      self.x_separator_mid.grid(row=3, column=1, columnspan=2, sticky='ew')
+    self.unload_data()
     self.refresh_user_interface()
 
   def update_program(self, selection):
     self.program = selection
     self.refresh_user_interface()
   
-  def refresh_user_interface(self):
-    if self.data_selection_method != 'Test':
+  def refresh_user_interface(self):  
+    if self.data_selection_method in ['Single', 'Folder', 'Processor']:
       self.data_loading_frame.grid(row=4, column=1, padx=5, pady=0)
       self.selectDataLabel.grid(row=2, column=0, padx=(0, 50), pady=(2,0))
       self.selectDataButton.grid(row=3, column=0, padx=(0, 50), pady=(0,7))
-    else:
+    else: #Test
       self.data_loading_frame.grid_forget()
       self.selectDataLabel.grid_forget()
       self.selectDataButton.grid_forget()
-      if self.OptionsFrame:
-        self.unload_optional_settings()
-
-    if self.data_selection_method != 'Test' and self.data_selection_method != 'Processor':
+      self.OptionsFrame.grid_forget()
+      
+    if self.data_selection_method == 'Single' or self.data_selection_method == 'Folder':
       self.cohortNameLabel.grid(row=0, column=0, padx=(0, 50), pady=(2, 0))
       self.cohortNameEntry.grid(row=1, column=0, padx=(0, 50), pady=(0, 5))
       self.metaselectDataLabel.grid(row=0, column=2, padx=(50, 0), pady=(2, 0))
@@ -157,31 +154,31 @@ class SkynDataManagerApp(Tk):
       self.createMetadataButton.grid_forget()
       self.y_separator.grid_forget()
 
-    if self.selected_data == '':
-      if self.data_selection_method == 'Single':
-        self.selectDataButton['text'] = 'Select Dataset (.xlsx or .csv)'
-        self.selectDataButton.config(width = 27)
-      elif self.data_selection_method == 'Processor':
-        self.selectDataButton['text'] = 'Select Processor (.pickle)'
-        self.selectDataButton.grid(row=2, column=0, padx=30, pady=30)
-        self.selectDataButton.config(width = 22)
-      else:
-        self.selectDataButton['text'] = 'Select Cohort (Folder of .xlsx and/or .csv files)'
-        self.selectDataButton.config(width = 35)
+    if self.data_selection_method == 'Single':
+      self.selectDataButton['text'] = 'Select Dataset (.xlsx or .csv)'
+      self.selectDataButton.config(width = 27)
+    elif self.data_selection_method == 'Processor':
+      self.selectDataButton['text'] = 'Select Processor (.pickle)'
+      self.selectDataButton.grid(row=3, column=0, padx=5, pady=5)
+      self.selectDataButton.config(width = 22)
+    else:
+      self.selectDataButton['text'] = 'Select Cohort (Folder of .xlsx and/or .csv files)'
+      self.selectDataButton.config(width = 35)
 
     if self.program:
       if self.OptionsFrame:
         self.unload_optional_settings()
-      self.show_optional_settings()
+      if self.data_selection_method != 'Test':
+        self.show_optional_settings()
       if 'T' in self.program:
         self.models = {}
     else:
       if self.OptionsFrame:
         self.unload_optional_settings()
 
-    self.showRunButton()
+    self.show_run_button()
 
-  def showRunButton(self):
+  def show_run_button(self):
     if self.program and self.data_selection_method:
       if self.data_selection_method == 'Test':
         self.runProgramButton.grid(row=35, column=0, pady=(30, 15), padx=(100, 0), sticky='w')
@@ -207,23 +204,22 @@ class SkynDataManagerApp(Tk):
 
   def unload_optional_settings(self):
     self.OptionsFrame.grid_forget()
-    if list(self.defaults.values()) != [self.files_to_merge, self.previous_processor, self.models, self.timestamps_filename, self.data_download_timezone, self.max_dataset_duration, self.subid_i_start, self.subid_i_end, self.condition_i_start, self.condition_i_end, self.episode_identifier_i_start, self.episode_identifer_i_end]:
-      messagebox.showinfo('SDM: Update', 'Settings Reset to Defaults.')
-      self.reset_settings()
+    if list(self.defaults_options.values()) != [self.models, self.files_to_merge, self.data_download_timezone, self.timestamps_filename,  self.max_dataset_duration]:
+      self.reset_optional_settings()
 
-  def reset_settings(self):
+  def reset_optional_settings(self):
     self.files_to_merge = {}
-    self.previous_processor = None
     self.models = {}
     self.timestamps_filename = None
     self.data_download_timezone = -5
     self.max_dataset_duration = 24
-    self.subid_i_start = None
-    self.subid_i_end = None
-    self.condition_i_start = None
-    self.condition_i_end = None
-    self.episode_identifier_i_start = None
-    self.episode_identifer_i_end = None
+
+  def unload_data(self):
+    self.selectDataLabel['text'] = 'Select Data'
+    self.selectDataLabel.config(fg = 'black')
+    self.selectDataButton['text'] = self.selectDataLabelText
+    self.selected_data = ''
+    self.previous_processor = None
   
   def select_skyn_data(self):
     if self.data_selection_method == 'Single':
@@ -231,11 +227,9 @@ class SkynDataManagerApp(Tk):
       if skyn_dataset_file:
         skyn_dataset_filename = os.path.abspath(skyn_dataset_file.name)
         self.selected_data = skyn_dataset_filename
-        file_to_parse_metadata=skyn_dataset_filename.split("\\")[-1]
-        data_configuration_window = DataConfigurationWindow(self, file_to_parse_metadata)
-        data_configuration_window.grab_set()
-        self.wait_window(data_configuration_window)
-        self.selectDataLabel['text'] = f'Dataset selected: {file_to_parse_metadata}'
+        filename=skyn_dataset_filename.split("\\")[-1]
+        self.selectDataLabel['text'] = f'Dataset selected: {filename}'
+        self.verify_filename(filename, os.path.dirname(self.selected_data))
 
     elif self.data_selection_method == 'Processor':
       processor_file = filedialog.askopenfile(mode='r', filetypes=[('Previous Processor', '*.pickle')])
@@ -244,23 +238,92 @@ class SkynDataManagerApp(Tk):
           pickle_in = open(processor_file.name, "rb") 
           skyn_processor = pickle.load(pickle_in)
           pickle_in.close()
-          self.selected_data = skyn_processor
-          self.selectDataLabel['text'] = f'Skyn processor: {str(processor_file.name.split("/")[-1])}'
-        except:
+          model_avail = models_ready(skyn_processor)
+          data_avail = data_ready(skyn_processor)
+          data_avail = all([occasion.condition in ['Alc', 'Non'] for occasion in skyn_processor.occasions])
+          print([occasion.condition for occasion in skyn_processor.occasions]) if data_avail else False
+          print(skyn_processor.models.keys())
+          print(data_avail, 'data avail')
+          print(model_avail, 'model avail')
+          print(skyn_processor.__dict__.items())
+          print(skyn_processor.models.keys())
+          if not model_avail and not data_avail:
+            self.previous_processor = None
+            self.selected_data = ''
+            messagebox.showerror('SDM Error', 'This file does not have data processed, or data is not processsed with known labels (Alc or Non).')
+            self.select_skyn_data()
+          elif data_avail:
+            if not model_avail:
+              messagebox.showinfo('SDM', 'No models detected within file. You will not be able to make predictions using already-trained model. However, you can build a new model using this file.')
+            self.previous_processor = skyn_processor
+            self.selected_data = processor_file.name
+            self.selectDataLabel['text'] = f'Skyn processor: {str(processor_file.name.split("/")[-1])}'
+            self.selectDataLabel.config(fg = 'green')
+            if self.program_selection_frame.grid_info():
+              self.program_selection_frame.update_processor_programs(model_avail)
+            else:
+              self.program_selection_frame = ProgramSelectionFrame(self.required_inputs_frame, self)
+              self.program_selection_frame.grid(row=2, column=1, padx=5, pady=(0, 15), sticky='w')
+              self.x_separator_mid.grid(row=3, column=1, columnspan=2, sticky='ew')
+            
+        except Exception:
+          print(traceback.format_exc())
+          messagebox.showerror('SDM Error', traceback.format_exc())
           self.selectDataLabel['text'] = f'Failed to load: {str(processor_file.name.split("/")[-1])}'
+          self.selectDataLabel.config(fg = 'red')
     else:
       cohort_data_folder = filedialog.askdirectory()
       if cohort_data_folder:
-        self.selected_data = cohort_data_folder + '/'
-        file_to_parse_metadata = [f for f in os.listdir(cohort_data_folder) if os.path.isfile(os.path.join(cohort_data_folder, f))][0]
-        print(file_to_parse_metadata)
-        data_configuration_window = DataConfigurationWindow(self, file_to_parse_metadata)
-        data_configuration_window.grab_set()
-        self.wait_window(data_configuration_window)
-        self.selectDataLabel['text'] = f'Cohort Data:  {cohort_data_folder.split("/")[-1]}'
+        self.verify_directory(cohort_data_folder + '/')
+        
+    self.show_run_button()
 
-    self.showRunButton()
-      
+  def verify_directory(self, directory):
+    print(directory)
+    self.filenames = [file for file in os.listdir(directory)]
+    self.episode_identifiers_required = all([identify_episode_identifier(filename) != None for filename in self.filenames])
+    self.user_confirmation = False
+    if directory_analysis_ready(directory):
+      self.parsing_indices = get_default_parsing_indices(identify_subid(self.filenames[0]), self.episode_identifiers_required)
+      self.selected_data = directory
+      self.update_filename_parsing(self.parsing_indices)
+      confirmation_window = FilenamesConfirmationWindow(self, self.parsing_indices)
+      confirmation_window.grab_set()
+      self.wait_window(confirmation_window)
+      self.user_confirmation = confirmation_window.confirmed
+    if directory_analysis_ready(directory) and self.user_confirmation:
+      self.update_filename_parsing(self.parsing_indices)
+      self.selectDataLabel['text'] = f'Cohort Data:  {self.selected_data.split("/")[-1]}'
+      self.selectDataLabel.config(fg='green')
+    else:
+      self.selectDataLabel.config(fg='black')
+      renameFiles = RenameFilesWindow(self, directory, self.filenames)
+      renameFiles.grab_set()
+      self.wait_window(renameFiles)
+      self.select_skyn_data()
+
+  def verify_filename(self, filename, directory):
+    self.filenames = [file for file in os.listdir(directory)]
+    subid = identify_subid(filename)
+    condition = identify_condition(filename)
+    episode_identifier = identify_episode_identifier(filename)
+    self.episode_identifiers_required = episode_identifier != None
+
+    filename_valid = identify_subid(filename) and identify_condition(filename)
+    self.user_confirmation = False
+    if filename_valid:
+      self.user_confirmation = messagebox.askyesno('SDM', f'Is data set info correct?\nSubID = {subid}\nCondition = {condition}\nEpisode Identifier = {episode_identifier}')
+      print('confirmed?', self.user_confirmation)
+    elif filename_valid and self.user_confirmation:
+      self.parsing_indices = get_default_parsing_indices(identify_subid(self.filenames[0]), self.episode_identifiers_required)
+      self.update_filename_parsing(self.parsing_indices)
+      self.selectDataLabel.config(fg='green')
+    else:
+      renameFiles = RenameFilesWindow(self, self.selected_data, self.filenames)
+      renameFiles.grab_set()
+      self.wait_window(renameFiles)
+      self.select_skyn_data()
+
   def update_filename_parsing(self, indices):
     self.subid_i_start = indices[0]
     self.subid_i_end = indices[1]
@@ -295,7 +358,7 @@ class SkynDataManagerApp(Tk):
       else:
         messagebox.showerror('SDM Error', f'Metadata file must have columns: {", ".join(necessary_columns)}. \nFor example, see file: Resources/Test/Cohort Metadata TEST.xlsx')
     
-    self.showRunButton()
+    self.show_run_button()
 
   def open_metadata_creator(self):
     if self.cohortNameEntry.get() == '':
@@ -318,8 +381,8 @@ class SkynDataManagerApp(Tk):
     if self.data_selection_method == 'Single':
       file = self.selected_data.split("\\")[-1]
       return {
-        'SubID': [file[int(self.subid_i_start):int(self.subid_i_end)+1]],
-        'Condition': [file[int(self.condition_i_start): int(self.condition_i_end)+1]],
+        'SubID': [file[int(self.subid_i_start):int(self.subid_i_end)]+1],
+        'Condition': [file[int(self.condition_i_start): int(self.condition_i_end)]+1],
         'Episode_Identifier': [file[int(self.episode_identifier_i_start): int(self.episode_identifer_i_end)+1]] if all([self.episode_identifier_i_start, self.episode_identifer_i_end]) else [""],
         'Use_Data': ["Y"],
         'TotalDrks': [""],
@@ -327,16 +390,16 @@ class SkynDataManagerApp(Tk):
       }
     else:
       if None in [self.episode_identifier_i_start, self.episode_identifer_i_end]:
-          episode_identifiers = ["" for i in range(0, len(
-                                  [file 
-                                    for file in os.listdir(self.selected_data) 
-                                    if (file[-3:]== 'csv') or (file[-4:] == 'xlsx')
-                                  ]))
-                                ]
+        episode_identifiers = ["" for i in range(0, len(
+                                [file 
+                                  for file in os.listdir(self.selected_data) 
+                                  if (file[-3:]== 'csv') or (file[-4:] == 'xlsx')
+                                ]))
+                              ]
       else:
         episode_identifiers = [file[
                                 int(self.episode_identifier_i_start)
-                                :int(self.episode_identifer_i_end) + 1] 
+                                :int(self.episode_identifer_i_end)+1] 
                               for file in os.listdir(self.selected_data) 
                               if (file[-3:] == 'csv') or (file[-4:] == 'xlsx')]
       return {
@@ -521,7 +584,6 @@ class SkynDataManagerApp(Tk):
             occasion.make_prediction(self.models) # The only difference between P and PP
             occasion.export_workbook()
 
-            
       SDM_run_settings = get_sdm_run_settings(self, self.data_selection_method, program, data_out, graphs_out, analyses_out, cohort_name)
       SDM_run_settings.to_excel(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/program_settings_{datetime.now().strftime("%H-%M-%S")}.xlsx',
                                 sheet_name='Program Settings')

@@ -23,8 +23,9 @@ class OptionalSettingsFrame(Frame):
       self.mergeVariablesButton.grid(row=1, column=0, padx=5, pady=5)
 
     #checkbox to enable cropping of TAC datasets
-    self.cropDatasetsButton = Button(self, text='Crop Datasets', command=self.open_crop_settings_window)
-    self.cropDatasetsButton.grid(row=2, column=0, padx=5, pady=5)
+    if self.parent.data_selection_method != 'Processor':
+      self.cropDatasetsButton = Button(self, text='Crop Datasets', command=self.open_crop_settings_window)
+      self.cropDatasetsButton.grid(row=2, column=0, padx=5, pady=5)
 
     #checkbox to load model
     self.models = self.parent.models

@@ -81,9 +81,12 @@ def crop_using_timestamp(subid, condition, episode_identifier, dataset, metadata
       hour_adjustment = 0
     else:
       pass_test[Subid_condition] = 1
-      time_zone_code = int(session_timestamp.loc[0, 'Time Zone'].split(':')[0]) if session_timestamp.loc[0, 'Time Zone'] else skyn_download_timezone
-      hour_adjustment = time_zone_code - (skyn_download_timezone)
-      dataset.loc[:, 'Time_Adjusted'] = dataset.loc[:, 'datetime'] + pd.Timedelta(hours=hour_adjustment)
+      if skyn_download_timezone != 999:
+        time_zone_code = int(session_timestamp.loc[0, 'Time Zone'].split(':')[0]) if session_timestamp.loc[0, 'Time Zone'] else skyn_download_timezone
+        hour_adjustment = time_zone_code - (skyn_download_timezone)
+        dataset.loc[:, 'Time_Adjusted'] = dataset.loc[:, 'datetime'] + pd.Timedelta(hours=hour_adjustment)
+      else:
+        dataset.loc[:, 'Time_Adjusted'] = dataset.loc[:, 'datetime'] + pd.Timedelta(hours=0)
       datetime_begin_drinking, datetime_end_episode = get_session_time_range(session_timestamp, max_duration)
       cropped_plot_path = plot_cropping(dataset, datetime_begin_drinking, datetime_end_episode, subid, condition, episode_identifier, plot_directory, max_duration)
       cropped_clean_dataset = dataset[(dataset['Time_Adjusted'] > datetime_begin_drinking) & (dataset['Time_Adjusted'] < datetime_end_episode)]

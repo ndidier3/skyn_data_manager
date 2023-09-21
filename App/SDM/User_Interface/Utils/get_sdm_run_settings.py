@@ -54,7 +54,7 @@ def get_sdm_run_settings(self, data_format, program, data_out, graphs_out, analy
         return pd.DataFrame(dict(zip(
             ['program', 'cohort name', 'raw data folder', 'processed data folder', 'graphs folder', 'model results folder', 'Loaded already-processed data', 'files used in merging', 'chosen merge variables', 'Subject ID column key', 'Timestamps to crop pre-episode data', 'Timezone of data download', 'Max dataset duration'],
             [[program_descriptions[self.program]], 
-             [self.cohort_name], 
+             [cohort_name], 
              [self.selected_data], 
              [data_out], 
              [graphs_out],

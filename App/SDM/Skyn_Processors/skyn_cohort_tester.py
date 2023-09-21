@@ -17,7 +17,7 @@ class skynCohortTester:
     self.stats = cohort_processor.stats
     self.predictions = {}
 
-  def make_binary_predictions(self, export_python_object=True, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent', 'major_outlier_N', 'minor_outlier_N']):
+  def make_binary_predictions(self, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent', 'major_outlier_N', 'minor_outlier_N']):
     for version in ['Cleaned', 'Raw']:
       features = self.stats[version]
       if 'major_outlier_N' not in features.columns.tolist():
@@ -32,8 +32,7 @@ class skynCohortTester:
     python_object_folder = self.analyses_out_folder + '/Python_Objects'
     if not os.path.exists(python_object_folder):
       os.mkdir(python_object_folder)
-    if export_python_object:
-      save(self, self.cohort_name + '_predictions', python_object_folder)
+    
 
   def create_feature_and_predictions_report(self):
     writer = pd.ExcelWriter(f'{self.analyses_out_folder}/SDM_predictions_{self.cohort_name}.xlsx', engine='xlsxwriter')

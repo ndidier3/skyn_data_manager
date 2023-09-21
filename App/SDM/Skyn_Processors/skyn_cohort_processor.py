@@ -126,14 +126,15 @@ class skynCohortProcessor:
     if export_python_object:
       save(self, self.cohort_name + '_features_only', self.python_object_folder)
   
-  def make_predictions(self, models, prediction_type='binary'):
+  def make_predictions(self, models, prediction_type='binary', save_processor=True):
     if prediction_type == 'binary':
       tester = skynCohortTester(self, models)
       tester.make_binary_predictions(predictors=self.predictors)
       tester.create_feature_and_predictions_report()
-    #if prediction_type == 'binge':
+      if save_processor:
+        save(self, self.cohort_name + '_predictions', self.python_object_folder)
     
-  def model_dev_and_test(self, force_refresh=False):
+  def model_dev_and_test(self, force_refresh=False, save_processor=True, save_models=True):
     if not os.path.exists(self.model_figures_folder):
       os.mkdir(self.model_figures_folder)
     self.load_stats(force_refresh=force_refresh)
@@ -144,11 +145,13 @@ class skynCohortProcessor:
     self.load_stats(force_refresh=force_refresh)
     self.principal_component_analysis('Cleaned')
     self.principal_component_analysis('Raw')
-    save(self, self.cohort_name + '_models_and_predictions', self.python_object_folder)
-    save(self.models['random_forest_cleaned'], self.cohort_name + 'RF_model_cleaned', self.python_object_folder)
-    save(self.models['logistic_regression_cleaned'], self.cohort_name + 'LR_model_cleaned', self.python_object_folder)
-    save(self.models['random_forest_raw'], self.cohort_name + 'RF_model_raw', self.python_object_folder)
-    save(self.models['logistic_regression_raw'], self.cohort_name + 'LR_model_raw', self.python_object_folder)
+    if save_processor:
+      save(self, self.cohort_name + '_models_and_predictions', self.python_object_folder)
+    if save_models:
+      save(self.models['random_forest_cleaned'], self.cohort_name + 'RF_model_cleaned', self.python_object_folder)
+      save(self.models['logistic_regression_cleaned'], self.cohort_name + 'LR_model_cleaned', self.python_object_folder)
+      save(self.models['random_forest_raw'], self.cohort_name + 'RF_model_raw', self.python_object_folder)
+      save(self.models['logistic_regression_raw'], self.cohort_name + 'LR_model_raw', self.python_object_folder)
   
   def load_stats(self, force_refresh=True):
     data = {

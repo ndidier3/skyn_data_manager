@@ -13,13 +13,12 @@ class CreateMetadataWindow:
     self.__subWindow.geometry("1200x900")
 
     self.data = data
-    print(data)
     self.cohort_name = cohort_name
 
     self.metadata_frame = Frame(self.__subWindow, width=600, height=800, highlightbackground="black", highlightthickness=2)
     self.metadata_frame.grid(row=0, column=1)
 
-    self.excludeSubidsLabelText = 'First, confirm that SubIDs, Conditions, and Episode Identifiers have been properly read for each episode listed below. \n           If any are incorrect, exit this window and then revise either index submissions in the previous window or \n          filenames in your cohort data folder. \nNext, select each episode that you want to exclude from analyses. \nTo create metadata file, click the button below.'
+    self.excludeSubidsLabelText = 'Confirm that SubIDs, Conditions, and Episode Identifiers have been properly read for each episode listed below.\nNext, select each episode that you want to exclude from analyses. \nTo create metadata file, click the button below.'
     self.excludeSubidsLabel = Label(self.metadata_frame, text = self.excludeSubidsLabelText, anchor='w', justify='left')
     self.excludeSubidsLabel.grid(row=1, column=1, padx=5, pady=5)
 

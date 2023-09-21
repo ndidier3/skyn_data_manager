@@ -79,6 +79,7 @@ class MergeFilesWindow(Toplevel):
     if file:
       excel_file = os.path.abspath(file.name)
       workbook = openpyxl.load_workbook(excel_file)
+      self.reset_merge_file_UI()
       self.selected_sheet == 0
       if len(workbook.sheetnames) > 1:
         select_tab_window = SelectTabWindow(self, workbook.sheetnames)

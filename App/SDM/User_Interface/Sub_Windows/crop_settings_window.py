@@ -39,7 +39,7 @@ class CropSettingsWindow(Toplevel):
     self.data_download_timezone = self.main.data_download_timezone
     self.timezoneVariable = IntVar()
     self.timezoneVariable.set(self.data_download_timezone)
-    self.timezoneLabelText = '1. In which time zone was the data downloaded?'
+    self.timezoneLabelText = "1. In which time zone was the data downloaded?\nIf participants downloaded their data, enter 999."
     self.timezoneLabel = Label(self, text = self.timezoneLabelText)
     self.timezoneEntry = Entry(self, text = self.timezoneVariable, width = 6)
 
@@ -74,8 +74,8 @@ class CropSettingsWindow(Toplevel):
       self.timestamps_data = pd.read_excel(excel_file)
   
   def submit(self):
-    if not self.timezoneEntry.get().lstrip('-').isdigit():
-      messagebox.showerror('SDM Error', 'Timezone must be an integer corresponding to a UTC timezone.')
+    if not self.timezoneEntry.get().lstrip('-').isdigit() and self.timezoneEntry.get() != 999:
+      messagebox.showerror('SDM Error', 'Timezone must be an integer corresponding to a UTC timezone, unless participants downloaded their own Skyn data, in which case use 999.')
     elif not self.maxDatasetDurationEntry.get().isnumeric():
       messagebox.showerror('SDM Error', 'Max dataset duration must be an integer')
     else:
