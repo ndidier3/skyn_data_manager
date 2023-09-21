@@ -379,8 +379,8 @@ class SkynDataManagerApp(Tk):
     if self.data_selection_method == 'Single':
       file = os.path.split(self.selected_data)[-1]
       return {
-        'SubID': [file[int(self.subid_i_start):int(self.subid_i_end)]+1],
-        'Condition': [file[int(self.condition_i_start): int(self.condition_i_end)]+1],
+        'SubID': [file[int(self.subid_i_start):int(self.subid_i_end) + 1]],
+        'Condition': [file[int(self.condition_i_start): int(self.condition_i_end) + 1]],
         'Episode_Identifier': [file[int(self.episode_identifier_i_start): int(self.episode_identifer_i_end)+1]] if all([self.episode_identifier_i_start, self.episode_identifer_i_end]) else [""],
         'Use_Data': ["Y"],
         'TotalDrks': [""],
