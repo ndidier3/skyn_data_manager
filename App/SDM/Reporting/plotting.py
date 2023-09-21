@@ -5,7 +5,6 @@ import os
 from SDM.Configuration.configuration import normalize_column
 from SDM.Stats.get_feature_importances import get_feature_importances
 import numpy as np
-from sklearn.metrics import plot_roc_curve
 from sklearn.tree import plot_tree
 
 

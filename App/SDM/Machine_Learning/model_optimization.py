@@ -4,7 +4,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
-from sklearn.metrics import plot_roc_curve
 from sklearn.tree import plot_tree
 from sklearn.model_selection import cross_validate, cross_val_score, cross_val_predict
 from sklearn.model_selection import GroupKFold
