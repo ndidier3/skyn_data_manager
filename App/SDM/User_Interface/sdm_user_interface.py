@@ -228,7 +228,8 @@ class SkynDataManagerApp(Tk):
       if skyn_dataset_file:
         skyn_dataset_filename = os.path.abspath(skyn_dataset_file.name)
         self.selected_data = skyn_dataset_filename
-        filename=skyn_dataset_filename.split("\\")[-1]
+        print('this gets split', skyn_dataset_filename)
+        filename=os.path.split(skyn_dataset_filename)[-1]
         self.selectDataLabel['text'] = f'Dataset selected: {filename}'
         skyn_dataset_file.close()
         self.verify_filename(filename, os.path.dirname(self.selected_data))
@@ -376,7 +377,7 @@ class SkynDataManagerApp(Tk):
 
   def prepare_filename_data(self):
     if self.data_selection_method == 'Single':
-      file = self.selected_data.split("\\")[-1]
+      file = os.path.split(self.selected_data)[-1]
       return {
         'SubID': [file[int(self.subid_i_start):int(self.subid_i_end)]+1],
         'Condition': [file[int(self.condition_i_start): int(self.condition_i_end)]+1],
@@ -531,8 +532,7 @@ class SkynDataManagerApp(Tk):
           run_procedure = False
           messagebox.showerror('Error', 'Invalid program selection.')
       if data_format == 'Single':
-        path_length_to_folder = len("/".join(self.selected_data.split("\\")[:-1]) + '/')
-        print(self.selected_data.split("\\")[:-1])
+        path_length_to_folder = len("/".join(os.path.split(self.selected_data)[:-1]) + '/')
         occasion = skynDatasetProcessor(
           self.selected_data,
           data_out,

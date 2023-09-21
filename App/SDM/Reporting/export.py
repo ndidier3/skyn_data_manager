@@ -61,7 +61,7 @@ def load(name, folder):
   return object
 
 def load_default_model():
-  pickle_in = open('App\SDM\Default_Model\MARSRF_model.pickle', "rb")
+  pickle_in = open('App/SDM/Default_Model/MARSRF_model.pickle', "rb")
   object = pickle.load(pickle_in)
   pickle_in.close()
   return {'RF_default': object}
