@@ -135,7 +135,8 @@ class SkynDataManagerApp(Tk):
       self.data_loading_frame.grid_forget()
       self.selectDataLabel.grid_forget()
       self.selectDataButton.grid_forget()
-      self.OptionsFrame.grid_forget()
+      if self.OptionsFrame:
+        self.OptionsFrame.grid_forget()
       
     if self.data_selection_method == 'Single' or self.data_selection_method == 'Folder':
       self.cohortNameLabel.grid(row=0, column=0, padx=(0, 50), pady=(2, 0))
@@ -229,6 +230,7 @@ class SkynDataManagerApp(Tk):
         self.selected_data = skyn_dataset_filename
         filename=skyn_dataset_filename.split("\\")[-1]
         self.selectDataLabel['text'] = f'Dataset selected: {filename}'
+        skyn_dataset_file.close()
         self.verify_filename(filename, os.path.dirname(self.selected_data))
 
     elif self.data_selection_method == 'Processor':
@@ -241,12 +243,7 @@ class SkynDataManagerApp(Tk):
           model_avail = models_ready(skyn_processor)
           data_avail = data_ready(skyn_processor)
           data_avail = all([occasion.condition in ['Alc', 'Non'] for occasion in skyn_processor.occasions])
-          print([occasion.condition for occasion in skyn_processor.occasions]) if data_avail else False
-          print(skyn_processor.models.keys())
-          print(data_avail, 'data avail')
-          print(model_avail, 'model avail')
-          print(skyn_processor.__dict__.items())
-          print(skyn_processor.models.keys())
+
           if not model_avail and not data_avail:
             self.previous_processor = None
             self.selected_data = ''
@@ -314,12 +311,12 @@ class SkynDataManagerApp(Tk):
     if filename_valid:
       self.user_confirmation = messagebox.askyesno('SDM', f'Is data set info correct?\nSubID = {subid}\nCondition = {condition}\nEpisode Identifier = {episode_identifier}')
       print('confirmed?', self.user_confirmation)
-    elif filename_valid and self.user_confirmation:
-      self.parsing_indices = get_default_parsing_indices(identify_subid(self.filenames[0]), self.episode_identifiers_required)
+    if filename_valid and self.user_confirmation:
+      self.parsing_indices = get_default_parsing_indices(identify_subid(filename), self.episode_identifiers_required)
       self.update_filename_parsing(self.parsing_indices)
       self.selectDataLabel.config(fg='green')
     else:
-      renameFiles = RenameFilesWindow(self, self.selected_data, self.filenames)
+      renameFiles = RenameFilesWindow(self, directory, self.filenames)
       renameFiles.grab_set()
       self.wait_window(renameFiles)
       self.select_skyn_data()
@@ -440,15 +437,18 @@ class SkynDataManagerApp(Tk):
     data_format = self.data_selection_method 
 
     self.models = self.models if len(list((self.models.keys())))>0 else load_default_model()
+
     if data_format == 'Test':
       cohort_name = 'Test'
-      self.selected_data = os.path.abspath('Raw/TestData/')
-      self.subid_i_start = 0
-      self.subid_i_end = 3
-      self.condition_i_start = 5
-      self.condition_i_end = 8
-      self.episode_identifier_i_start = 10
-      self.episode_identifer_i_end = 13
+      self.selected_data = os.path.abspath('Raw/TestData/') + '/'
+      self.filenames = [file for file in os.listdir(self.selected_data)]
+      self.parsing_indices = get_default_parsing_indices(identify_subid(self.filenames[0]), True)
+      self.subid_i_start = self.parsing_indices[0]
+      self.subid_i_end = self.parsing_indices[1]
+      self.condition_i_start = self.parsing_indices[2]
+      self.condition_i_end = self.parsing_indices[3]
+      self.episode_identifier_i_start = self.parsing_indices[4]
+      self.episode_identifer_i_end = self.parsing_indices[5]
       self.metadata = 'Resources/Test/Cohort Metadata TEST.xlsx'
     elif data_format == 'Processor':
       cohort_name = self.previous_processor.cohort_name

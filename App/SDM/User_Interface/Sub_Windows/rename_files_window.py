@@ -142,6 +142,6 @@ class RenameFilesWindow(Toplevel):
         filepath = 'Results/File_Renaming/' + f'{self.directory.split("/")[-2]}_renaming_{date.today().strftime("%m.%d.%Y")}{datetime.now().strftime("%H-%M-%S")}.xlsx'
         print(filenames_df)
         filenames_df.to_excel(filepath, index=False)
-        messagebox.showinfo('SDM Update', f'Previous and new filenames are recorded in excel file located here:')
+        messagebox.showinfo('SDM Update', f'Previous and new filenames are recorded in excel file located here: {filepath}')
 
       
