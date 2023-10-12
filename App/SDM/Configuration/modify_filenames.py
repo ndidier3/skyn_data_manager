@@ -1,5 +1,7 @@
 import os
 import pandas as pd
+import string
+import random
 
 def modify_filenames(directory_path, insert_index, insert_character):
 
@@ -54,6 +56,11 @@ def modify_filenames_with_randomization(directory_path, randomization_filepath, 
             new_filename = filename.replace(s, session_order[i])
             print('new filename: ', new_filename)
             os.rename(directory_absolute_path + filename, directory_absolute_path + new_filename)
+
+def generate_random_id(length=4):
+  characters = string.ascii_letters + string.digits  # Letters and digits
+  random_id = ''.join(random.choice(characters) for _ in range(length))
+  return random_id
 
 # modify_filenames('raw/C4_field/', 0, '#')
 # modify_filenames('raw/C4_field/', 8, '')

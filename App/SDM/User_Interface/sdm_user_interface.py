@@ -26,15 +26,18 @@ class SkynDataManagerApp(Tk):
     self.geometry("1400x800")
     self.title("SDM")
 
-    self.params = {
-      'show_merge_info': True
-    }
+    style = ttk.Style()
+    style.configure("BW-Label", foreground="black", background="white", fontsize=14)
+    style.configure("Header", foreground="black", background="white", fontsize=14)
+
 
     self.required_inputs_frame = Frame(self, highlightbackground="black", highlightthickness=3)
     self.required_inputs_frame.grid(row=0, column=0, padx=0, pady=0)
 
-    self.mainHeader = Label(self.required_inputs_frame, text = 'Skyn Data Manager')
-    self.mainHeader.config(font=(None, 12, 'bold'))
+    self.header_style = (None, 16, 'bold')
+    self.label_style = (None, 13)
+
+    self.mainHeader = Label(self.required_inputs_frame, text = 'Skyn Data Manager', font=self.header_style)
     self.mainHeader.grid(row=0, column=1, padx=5, pady=8)
 
     self.data_selection_method = None
@@ -128,6 +131,9 @@ class SkynDataManagerApp(Tk):
   
   def refresh_user_interface(self):  
     if self.data_selection_method in ['Single', 'Folder', 'Processor']:
+      self.data_loading_frame.grid_forget()
+      self.selectDataLabel.grid_forget()
+      self.selectDataButton.grid_forget()
       self.data_loading_frame.grid(row=4, column=1, padx=5, pady=0)
       self.selectDataLabel.grid(row=2, column=0, padx=(0, 50), pady=(2,0))
       self.selectDataButton.grid(row=3, column=0, padx=(0, 50), pady=(0,7))

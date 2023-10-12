@@ -12,14 +12,11 @@ class ProgramSelectionFrame(Frame):
     self.parent = parent
     self.main_window = main_window
 
-    self.header = Label(self, text='Select SDM program:')
-    self.header.grid(row=0, column=0, padx=5, pady=(3, 3), sticky='w')
-    self.header.config(font=(None, 10, 'bold'))
+    self.header = Label(self, text='Select SDM program:', font=(self.main_window.header_style))
+    self.header.grid(row=1, column=0, padx=5, pady=(3, 3), sticky='w')
 
     self.var = StringVar()
     self.var.set(None)
-
-    self.custom_font = ('Arial', 9)
 
     self.signal_processing = self.main_window.data_selection_method != 'Processor'
 
@@ -28,16 +25,16 @@ class ProgramSelectionFrame(Frame):
       self.can_use_already_trained_models = models_ready(self.main_window.previous_processor)
 
     if self.signal_processing:
-      self.signalProcessingRadiobutton = Radiobutton(self, text = 'Process TAC signal (cleaning, smoothing, and feature generation).', command=self.update_program, variable=self.var, value = 'P', font=self.custom_font)
-      self.signalProcessingRadiobutton.grid(row=1, column=0, padx=5, pady=1, sticky='w')
+      self.signalProcessingRadiobutton = Radiobutton(self, text = 'Process TAC signal (cleaning, smoothing, and feature generation).', command=self.update_program, variable=self.var, value = 'P', font=self.main_window.label_style)
+      self.signalProcessingRadiobutton.grid(row=2, column=0, padx=5, pady=1, sticky='w')
 
     if self.can_use_already_trained_models:
-      self.makePredictionsRadiobutton = Radiobutton(self, text = 'Process TAC signal and make predictions using already-trained model.' if self.signal_processing else 'Make predictions using already-trained model.', command=self.update_program, variable=self.var, value = 'PP', font=self.custom_font)
-      self.makePredictionsRadiobutton.grid(row=2, column=0, padx=5, pady=1, sticky='w')
+      self.makePredictionsRadiobutton = Radiobutton(self, text = 'Process TAC signal and make predictions using already-trained model.' if self.signal_processing else 'Make predictions using already-trained model.', command=self.update_program, variable=self.var, value = 'PP', font=self.main_window.label_style)
+      self.makePredictionsRadiobutton.grid(row=3, column=0, padx=5, pady=1, sticky='w')
 
     if self.main_window.data_selection_method != 'Single': 
-      self.modelTrainingRadiobutton = Radiobutton(self, text = 'Process TAC signal, train new model, and make predictions using new model.' if self.signal_processing else 'Train new model and make predictions using new model.', command=self.update_program, variable=self.var, value = 'PTP', font=self.custom_font)
-      self.modelTrainingRadiobutton.grid(row=3, column=0, padx=5, pady=1, sticky='w')
+      self.modelTrainingRadiobutton = Radiobutton(self, text = 'Process TAC signal, train new model, and make predictions using new model.' if self.signal_processing else 'Train new model and make predictions using new model.', command=self.update_program, variable=self.var, value = 'PTP', font=self.main_window.label_style)
+      self.modelTrainingRadiobutton.grid(row=4, column=0, padx=5, pady=1, sticky='w')
       
     self.main_window = main_window
     self.program = self.main_window.program
@@ -48,8 +45,7 @@ class ProgramSelectionFrame(Frame):
 
   def update_processor_programs(self, can_use_already_trained_models):
     if can_use_already_trained_models:
-      self.makePredictionsRadiobutton = Radiobutton(self, text = 'Process TAC signal and make predictions using already-trained model.' if self.signal_processing else 'Make predictions using already-trained model.', command=self.update_program, variable=self.var, value = 'PP', font=self.custom_font)
-      self.makePredictionsRadiobutton.grid(row=2, column=0, padx=5, pady=1, sticky='w')
+      self.makePredictionsRadiobutton = Radiobutton(self, text = 'Process TAC signal and make predictions using already-trained model.' if self.signal_processing else 'Make predictions using already-trained model.', command=self.update_program, variable=self.var, value = 'PP', font=self.main_window.label_style)
+      self.makePredictionsRadiobutton.grid(row=3, column=0, padx=5, pady=1, sticky='w')
     else:
       self.makePredictionsRadiobutton.grid_forget()
-
