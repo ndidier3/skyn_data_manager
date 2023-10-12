@@ -18,7 +18,7 @@ class FileSplittingToolWindow(Toplevel):
     self.parent = parent
     self.main_window = main_window
 
-    self.header = Label(self, text = "Complete the following prompts to split a Skyn data set into multiple data sets", font = self.main_window.header_style)
+    self.header = Label(self, text = "Complete the following prompts to split a raw Skyn dataset into multiple datasets", font = self.main_window.header_style)
     self.header.grid(row=0, column=0, padx=2, pady=5)
 
     self.frame = Frame(self)
