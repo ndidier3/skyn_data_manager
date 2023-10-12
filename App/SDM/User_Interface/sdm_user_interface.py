@@ -10,6 +10,7 @@ from SDM.User_Interface.Sub_Windows.filenames_confirmation_window import Filenam
 from SDM.User_Interface.Sub_Windows.rename_files_window import RenameFilesWindow
 from SDM.User_Interface.Utils.filename_tools import *
 from SDM.User_Interface.Utils.get_sdm_run_settings import get_sdm_run_settings
+from SDM.User_Interface.Utils.get_font_size import get_font_size
 from tkinter import *
 from tkinter import filedialog, ttk
 from tkinter import messagebox
@@ -33,9 +34,9 @@ class SkynDataManagerApp(Tk):
 
     self.required_inputs_frame = Frame(self, highlightbackground="black", highlightthickness=3)
     self.required_inputs_frame.grid(row=0, column=0, padx=0, pady=0)
-
-    self.header_style = (None, 16, 'bold')
-    self.label_style = (None, 13)
+    
+    self.header_style = (None, get_font_size('header'), 'bold')
+    self.label_style = (None, get_font_size('label'))
 
     self.mainHeader = Label(self.required_inputs_frame, text = 'Skyn Data Manager', font=self.header_style)
     self.mainHeader.grid(row=0, column=1, padx=5, pady=8)
