@@ -27,47 +27,47 @@ class FileSplittingToolWindow(Toplevel):
 
     self.data_to_split = pd.DataFrame()
     self.selectFileButton = Button(self.frame, text = "Select File to Split", command = self.open_file)
-    self.selectedFileLabel = Label(self.frame, text = "")
+    self.selectedFileLabel = Label(self.frame, text = "", font=self.main_window.label_style)
     self.selectedFileLabel.grid(row=1, column=0, pady=(5,2), padx=(0,5), sticky='w')
     self.selectFileButton.grid(row=1, column=1, pady=(5,2), padx=(5,0), sticky='e')
 
     self.split_time_options = [str(i+1) + ':00' for i in range(0, 24)]
     self.split_time = StringVar()
     self.split_time.set(None)
-    self.splitTimeStartLabel = Label(self.frame, text = 'Select the hour of the day where splitting should occur.')
+    self.splitTimeStartLabel = Label(self.frame, text = 'Select the hour of the day where splitting should occur.', font=self.main_window.label_style)
     self.splitTimeOptionMenu = OptionMenu(self.frame, self.split_time, *self.split_time_options, command=self.show_interval_options)
 
     self.interval_options = ['Day-Level', 'Week-Level']
     self.interval = StringVar()
     self.interval.set(None)
-    self.intervalLabel = Label(self.frame, text = f'Select frequency at which the data should be split at {self.split_time.get()}')
+    self.intervalLabel = Label(self.frame, text = f'Select frequency at which the data should be split at {self.split_time.get()}', font=self.main_window.label_style)
     self.intervalOptionMenu = OptionMenu(self.frame, self.interval, *self.interval_options, command = self.show_remaining_prompts)
 
     self.exclude_intervals = IntVar()
-    self.excludeIntervalsCheckbuttonLabel = Label(self.frame, text = 'Check the box to exclude data at certain times of the day.')
+    self.excludeIntervalsCheckbuttonLabel = Label(self.frame, text = 'Check the box to exclude data at certain times of the day.', font=self.main_window.label_style)
     self.excludeIntervalsCheckbutton = Checkbutton(self.frame, text ='', variable=self.exclude_intervals, command=self.show_exclude_interval_options)
 
     self.exclude_start_options = [str(i+1) + ':00' for i in range(0, 24)]
     self.exclude_start = StringVar()
     self.exclude_start.set(None)
-    self.excludeStartLabel = Label(self.frame, text = 'Select time to begin excluding data.')
+    self.excludeStartLabel = Label(self.frame, text = 'Select time to begin excluding data.', font=self.main_window.label_style)
     self.excludeStartOptionMenu = OptionMenu(self.frame, self.exclude_start, *self.exclude_start_options, command = lambda x: self.exclude_start.set(x))
 
     self.exclude_end_options = [str(i+1) + ':00' for i in range(0, 24)]
     self.exclude_end = StringVar()
     self.exclude_end.set(None)
-    self.excludeEndLabel = Label(self.frame, text = 'Select time to finish excluding data.')
+    self.excludeEndLabel = Label(self.frame, text = 'Select time to finish excluding data.', font=self.main_window.label_style)
     self.excludeEndOptionMenu = OptionMenu(self.frame, self.exclude_end, *self.exclude_end_options, command = lambda x: self.exclude_end.set(x))
 
     self.export_folder = ''
     self.selectExportFolderButton = Button(self.frame, text = "Select Export Folder", command = self.open_folder)
-    self.selectedExportFolderLabel = Label(self.frame, text = "")
+    self.selectedExportFolderLabel = Label(self.frame, text = "", font=self.main_window.label_style)
 
     self.one_subject = IntVar()
-    self.oneSubidLabel = Label(self.frame, text = 'Check the box if all data corresponds to a single person.')
+    self.oneSubidLabel = Label(self.frame, text = 'Check the box if all data corresponds to a single person.', font=self.main_window.label_style)
     self.oneSubidCheckbutton = Checkbutton(self.frame, variable = self.one_subject, command = self.show_subid)
 
-    self.subidLabel = Label(self.frame, text = 'Enter SubID')
+    self.subidLabel = Label(self.frame, text = 'Enter SubID', font=self.main_window.label_style)
     self.subidEntry = Entry(self.frame, width = 15)
 
     self.executeFileSplittingButton = Button(self, text = 'Split Files', command = self.split_file)
