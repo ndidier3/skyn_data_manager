@@ -37,7 +37,7 @@ class FileSplittingToolWindow(Toplevel):
     self.splitTimeStartLabel = Label(self.frame, text = 'Select the hour of the day where splitting should occur.', font=self.main_window.label_style)
     self.splitTimeOptionMenu = OptionMenu(self.frame, self.split_time, *self.split_time_options, command=self.show_interval_options)
 
-    self.interval_options = ['Day-Level', 'Week-Level']
+    self.interval_options = ['Day-Level']
     self.interval = StringVar()
     self.interval.set(None)
     self.intervalLabel = Label(self.frame, text = f'Select frequency at which the data should be split at {self.split_time.get()}', font=self.main_window.label_style)
