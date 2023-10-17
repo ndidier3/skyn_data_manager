@@ -3,13 +3,15 @@ Raw/C4_errors/
 Raw/C4_field/
 Raw/C4_lab/
 Raw/MARS - Copy/
+Raw/YW field data/
 Raw/on_hold/
-Raw/fieldDataYW
+Raw/fieldDataYW/
+Raw/testSplit/
 Resources/C4Field Metadata.xlsx
 Resources/C4Lab Metadata.xlsx
 Resources/C4 Measures/
 resources/*
-
+.DS_Store
 /Results/*
 dist/
 build/

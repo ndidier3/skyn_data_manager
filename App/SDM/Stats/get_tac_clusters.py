@@ -9,7 +9,7 @@ def get_distortions(data, k_max):
     k_values_to_test = range(1, k_max)
     for k in k_values_to_test:
         tac = data['TAC'].to_numpy().reshape(-1, 1)
-        kmeansModel = KMeans(n_clusters=k)
+        kmeansModel = KMeans(n_clusters=k, n_init='auto')
         kmeansModel.fit(tac)
         distortions.append(kmeansModel.inertia_)
     return distortions, k_values_to_test
@@ -20,7 +20,7 @@ def get_knee(distortions, k_values_to_test):
 
 def label_clusters(data, optimal_k):
     tac = data['TAC'].to_numpy().reshape(-1, 1)
-    kmeans = KMeans(n_clusters=optimal_k)
+    kmeans = KMeans(n_clusters=optimal_k, n_init='auto')
     prediction = kmeans.fit_predict(tac)
     data['cluster'] = prediction
     return data
