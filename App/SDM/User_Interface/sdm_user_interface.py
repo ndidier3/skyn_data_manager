@@ -26,6 +26,7 @@ class SkynDataManagerApp(Tk):
     super().__init__()
     self.geometry("1400x800")
     self.title("SDM")
+    self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     style = ttk.Style()
     style.configure("BW-Label", foreground="black", background="white", fontsize=14)
@@ -592,12 +593,16 @@ class SkynDataManagerApp(Tk):
             occasion.make_prediction(self.models) # The only difference between P and PP
             occasion.export_workbook()
 
-      SDM_run_settings = get_sdm_run_settings(self, self.data_selection_method, program, data_out, graphs_out, analyses_out, cohort_name)
-      SDM_run_settings.to_excel(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/program_settings_{datetime.now().strftime("%H-%M-%S")}.xlsx',
-                                sheet_name='Program Settings')
-      messagebox.showinfo("Skyn Data Manager", f'Program complete. Program settings saved here: Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/.')
-
     except Exception:
       print(traceback.format_exc())
       messagebox.showerror('Error', traceback.format_exc())
 
+    finally:
+      SDM_run_settings = get_sdm_run_settings(self, self.data_selection_method, program, data_out, graphs_out, analyses_out, cohort_name)
+      writer = pd.ExcelWriter(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/program_settings_{datetime.now().strftime("%H-%M-%S")}.xlsx')
+      SDM_run_settings.to_excel(writer, sheet_name='Program Settings', index=False)
+      writer.save()
+      messagebox.showinfo("Skyn Data Manager", f'Program complete. Program settings saved here: Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/.')
+
+  def on_closing(self):
+    self.destroy()
