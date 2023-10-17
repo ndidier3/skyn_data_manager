@@ -10,25 +10,25 @@ import numpy as np
 import traceback
 
 class skynDatasetProcessor:
-  def __init__(self, path, data_out_folder, graphs_out_folder, subid_index_start, subid_index_end, condition_index_start, condition_index_end, episode_identifier_index_start = None, episode_identifier_index_end = None, metadata_path = None, episode_start_timestamps_path = None, skyn_download_timezone = -5, max_duration = 18):
+  def __init__(self, path, data_out_folder, graphs_out_folder, subid_index_start, subid_index_end, condition_index_start, condition_index_end, dataset_identifier_index_start = None, dataset_identifier_index_end = None, metadata_path = None, episode_start_timestamps_path = None, skyn_download_timezone = -5, max_duration = 18):
     self.path = path
     self.subid_index_start = subid_index_start
     self.subid_index_end = subid_index_end
     self.condition_index_start = condition_index_start
     self.condition_index_end = condition_index_end
-    self.episode_identifier_index_start = episode_identifier_index_start
-    self.episode_identifier_index_end = episode_identifier_index_end
+    self.dataset_identifier_index_start = dataset_identifier_index_start
+    self.dataset_identifier_index_end = dataset_identifier_index_end
     print(path[condition_index_start:condition_index_end+1], 'condition')
     print(path[subid_index_start:subid_index_end+1], 'subid')
     self.subid = int(path[subid_index_start:subid_index_end+1])
     self.condition = path[condition_index_start:condition_index_end+1]
-    self.episode_identifier = '' if (self.episode_identifier_index_start == None) or (self.episode_identifier_index_end == None) else path[self.episode_identifier_index_start:self.episode_identifier_index_end+1]
-    print(self.episode_identifier, 'episode identifier')
+    self.dataset_identifier = '' if (self.dataset_identifier_index_start == None) or (self.dataset_identifier_index_end == None) else path[self.dataset_identifier_index_start:self.dataset_identifier_index_end+1]
+    print(self.dataset_identifier, 'Dataset ID')
     self.raw_dataset = None
     self.cleaned_dataset = None
     self.cohort = None
     self.study_title = None
-    self.metadata = pd.read_excel(metadata_path) if metadata_path != None else pd.DataFrame(columns=['SubID', 'Condition', 'episode_identifier','Use_Data'])
+    self.metadata = pd.read_excel(metadata_path) if metadata_path != None else pd.DataFrame(columns=['SubID', 'Condition', 'dataset_identifier','Use_Data'])
     self.timestamps = pd.read_excel(episode_start_timestamps_path) if episode_start_timestamps_path != None else pd.DataFrame(columns = ['SubID', 'Start Date', 'Start Time', 'Time Zone'])
     self.skyn_download_timezone = skyn_download_timezone
     self.data_out_folder = data_out_folder
@@ -38,7 +38,7 @@ class skynDatasetProcessor:
     self.plot_paths = self.simple_plot_paths + self.complex_plot_paths
     self.condition_plot_folder = None
     self.stats = {'temp_cropped_count': 0, 'Cleaned': {}, 'Raw': {}}
-    self.croppable = is_data_croppable(self.subid, self.condition, self.episode_identifier, self.metadata) if len(self.timestamps) != 0 else False
+    self.croppable = is_data_croppable(self.subid, self.condition, self.dataset_identifier, self.metadata) if len(self.timestamps) != 0 else False
     self.max_duration = max_duration
     self.data_cropped = False
     self.info_repository = {
@@ -51,7 +51,8 @@ class skynDatasetProcessor:
     self.predictions = pd.DataFrame()
 
   def initialize_data(self):
-    print(f'initializing {self.subid} {self.condition} {self.episode_identifier}')
+    print(f'initializing {self.subid} {self.condition} {self.dataset_identifier}')
+    print(self.path)
     if self.path[-3:] == 'csv':
       df_raw = pd.read_csv(self.path, index_col=False)
     else:
@@ -80,7 +81,7 @@ class skynDatasetProcessor:
     self.condition_plot_folder = condition_plot_folder
 
     for dataset_version in ['Cleaned', 'Raw']:
-      self.stats[dataset_version]['drink_total'] = get_drink_count(self.metadata, self.subid, self.condition, self.episode_identifier)
+      self.stats[dataset_version]['drink_total'] = get_drink_count(self.metadata, self.subid, self.condition, self.dataset_identifier)
 
     if 'Motion' in df_raw.columns.tolist():
       df_raw['Motion_Norm'] = normalize_column(df_raw['Motion'])
@@ -98,7 +99,7 @@ class skynDatasetProcessor:
         self.data_cropped = True
       self.info_repository['raw'] = df_raw['TAC'].tolist()
     else:
-      print(f'Multiple Device IDs detected within single dataset {self.subid} {self.condition}{self.episode_identifier}')
+      print(f'Multiple Device IDs detected within single dataset {self.subid} {self.condition}{self.dataset_identifier}')
       return False
     
   def process_with_default_settings(self, make_plots=False):
@@ -165,9 +166,9 @@ class skynDatasetProcessor:
 
   def crop_dataset_with_timestamps(self, data_clean=False):
     if data_clean:
-        self.cleaned_dataset, cropped_plot_path = crop_using_timestamp(self.subid, self.condition, self.episode_identifier, self.cleaned_dataset, self.metadata, self.timestamps, self.condition_plot_folder, self.max_duration, self.skyn_download_timezone)
+        self.cleaned_dataset, cropped_plot_path = crop_using_timestamp(self.subid, self.condition, self.dataset_identifier, self.cleaned_dataset, self.metadata, self.timestamps, self.condition_plot_folder, self.max_duration, self.skyn_download_timezone)
     else:
-      self.raw_dataset, cropped_plot_path = crop_using_timestamp(self.subid, self.condition, self.episode_identifier, self.raw_dataset, self.metadata, self.timestamps, self.condition_plot_folder, self.max_duration, self.skyn_download_timezone)
+      self.raw_dataset, cropped_plot_path = crop_using_timestamp(self.subid, self.condition, self.dataset_identifier, self.raw_dataset, self.metadata, self.timestamps, self.condition_plot_folder, self.max_duration, self.skyn_download_timezone)
 
     self.complex_plot_paths.append(cropped_plot_path)
     self.time_variable = 'time_elapsed_hours_adjusted'
@@ -195,7 +196,7 @@ class skynDatasetProcessor:
       self.stats[dataset_version]['valid_occasion'] = 1 if (self.stats[dataset_version]['valid_duration_percent'] > 0.5) and (self.stats[dataset_version]['valid_duration'] > 2) else 0
 
   def export_workbook(self):
-    export_skyn_workbook(self.cleaned_dataset, self.subid, self.condition, self.episode_identifier, self.predictions, self.data_out_folder, self.simple_plot_paths, self.complex_plot_paths)
+    export_skyn_workbook(self.cleaned_dataset, self.subid, self.condition, self.dataset_identifier, self.predictions, self.data_out_folder, self.simple_plot_paths, self.complex_plot_paths)
 
   def get_stats(self):
 
@@ -240,24 +241,24 @@ class skynDatasetProcessor:
         self.stats[dataset_version]['minor_outlier_N'] = len(self.info_repository['signal_processing']['minor_outliers'])
         self.stats[dataset_version]['imputed_count'] = self.stats['Cleaned']['minor_outlier_N'] + self.stats[dataset_version]['major_outlier_N']
         
-        plot_path = plot_smoothed_curve(df, self.plot_folder, self.subid, self.condition, self.episode_identifier, self.time_variable, self.stats[dataset_version]['peak'], self.stats[dataset_version]['baseline_mean'] + self.stats[dataset_version]['baseline_stdev'], curve_begins_index, curve_ends_index)
+        plot_path = plot_smoothed_curve(df, self.plot_folder, self.subid, self.condition, self.dataset_identifier, self.time_variable, self.stats[dataset_version]['peak'], self.stats[dataset_version]['baseline_mean'] + self.stats[dataset_version]['baseline_stdev'], curve_begins_index, curve_ends_index)
         self.complex_plot_paths.append(plot_path)
 
   # MAKE PLOTS     
   def plot_column(self, variable_name):
-    plot_path = plot_column(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.episode_identifier, variable_name, self.time_variable)
+    plot_path = plot_column(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.dataset_identifier, variable_name, self.time_variable)
     self.simple_plot_paths.append(plot_path)
     
   def plot_normalized_columns(self, variables, plot_name):
-    plot_path = plot_overlaid_with_normalization(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.episode_identifier, variables, self.time_variable, plot_name)
+    plot_path = plot_overlaid_with_normalization(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.dataset_identifier, variables, self.time_variable, plot_name)
     self.simple_plot_paths.append(plot_path)
   
   def plot_temp_cleaning(self):
-    plot_path = plot_temp_cleaning(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.episode_identifier, 'Temperature_C', self.time_variable)
+    plot_path = plot_temp_cleaning(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.dataset_identifier, 'Temperature_C', self.time_variable)
     self.complex_plot_paths.append(plot_path)
 
   def plot_tac_and_temp(self):
-    plot_path = plot_tac_and_temp(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.episode_identifier, 'TAC', 'Temperature_C', self.time_variable)
+    plot_path = plot_tac_and_temp(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.dataset_identifier, 'TAC', 'Temperature_C', self.time_variable)
     self.complex_plot_paths.append(plot_path)
 
   def plot_cleaning_comparison(self):
@@ -268,7 +269,7 @@ class skynDatasetProcessor:
     dataset_columns = self.cleaned_dataset.columns.tolist()
     for variable_name in [col for col in self.cleaned_dataset.columns.tolist() if 'TAC' in col]:
       plot_path = plot_TAC_curve(self.cleaned_dataset, 
-      self.plot_folder, self.subid, self.condition, self.episode_identifier, variable_name, self.time_variable)
+      self.plot_folder, self.subid, self.condition, self.dataset_identifier, variable_name, self.time_variable)
       self.complex_plot_paths.append(plot_path)
     
     groupings = {
@@ -278,7 +279,7 @@ class skynDatasetProcessor:
 
     for group_name, variable_grouping in groupings.items():
       if len(variable_grouping) > 0:
-        plot_path = plot_overlaid_TAC_curves(self.cleaned_dataset, self.plot_folder, self.subid, self.condition,self.episode_identifier, variable_grouping, self.time_variable, group_name)
+        plot_path = plot_overlaid_TAC_curves(self.cleaned_dataset, self.plot_folder, self.subid, self.condition,self.dataset_identifier, variable_grouping, self.time_variable, group_name)
         self.plot_paths.append(plot_path)
 
   def make_prediction(self, models, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent', 'major_outlier_N', 'minor_outlier_N']):

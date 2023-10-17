@@ -40,11 +40,27 @@ def normalize_column(series):
     norm = (series - mean) / (stdev)
     return norm
 
+def configure_timestamp_column(df):
+    df['datetime_with_timezone'] = pd.to_datetime(df['datetime'], format='%Y-%m-%d %H:%M:%S %z', errors='coerce')
+    df['datetime_without_timezone'] = pd.to_datetime(df['datetime'], format='%Y-%m-%d %H:%M:%S', errors='coerce')
+
+    # Check which format was successful
+    if not df['datetime_with_timezone'].isna().all():
+        df['datetime'] = df['datetime_with_timezone'].dt.tz_localize(None)
+    elif not df['datetime_without_timezone'].isna().all():
+        df['datetime'] = df['datetime_without_timezone']
+    
+    # Drop the intermediate columns
+    df.drop(['datetime_with_timezone', 'datetime_without_timezone'], axis=1, inplace=True)
+    df.reset_index(inplace=True, drop=True)
+    print(df['datetime'])
+    return df['datetime']
+
 def get_time_elapsed(df):
     try:
-        df.loc[:, "datetime"] = pd.to_datetime(df.loc[:, "datetime"], unit='s')
+        df["datetime"] = pd.to_datetime(df["datetime"], unit='s')
     except:
-        df.loc[:, "datetime"] = pd.to_datetime(df.loc[:, "datetime"])
+        df["datetime"] = pd.to_datetime(df["datetime"])
     if 'device time zone' in df.columns.tolist():
         if df['device time zone'].mode().tolist()[0] == 'UTC':
             df[:, 'datetime'] = df['datetime'] - timedelta(hours=6)
@@ -123,18 +139,18 @@ def get_string_from_path(path, search_substring, range):
     string = path[string_start:string_end]
     return string
 
-def is_data_croppable(subid, condition, episode_identifier, metadata):
-    if episode_identifier == '':
+def is_data_croppable(subid, condition, dataset_identifier, metadata):
+    if dataset_identifier == '':
         return ((metadata['Use_Data']=='Y') & (metadata['SubID']==subid) & (metadata['Condition']==condition)).any()
     else: 
-        return ((metadata['Use_Data']=='Y') & (metadata['SubID']==subid) & (metadata['Condition']==condition) & (metadata['Episode_Identifier']==episode_identifier)).any()
+        return ((metadata['Use_Data']=='Y') & (metadata['SubID']==subid) & (metadata['Condition']==condition) & (metadata['Dataset_Identifier']==dataset_identifier)).any()
 
-def get_drink_count(metadata, subid, condition, episode_identifier):
-    print(episode_identifier)
-    if episode_identifier == '':
+def get_drink_count(metadata, subid, condition, dataset_identifier):
+    print(dataset_identifier)
+    if dataset_identifier == '':
         return metadata[(metadata['SubID']==subid) & (metadata['Condition'] == condition)]['TotalDrks'].tolist()[0]
     else:
-        return metadata[(metadata['SubID']==subid) & (metadata['Condition'] == condition) & (metadata['Episode_Identifier'] == int(episode_identifier))]['TotalDrks'].tolist()[0]
+        return metadata[(metadata['SubID']==subid) & (metadata['Condition'] == condition) & (metadata['Dataset_Identifier'] == int(dataset_identifier))]['TotalDrks'].tolist()[0]
 
 def baseline_correct_tac(tac_column):
     if tac_column.min() < 0:

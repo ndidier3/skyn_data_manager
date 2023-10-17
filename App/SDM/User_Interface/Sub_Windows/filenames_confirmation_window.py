@@ -20,7 +20,7 @@ class FilenamesConfirmationWindow(Toplevel):
     else:
       data = self.parent.prepare_filename_data()
       self.episode_labels = Variable(
-        value = [f'Subject: {data["SubID"][i]} | Condition: {data["Condition"][i]} | ID: {data["Episode_Identifier"][i] if data["Episode_Identifier"][i] else "NA"}' for i in range(0, len(data['SubID']))])
+        value = [f'Subject: {data["SubID"][i]} | Condition: {data["Condition"][i]} | ID: {data["Dataset_Identifier"][i] if data["Dataset_Identifier"][i] else "NA"}' for i in range(0, len(data['SubID']))])
       
       self.fileDataListbox = Listbox(self, selectmode="none", height=18, width=60, listvariable=self.episode_labels)
       self.fileDataListbox.grid(row=22, column=1, padx=5, pady=5)

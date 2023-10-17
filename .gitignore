@@ -4,6 +4,7 @@ Raw/C4_field/
 Raw/C4_lab/
 Raw/MARS - Copy/
 Raw/on_hold/
+Raw/fieldDataYW
 Resources/C4Field Metadata.xlsx
 Resources/C4Lab Metadata.xlsx
 Resources/C4 Measures/
@@ -18,3 +19,5 @@ test.py
 notes.txt
 *.pyc
 *.pyo
+Resources/fieldYW_Metadata.xlsx
+Resources/uf_field_Metadata.xlsx

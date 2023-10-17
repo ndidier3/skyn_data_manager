@@ -27,13 +27,13 @@ class skynCohortProcessor:
       graphs_out_folder = None, #folder to save graphs
       analyses_out_folder = None, #folder to save features and model results
 
-      #configuring how to identify a file's subid, condition and - if needed - a episode_identifier
+      #configuring how to identify a file's subid, condition and - if needed - a dataset_identifier
       subid_index_start = '#', #character (string) to indicate where subid begins
       subid_index_end = 4, 
       condition_index_start = '.', #character (string) to indicate where condition begins within a filename
       condition_index_end = -3, 
-      episode_identifier_search_index_start = None, #character (numeric string, e.g., 001, 002, 003) to distinguish between subids with repeated conditions
-      episode_identifier_search_index_end = None,  
+      dataset_identifier_search_index_start = None, #character (numeric string, e.g., 001, 002, 003) to distinguish between subids with repeated conditions
+      dataset_identifier_search_index_end = None,  
       
       #signal processing customization
       max_dataset_duration = 18, 
@@ -60,13 +60,13 @@ class skynCohortProcessor:
     self.model_figures_folder = self.analyses_out_folder + '/Figures'
     self.python_object_folder = self.analyses_out_folder + '/Python_Objects'
 
-    #configuring how to identify a file's subid, condition and - if needed - a episode_identifier
+    #configuring how to identify a file's subid, condition and - if needed - a dataset_identifier
     self.subid_index_start = subid_index_start
     self.subid_index_end = subid_index_end
     self.condition_index_start = condition_index_start
     self.condition_index_end = condition_index_end
-    self.episode_identifier_search_index_start = episode_identifier_search_index_start
-    self.episode_identifier_search_index_end = episode_identifier_search_index_end
+    self.dataset_identifier_search_index_start = dataset_identifier_search_index_start
+    self.dataset_identifier_search_index_end = dataset_identifier_search_index_end
 
     #signal processing customization
     self.max_dataset_duration = max_dataset_duration
@@ -99,12 +99,12 @@ class skynCohortProcessor:
   def process_cohort(self, make_plots=True, force_refresh=False, export_python_object=False):
     for i, path in enumerate(self.occasion_paths):
       print(path)
-      occasion = skynDatasetProcessor(path, self.data_out_folder, self.graphs_out_folder, self.subid_index_start, self.subid_index_end, self.condition_index_start, self.condition_index_end, self.episode_identifier_search_index_start, self.episode_identifier_search_index_end, self.metadata_path, self.timestamps_path, self.skyn_timestamps_timezone)
+      occasion = skynDatasetProcessor(path, self.data_out_folder, self.graphs_out_folder, self.subid_index_start, self.subid_index_end, self.condition_index_start, self.condition_index_end, self.dataset_identifier_search_index_start, self.dataset_identifier_search_index_end, self.metadata_path, self.timestamps_path, self.skyn_timestamps_timezone)
       metadata = pd.read_excel(self.metadata_path)
       occasion.max_duration = self.max_dataset_duration
       if ((metadata['Use_Data']=='Y') & (metadata['SubID']==occasion.subid) & (metadata['Condition']==occasion.condition)).any():
         for dataset_version in ['Raw', 'Cleaned']:
-          occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.episode_identifier)
+          occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.dataset_identifier)
         if (path not in [occasion.path for occasion in self.occasions]) or (force_refresh):
           occasion.process_with_default_settings(make_plots=True)
           occasion.plot_column('Motion')
@@ -114,7 +114,7 @@ class skynCohortProcessor:
           occasion.plot_cleaning_comparison()
           self.occasions.append(occasion)
           occasion.export_workbook()
-        occasion.cleaned_dataset['dataset_id'] = str(occasion.subid) + occasion.condition + occasion.episode_identifier if occasion.episode_identifier else str(occasion.subid) + occasion.condition
+        occasion.cleaned_dataset['dataset_id'] = str(occasion.subid) + occasion.condition + occasion.dataset_identifier if occasion.dataset_identifier else str(occasion.subid) + occasion.condition
       if len(self.master_dataset) == 0:
         self.master_dataset = occasion.cleaned_dataset
       else:
@@ -158,13 +158,13 @@ class skynCohortProcessor:
       'Cleaned': {
         'subid': [],
         'condition': [],
-        'episode_identifier': []
+        'dataset_identifier': []
         #features will be added here...
       },
       'Raw': {
         'subid': [],
         'condition': [],
-        'episode_identifier': []
+        'dataset_identifier': []
         #features will be added here...
       }
     }
@@ -172,7 +172,7 @@ class skynCohortProcessor:
       for occasion in self.occasions:
         data[dataset_version]['subid'].append(occasion.subid)
         data[dataset_version]['condition'].append(occasion.condition)
-        data[dataset_version]['episode_identifier'].append(occasion.episode_identifier)
+        data[dataset_version]['dataset_identifier'].append(occasion.dataset_identifier)
         for key, value in occasion.stats[dataset_version].items():
           refresh = (key not in self.stats[dataset_version].columns.tolist()) or (force_refresh)
           if refresh:
@@ -257,7 +257,7 @@ class skynCohortProcessor:
       signal_processing_info = occasion.info_repository['signal_processing']
       sheet_name = 'Report by Drinking Episode'
 
-      basic_info = pd.Series(name='Basic Info', data=[occasion.subid, occasion.condition, occasion.episode_identifier, stats['drink_total'], 'Yes' if occasion.croppable else 'No'], index=['SubID', 'Condition', 'Episode_Identifier', 'Drink Total', 'Data Cropped?'])
+      basic_info = pd.Series(name='Basic Info', data=[occasion.subid, occasion.condition, occasion.dataset_identifier, stats['drink_total'], 'Yes' if occasion.croppable else 'No'], index=['SubID', 'Condition', 'Dataset_Identifier', 'Drink Total', 'Data Cropped?'])
       basic_info.to_excel(writer, sheet_name = sheet_name, startrow = row, startcol=1)
 
       general_stats = pd.Series(name='TAC Dataset: General Stats',
@@ -292,26 +292,26 @@ class skynCohortProcessor:
       x = xlsxwriter.utility.xl_col_to_name(col_start + (col_interval * 0))
       image_start_cell = x + str(row)
       worksheet.insert_image(image_start_cell, 
-                             f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.episode_identifier}_smoothed_curve.png', 
+                             f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.dataset_identifier}_smoothed_curve.png', 
                              {'x_scale': x_scale,
                               'y_scale': y_scale})
       
       if occasion.croppable:
         x = xlsxwriter.utility.xl_col_to_name(col_start + (col_interval * 1))
         image_start_cell = x + str(row)
-        worksheet.insert_image(image_start_cell, f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.episode_identifier}_cropping.png', 
+        worksheet.insert_image(image_start_cell, f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.dataset_identifier}_cropping.png', 
                               {'x_scale': x_scale,
                                 'y_scale': y_scale})
         
       x = xlsxwriter.utility.xl_col_to_name(col_start + (col_interval * (1 + crop_plot_placement_adjustment) + 2))
       image_start_cell = x + str(row)
-      worksheet.insert_image(image_start_cell, f'{plot_folder}/cleaning/cleaning - {occasion.subid} - {occasion.condition}{occasion.episode_identifier}.png', 
+      worksheet.insert_image(image_start_cell, f'{plot_folder}/cleaning/cleaning - {occasion.subid} - {occasion.condition}{occasion.dataset_identifier}.png', 
                             {'x_scale': x_scale,
                               'y_scale': y_scale})
       
       x = xlsxwriter.utility.xl_col_to_name(col_start + (col_interval * (2 + crop_plot_placement_adjustment) + 2))
       image_start_cell = x + str(row)
-      worksheet.insert_image(image_start_cell, f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.episode_identifier}_temp_cleaning.png', 
+      worksheet.insert_image(image_start_cell, f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.dataset_identifier}_temp_cleaning.png', 
                              {'x_scale': x_scale,
                               'y_scale': y_scale})
 

@@ -28,7 +28,12 @@ class skynCohortTester:
         self.predictions[model_name + '_' + version] = model.predict(features[predictors])
         predictions = self.predictions[model_name + '_' + version]
         self.stats[version][model_name + '_prediction'] = ['Alc' if x==1 else 'Non' for x in predictions]
-        self.stats[version][model_name + '_correct'] = np.where(self.stats[version][model_name + '_prediction'] == self.stats[version]['condition'], 'correct', 'incorrect')
+        self.stats[version][model_name + '_correct'] = np.where(
+          self.stats[version]['condition'] == 'Unk', 
+            'unknown',
+          np.where(self.stats[version][model_name + '_prediction'] == self.stats[version]['condition'], 
+            'correct', 'incorrect'))
+        
     python_object_folder = self.analyses_out_folder + '/Python_Objects'
     if not os.path.exists(python_object_folder):
       os.mkdir(python_object_folder)
@@ -59,16 +64,16 @@ class skynCohortTester:
       sheet_name = 'Report by Drinking Episode'
 
 
-      occasion_data=[occasion.subid, occasion.condition, occasion.episode_identifier, stats['drink_total'], 'Yes' if occasion.croppable else 'No']
-      index_labels = ['SubID', 'Condition', 'Episode_Identifier', 'Drink Total', 'Data Cropped?']
+      occasion_data=[occasion.subid, occasion.condition, occasion.dataset_identifier, stats['drink_total'], 'Yes' if occasion.croppable else 'No']
+      index_labels = ['SubID', 'Condition', 'Dataset_Identifier', 'Drink Total', 'Data Cropped?']
       for model_name, model in self.models.items():
         results = self.stats['Cleaned']
-        prediction_clean = results.loc[(results['subid'] == occasion.subid) & (results['condition'] == occasion.condition) & (results['episode_identifier'] == occasion.episode_identifier), model_name + '_prediction'].tolist()[0]
-        correct_clean = results.loc[(results['subid'] == occasion.subid) & (results['condition'] == occasion.condition) & (results['episode_identifier'] == occasion.episode_identifier), model_name + '_correct'].tolist()[0]
+        prediction_clean = results.loc[(results['subid'] == occasion.subid) & (results['condition'] == occasion.condition) & (results['dataset_identifier'] == occasion.dataset_identifier), model_name + '_prediction'].tolist()[0]
+        correct_clean = results.loc[(results['subid'] == occasion.subid) & (results['condition'] == occasion.condition) & (results['dataset_identifier'] == occasion.dataset_identifier), model_name + '_correct'].tolist()[0]
 
         results = self.stats['Raw']
-        prediction_raw = results.loc[(results['subid'] == occasion.subid) & (results['condition'] == occasion.condition) & (results['episode_identifier'] == occasion.episode_identifier), model_name + '_prediction'].tolist()[0]
-        correct_raw = results.loc[(results['subid'] == occasion.subid) & (results['condition'] == occasion.condition) & (results['episode_identifier'] == occasion.episode_identifier), model_name + '_correct'].tolist()[0]
+        prediction_raw = results.loc[(results['subid'] == occasion.subid) & (results['condition'] == occasion.condition) & (results['dataset_identifier'] == occasion.dataset_identifier), model_name + '_prediction'].tolist()[0]
+        correct_raw = results.loc[(results['subid'] == occasion.subid) & (results['condition'] == occasion.condition) & (results['dataset_identifier'] == occasion.dataset_identifier), model_name + '_correct'].tolist()[0]
 
         occasion_data.extend([prediction_clean, correct_clean])
         index_labels.extend([model_name + ' prediction (cleaned)', model_name + ' correct (cleaned)'])
@@ -118,26 +123,26 @@ class skynCohortTester:
       x = xlsxwriter.utility.xl_col_to_name(col_start + (col_interval * 0))
       image_start_cell = x + str(row)
       worksheet.insert_image(image_start_cell, 
-                             f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.episode_identifier}_smoothed_curve.png', 
+                             f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.dataset_identifier}_smoothed_curve.png', 
                              {'x_scale': x_scale,
                               'y_scale': y_scale})
       
       if occasion.croppable:
         x = xlsxwriter.utility.xl_col_to_name(col_start + (col_interval * 1))
         image_start_cell = x + str(row)
-        worksheet.insert_image(image_start_cell, f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.episode_identifier}_cropping.png', 
+        worksheet.insert_image(image_start_cell, f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.dataset_identifier}_cropping.png', 
                               {'x_scale': x_scale,
                                 'y_scale': y_scale})
         
       x = xlsxwriter.utility.xl_col_to_name(col_start + (col_interval * (1 + crop_plot_placement_adjustment) + 2))
       image_start_cell = x + str(row)
-      worksheet.insert_image(image_start_cell, f'{plot_folder}/cleaning/cleaning - {occasion.subid} - {occasion.condition}{occasion.episode_identifier}.png', 
+      worksheet.insert_image(image_start_cell, f'{plot_folder}/cleaning/cleaning - {occasion.subid} - {occasion.condition}{occasion.dataset_identifier}.png', 
                             {'x_scale': x_scale,
                               'y_scale': y_scale})
       
       x = xlsxwriter.utility.xl_col_to_name(col_start + (col_interval * (2 + crop_plot_placement_adjustment) + 2))
       image_start_cell = x + str(row)
-      worksheet.insert_image(image_start_cell, f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.episode_identifier}_temp_cleaning.png', 
+      worksheet.insert_image(image_start_cell, f'{plot_folder}/{occasion.subid}_{occasion.condition}{occasion.dataset_identifier}_temp_cleaning.png', 
                              {'x_scale': x_scale,
                               'y_scale': y_scale})
 

@@ -97,9 +97,9 @@ class SkynDataManagerApp(Tk):
     self.subid_i_end = None
     self.condition_i_start = None
     self.condition_i_end = None
-    self.episode_identifier_i_start = None
+    self.dataset_identifier_i_start = None
     self.episode_identifer_i_end = None
-    self.episode_identifiers_required = False
+    self.dataset_identifiers_required = False
 
     self.defaults_options = {
       'models': {},
@@ -286,10 +286,10 @@ class SkynDataManagerApp(Tk):
   def verify_directory(self, directory):
     print(directory)
     self.filenames = [file for file in os.listdir(directory)]
-    self.episode_identifiers_required = all([identify_episode_identifier(filename) != None for filename in self.filenames])
+    self.dataset_identifiers_required = all([identify_dataset_identifier(filename) != None for filename in self.filenames])
     self.user_confirmation = False
     if directory_analysis_ready(directory):
-      self.parsing_indices = get_default_parsing_indices(identify_subid(self.filenames[0]), self.episode_identifiers_required)
+      self.parsing_indices = get_default_parsing_indices(identify_subid(self.filenames[0]), self.dataset_identifiers_required)
       self.selected_data = directory
       self.update_filename_parsing(self.parsing_indices)
       confirmation_window = FilenamesConfirmationWindow(self, self.parsing_indices)
@@ -311,16 +311,16 @@ class SkynDataManagerApp(Tk):
     self.filenames = [file for file in os.listdir(directory)]
     subid = identify_subid(filename)
     condition = identify_condition(filename)
-    episode_identifier = identify_episode_identifier(filename)
-    self.episode_identifiers_required = episode_identifier != None
+    dataset_identifier = identify_dataset_identifier(filename)
+    self.dataset_identifiers_required = dataset_identifier != None
 
     filename_valid = identify_subid(filename) and identify_condition(filename)
     self.user_confirmation = False
     if filename_valid:
-      self.user_confirmation = messagebox.askyesno('SDM', f'Is data set info correct?\nSubID = {subid}\nCondition = {condition}\nEpisode Identifier = {episode_identifier}')
+      self.user_confirmation = messagebox.askyesno('SDM', f'Is data set info correct?\nSubID = {subid}\nCondition = {condition}\nDataset ID = {dataset_identifier}')
       print('confirmed?', self.user_confirmation)
     if filename_valid and self.user_confirmation:
-      self.parsing_indices = get_default_parsing_indices(identify_subid(filename), self.episode_identifiers_required)
+      self.parsing_indices = get_default_parsing_indices(identify_subid(filename), self.dataset_identifiers_required)
       self.update_filename_parsing(self.parsing_indices)
       self.selectDataLabel.config(fg='green')
     else:
@@ -334,7 +334,7 @@ class SkynDataManagerApp(Tk):
     self.subid_i_end = indices[1]
     self.condition_i_start = indices[2] 
     self.condition_i_end = indices[3]
-    self.episode_identifier_i_start = indices[4]
+    self.dataset_identifier_i_start = indices[4]
     self.episode_identifer_i_end = indices[5]
 
   def update_models(self, model_name, model):
@@ -356,7 +356,7 @@ class SkynDataManagerApp(Tk):
     if file:
       metadata_file = os.path.abspath(file.name)
       metadata = pd.read_excel(metadata_file)
-      necessary_columns = ['SubID', 'Condition', 'Episode_Identifier','Use_Data', 'TotalDrks']
+      necessary_columns = ['SubID', 'Condition', 'Dataset_Identifier','Use_Data', 'TotalDrks']
       if all(col in metadata.columns for col in necessary_columns):
         self.metaselectDataLabel['text'] = f'Selected metadata: {str(file.name.split("/")[-1])}'
         self.metadata = metadata_file
@@ -388,22 +388,22 @@ class SkynDataManagerApp(Tk):
       return {
         'SubID': [file[int(self.subid_i_start):int(self.subid_i_end) + 1]],
         'Condition': [file[int(self.condition_i_start): int(self.condition_i_end) + 1]],
-        'Episode_Identifier': [file[int(self.episode_identifier_i_start): int(self.episode_identifer_i_end)+1]] if all([self.episode_identifier_i_start, self.episode_identifer_i_end]) else [""],
+        'Dataset_Identifier': [file[int(self.dataset_identifier_i_start): int(self.episode_identifer_i_end)+1]] if all([self.dataset_identifier_i_start, self.episode_identifer_i_end]) else [""],
         'Use_Data': ["Y"],
         'TotalDrks': [""],
         'Notes': [""]
       }
     else:
-      if None in [self.episode_identifier_i_start, self.episode_identifer_i_end]:
-        episode_identifiers = ["" for i in range(0, len(
+      if None in [self.dataset_identifier_i_start, self.episode_identifer_i_end]:
+        dataset_identifiers = ["" for i in range(0, len(
                                 [file 
                                   for file in os.listdir(self.selected_data) 
                                   if (file[-3:]== 'csv') or (file[-4:] == 'xlsx')
                                 ]))
                               ]
       else:
-        episode_identifiers = [file[
-                                int(self.episode_identifier_i_start)
+        dataset_identifiers = [file[
+                                int(self.dataset_identifier_i_start)
                                 :int(self.episode_identifer_i_end)+1] 
                               for file in os.listdir(self.selected_data) 
                               if (file[-3:] == 'csv') or (file[-4:] == 'xlsx')]
@@ -418,7 +418,7 @@ class SkynDataManagerApp(Tk):
                         :int(self.condition_i_end)+1] 
                       for file in os.listdir(self.selected_data)
                       if (file[-3:] == 'csv') or (file[-4:] == 'xlsx')],
-        'Episode_Identifier': episode_identifiers,
+        'Dataset_Identifier': dataset_identifiers,
         'Use_Data': ["Y" for i in range(0, len(
                       [file 
                         for file in os.listdir(self.selected_data) 
@@ -455,7 +455,7 @@ class SkynDataManagerApp(Tk):
       self.subid_i_end = self.parsing_indices[1]
       self.condition_i_start = self.parsing_indices[2]
       self.condition_i_end = self.parsing_indices[3]
-      self.episode_identifier_i_start = self.parsing_indices[4]
+      self.dataset_identifier_i_start = self.parsing_indices[4]
       self.episode_identifer_i_end = self.parsing_indices[5]
       self.metadata = 'Resources/Test/Cohort Metadata TEST.xlsx'
     elif data_format == 'Processor':
@@ -497,8 +497,8 @@ class SkynDataManagerApp(Tk):
           subid_index_end=int(self.subid_i_end) + len(self.selected_data), 
           condition_index_start=int(self.condition_i_start) + len(self.selected_data), 
           condition_index_end=int(self.condition_i_end) + len(self.selected_data),
-          episode_identifier_search_index_start=int(self.episode_identifier_i_start) + len(self.selected_data) if self.episode_identifier_i_start else None,
-          episode_identifier_search_index_end=int(self.episode_identifer_i_end) + len(self.selected_data) if self.episode_identifer_i_end else None,
+          dataset_identifier_search_index_start=int(self.dataset_identifier_i_start) + len(self.selected_data) if self.dataset_identifier_i_start else None,
+          dataset_identifier_search_index_end=int(self.episode_identifer_i_end) + len(self.selected_data) if self.episode_identifer_i_end else None,
           max_dataset_duration=int(self.max_dataset_duration),
           skyn_timestamps_timezone=int(self.data_download_timezone)
         )
@@ -509,6 +509,7 @@ class SkynDataManagerApp(Tk):
             writer = pd.ExcelWriter(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/features.xlsx')
             sdm_processor.stats['Cleaned'].to_excel(writer, sheet_name = 'Cleaned', index=False)
             sdm_processor.stats['Raw'].to_excel(writer, sheet_name = 'Raw', index=False)
+            writer.save()
         elif program == 'PP':
           run_procedure = messagebox.askyesno("Skyn Data Manager", f'Would you like to process Skyn datasets, calculate features and make predictions on cohort "{cohort_name}" using model(s): {", ".join([model_name for model_name in self.models.keys()])}?')
           if run_procedure:
@@ -548,7 +549,7 @@ class SkynDataManagerApp(Tk):
           int(self.subid_i_end) + path_length_to_folder, 
           int(self.condition_i_start) + path_length_to_folder, 
           int(self.condition_i_end) + path_length_to_folder,
-          int(self.episode_identifier_i_start) + path_length_to_folder if self.episode_identifier_i_start else None,
+          int(self.dataset_identifier_i_start) + path_length_to_folder if self.dataset_identifier_i_start else None,
           int(self.episode_identifer_i_end) + path_length_to_folder if self.episode_identifer_i_end else None,
           self.metadata,
           self.timestamps_filename,
@@ -562,7 +563,7 @@ class SkynDataManagerApp(Tk):
             occasion.max_duration = self.max_dataset_duration
             for dataset_version in ['Raw', 'Cleaned']:
               try:
-                occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.episode_identifier)
+                occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.dataset_identifier)
               except:
                 pass
             occasion.process_with_default_settings(make_plots=True)
@@ -579,7 +580,7 @@ class SkynDataManagerApp(Tk):
             occasion.max_duration = self.max_dataset_duration
             for dataset_version in ['Raw', 'Cleaned']:
               try:
-                occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.episode_identifier)
+                occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.dataset_identifier)
               except:
                 pass
             occasion.process_with_default_settings(make_plots=True)

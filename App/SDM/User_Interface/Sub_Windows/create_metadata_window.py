@@ -18,12 +18,12 @@ class CreateMetadataWindow:
     self.metadata_frame = Frame(self.__subWindow, width=600, height=800, highlightbackground="black", highlightthickness=2)
     self.metadata_frame.grid(row=0, column=1)
 
-    self.excludeSubidsLabelText = 'Confirm that SubIDs, Conditions, and Episode Identifiers have been properly read for each episode listed below.\nNext, select each episode that you want to exclude from analyses. \nTo create metadata file, click the button below.'
+    self.excludeSubidsLabelText = 'Confirm that SubIDs, Conditions, and Dataset IDs have been properly read for each episode listed below.\nNext, select each episode that you want to exclude from analyses. \nTo create metadata file, click the button below.'
     self.excludeSubidsLabel = Label(self.metadata_frame, text = self.excludeSubidsLabelText, anchor='w', justify='left')
     self.excludeSubidsLabel.grid(row=1, column=1, padx=5, pady=5)
 
     self.episode_labels = Variable(
-      value = [f'Subject: {data["SubID"][i]} | Condition: {data["Condition"][i]} | ID: {data["Episode_Identifier"][i] if data["Episode_Identifier"][i] else "NA"}' for i in range(0, len(data['SubID']))]
+      value = [f'Subject: {data["SubID"][i]} | Condition: {data["Condition"][i]} | ID: {data["Dataset_Identifier"][i] if data["Dataset_Identifier"][i] else "NA"}' for i in range(0, len(data['SubID']))]
     )
     self.excludeSubidsListbox = Listbox(self.metadata_frame, selectmode=MULTIPLE, height=18, width=60, listvariable=self.episode_labels)
     self.excludeSubidsListbox.grid(row=2, column=1, padx=5, pady=5)

@@ -4,6 +4,7 @@ from tkinter.filedialog import askopenfile
 from tkinter import messagebox
 import pandas as pd
 import os
+import traceback
 from SDM.Configuration.configuration import update_column_names
 from SDM.Configuration.modify_filenames import generate_random_id
 from SDM.Configuration.split_skyn_dataset import split_skyn_dataset
@@ -58,16 +59,14 @@ class FileSplittingToolWindow(Toplevel):
     self.excludeEndLabel = Label(self.frame, text = 'Select time to finish excluding data.', font=self.main_window.label_style)
     self.excludeEndOptionMenu = OptionMenu(self.frame, self.exclude_end, *self.exclude_end_options, command = lambda x: self.exclude_end.set(x))
 
-    self.export_folder = ''
-    self.selectExportFolderButton = Button(self.frame, text = "Select Export Folder", command = self.open_folder)
-    self.selectedExportFolderLabel = Label(self.frame, text = "", font=self.main_window.label_style)
-
     self.one_subject = IntVar()
     self.oneSubidLabel = Label(self.frame, text = 'Check the box if all data corresponds to a single person.', font=self.main_window.label_style)
     self.oneSubidCheckbutton = Checkbutton(self.frame, variable = self.one_subject, command = self.show_subid)
 
+    validate_numeric = self.register(lambda P: (P.isdigit() and len(P) <= 6) or len(P) == 0)
     self.subidLabel = Label(self.frame, text = 'Enter SubID', font=self.main_window.label_style)
-    self.subidEntry = Entry(self.frame, width = 15)
+    self.subidEntry = Entry(self.frame, width = 15, validate='key', validatecommand=(validate_numeric, "%P"))
+
 
     self.executeFileSplittingButton = Button(self, text = 'Split Files', command = self.split_file)
 
@@ -75,6 +74,8 @@ class FileSplittingToolWindow(Toplevel):
     file = filedialog.askopenfile(mode='r', filetypes=[('Skyn Dataset','*.xlsx'), ('Skyn Dataset','*.csv')])
     if file:
       filepath = os.path.abspath(file.name)
+      self.filepath = filepath
+      self.export_folder = os.path.dirname(filepath) + '/'
       if filepath[-3:] == 'csv':
         self.data_to_split = pd.read_csv(filepath)
       else:
@@ -104,7 +105,7 @@ class FileSplittingToolWindow(Toplevel):
     self.interval.set(val)
     self.show_subid_id_checkbox(val)
     self.show_exclude_intervals_checkbox(val)
-    self.show_export_folder_button(val)
+    self.show_file_split_button(val)
   
   def show_subid_id_checkbox(self, val):
     if val:
@@ -113,14 +114,6 @@ class FileSplittingToolWindow(Toplevel):
     else:
       self.oneSubidLabel.grid_forget()
       self.oneSubidCheckbutton.grid_forget()
-
-  def show_export_folder_button(self, val):
-    if val:
-      self.selectedExportFolderLabel.grid(row=12, column=0, pady=(5,2), padx=(0,5), sticky='w')
-      self.selectExportFolderButton.grid(row=12, column=1, pady=(5,2), padx=(5,0), sticky='e')
-    else:
-      self.selectedExportFolderLabel.grid_forget()
-      self.selectExportFolderButton.grid_forget()
 
   def show_exclude_intervals_checkbox(self, val):
     if val:
@@ -137,48 +130,64 @@ class FileSplittingToolWindow(Toplevel):
       self.excludeEndLabel.grid(row=8, column=0, pady=(5, 2), padx=(30,5), sticky='w')
       self.excludeEndOptionMenu.grid(row=8, column=1, pady=(2, 5), padx=(5,20), sticky='e')
     else:
-      self.selectedExportFolderLabel.grid_forget()
-      self.selectExportFolderButton.grid_forget()
-      self.selectedExportFolderLabel.grid(row=12, column=0, pady=(5,2), padx=(0,5), sticky='w')
-      self.selectExportFolderButton.grid(row=12, column=1, pady=(5,2), padx=(5,0), sticky='e')
       self.excludeStartLabel.grid_forget()
       self.excludeStartOptionMenu.grid_forget()
       self.excludeEndLabel.grid_forget()
       self.excludeEndOptionMenu.grid_forget()
       # self.
 
-  def open_folder(self):
-    export_folder = filedialog.askdirectory()
-    if export_folder:
-      self.selectedExportFolderLabel['text'] = f'Selected Folder: {export_folder.split("/")[-1]}'
-      self.export_folder = export_folder + '/'
-      self.executeFileSplittingButton.grid(row=15, column=0, pady=(10, 5))
-
   def show_subid(self):
     if self.one_subject.get() == 1:
       self.subidLabel.grid(row=11, column = 0, pady=(5,2), padx=(30,5), sticky='w')
       self.subidEntry.grid(row=11, column=1, pady=(5,2), padx=(5,0), sticky='e')
     else:
-      self.selectedExportFolderLabel.grid_forget()
-      self.selectExportFolderButton.grid_forget()
-      self.selectedExportFolderLabel.grid(row=12, column=0, pady=(5,2), padx=(0,5), sticky='w')
-      self.selectExportFolderButton.grid(row=12, column=1, pady=(5,2), padx=(5,0), sticky='e')
       self.subidLabel.grid_forget()
       self.subidEntry.grid_forget()
+
+  def show_file_split_button(self, val):
+    if val:
+      self.executeFileSplittingButton.grid(row=15, column=0, padx=10, pady=10)
+    else:
+      self.executeFileSplittingButton.grid_forget()
 
   def get_data_duration(self):
     return self.data_to_split['datetime'].max() - self.data_to_split['datetime'].min()
   
   def split_file(self):
-    datasets = split_skyn_dataset(self.data_to_split, self.split_time.get(), self.interval.get(), self.exclude_start.get(),self.exclude_end.get())
-    subid = self.subidEntry.get() if self.subidEntry.get() else None
-    i = 0
-    for timeframe, dataset in datasets.items():
-      subid = subid if subid else generate_random_id()
-      episode_identifier = "".join(['0' for _ in range(0, 3 - len(str(i)))] + [str(d) for d in str(i)])
-      filename = self.export_folder + f'{subid} Unk {episode_identifier} ' + timeframe + '.xlsx'
-      dataset.to_excel(filename, index=False)
-      i += 1
+    try:
+      datasets = split_skyn_dataset(self.data_to_split, self.split_time.get(), self.interval.get(), self.exclude_start.get(),self.exclude_end.get())
+      subid = self.subidEntry.get() if self.subidEntry.get() else None
+      subids = []
+      dataset_identifiers = []
+      start_timestamps = []
+      end_timestamps = []
+
+      if not os.path.exists(self.export_folder + f'DayLevel_{os.path.splitext(os.path.basename(self.filepath))[0]}'):
+        os.mkdir(self.export_folder + f'DayLevel_{os.path.splitext(os.path.basename(self.filepath))[0]}')
+
+      i = 1
+      for timeframe, dataset in datasets.items():
+        subid = subid if subid else generate_random_id()
+        subids.append(subid)
+        dataset_identifier = "".join(['0' for _ in range(0, 3 - len(str(i)))] + [str(d) for d in str(i)])
+        dataset_identifiers.append(dataset_identifier)
+        start_timestamps.append(min(dataset['datetime']))
+        end_timestamps.append(max(dataset['datetime']))
+        filename = self.export_folder + f'DayLevel_{os.path.splitext(os.path.basename(self.filepath))[0]}/{subid} Unk {dataset_identifier}.xlsx'
+        dataset.to_excel(filename, index=False, sheet_name="data")
+        i += 1
+      
+      split_details = pd.DataFrame({'SubID': subids,
+                    'Dataset_Identifiers': dataset_identifiers,
+                    'Start_Timestamp': start_timestamps,
+                    'End_Timestamp': end_timestamps})
+      split_details.to_excel(self.export_folder + f'Split_Details_{os.path.splitext(os.path.basename(self.filepath))[0]}.xlsx', index=False)
+
+      messagebox.showinfo('SDM Update', f'Split files are saved here: {self.export_folder}DayLevel_{os.path.splitext(os.path.basename(self.filepath))[0]}/')
+      
+    except Exception:
+      print(traceback.format_exc())
+      messagebox.showerror('SDM Error', f'Failed to split files. Error likely due to format of timestamps:\n{traceback.format_exc()}')
 
   def open_file_splitting_tool(self):
     sub_window = FileSplittingToolWindow(self)

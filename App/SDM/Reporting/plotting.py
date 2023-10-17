@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.tree import plot_tree
 
 
-def plot_column(df, plot_folder, subid, condition, episode_identifier, y_variable, time_variable, xlabel="Time (hours)"):
+def plot_column(df, plot_folder, subid, condition, dataset_identifier, y_variable, time_variable, xlabel="Time (hours)"):
       ylabel = y_variable    
       title = f'{y_variable} {subid} {condition}'
       plot = df.plot.scatter(y=y_variable, x=time_variable, title=title, ylabel=ylabel, xlabel=xlabel)
@@ -17,12 +17,12 @@ def plot_column(df, plot_folder, subid, condition, episode_identifier, y_variabl
       folder = f'{plot_folder}/{subid}/{condition}/{y_variable}'
       if not os.path.exists(folder):
             os.mkdir(folder)
-      full_path = f'{folder}/{y_variable} - {subid} - {condition}{episode_identifier}.png'
+      full_path = f'{folder}/{y_variable} - {subid} - {condition}{dataset_identifier}.png'
       fig.savefig(full_path)
       plt.close()
       return full_path
 
-def plot_TAC_curve(df, plot_folder, subid, condition, episode_identifier, tac_variable, time_variable, ylabel="TAC ug/L", xlabel="Time (hours)"):
+def plot_TAC_curve(df, plot_folder, subid, condition, dataset_identifier, tac_variable, time_variable, ylabel="TAC ug/L", xlabel="Time (hours)"):
       title = f'TAC Curve - {tac_variable}'
        
       plot = df.plot.scatter(y=tac_variable, x=time_variable, title=title, ylabel=ylabel, xlabel=xlabel)
@@ -37,12 +37,12 @@ def plot_TAC_curve(df, plot_folder, subid, condition, episode_identifier, tac_va
       if not os.path.exists(folder):
             os.mkdir(folder)
 
-      full_path = f'{folder}/{tac_variable} - {subid} - {condition}{episode_identifier}.png'
+      full_path = f'{folder}/{tac_variable} - {subid} - {condition}{dataset_identifier}.png'
       fig.savefig(full_path)
       plt.close()
       return full_path
 
-def plot_overlaid_TAC_curves(df, plot_folder, subid, condition, episode_identifier, tac_variables, time_variable, plot_name, ylabel="TAC ug/L", xlabel="Time (hours)"):
+def plot_overlaid_TAC_curves(df, plot_folder, subid, condition, dataset_identifier, tac_variables, time_variable, plot_name, ylabel="TAC ug/L", xlabel="Time (hours)"):
       title = f'TAC Curve - {plot_name}'
       plot = df.plot(y=tac_variables, x=time_variable, title=title, ylabel=ylabel, xlabel=xlabel)
       fig = plot.get_figure()
@@ -51,12 +51,12 @@ def plot_overlaid_TAC_curves(df, plot_folder, subid, condition, episode_identifi
       if not os.path.exists(folder):
             os.mkdir(folder)
 
-      full_path = f'{folder}/{plot_name} - {subid} - {condition}{episode_identifier}.png'
+      full_path = f'{folder}/{plot_name} - {subid} - {condition}{dataset_identifier}.png'
       fig.savefig(full_path)
       plt.close()
       return full_path
 
-def plot_overlaid_with_normalization(df_prior, plot_folder, subid, condition, episode_identifier, variables, time_variable, plot_name):
+def plot_overlaid_with_normalization(df_prior, plot_folder, subid, condition, dataset_identifier, variables, time_variable, plot_name):
       df = df_prior.copy()
       title = f'{" ".join(variables)} - {subid} - {condition}'
       fig = plt.figure()
@@ -74,23 +74,23 @@ def plot_overlaid_with_normalization(df_prior, plot_folder, subid, condition, ep
       if not os.path.exists(folder):
             os.mkdir(folder)
             
-      full_path = f'{folder}/{plot_name} - {subid} - {condition}{episode_identifier}.png'
+      full_path = f'{folder}/{plot_name} - {subid} - {condition}{dataset_identifier}.png'
       fig.savefig(full_path, bbox_inches='tight')
       plt.close()
       return full_path
 
-def plot_tac_and_temp(df, plot_folder, subid, condition, episode_identifier, tac_variable, temp_variable, time_variable, plot_title = "TAC and Temperature"):
+def plot_tac_and_temp(df, plot_folder, subid, condition, dataset_identifier, tac_variable, temp_variable, time_variable, plot_title = "TAC and Temperature"):
       fig, ax = plt.subplots(figsize=(16, 7))
       df.plot(x = time_variable, y = tac_variable, ax = ax)
       df.plot(x = time_variable, y = temp_variable, ax = ax, secondary_y = True)
       fig.suptitle(plot_title, fontsize=14)
-      path = f'{plot_folder}/{subid}/{condition}/tac_and_temp_plot_{subid}_{condition}{episode_identifier}.png'
+      path = f'{plot_folder}/{subid}/{condition}/tac_and_temp_plot_{subid}_{condition}{dataset_identifier}.png'
       fig.savefig(path)
       plt.close()
 
       return path
 
-def plot_temp_cleaning(df, plot_folder, subid, condition, episode_identifier, temp_variable, time_variable, add_color=False, plot_title = "Temperature Assessment"):
+def plot_temp_cleaning(df, plot_folder, subid, condition, dataset_identifier, temp_variable, time_variable, add_color=False, plot_title = "Temperature Assessment"):
       if add_color:
             marker_colors = ['red', 'dimgray']
       else:
@@ -113,13 +113,13 @@ def plot_temp_cleaning(df, plot_folder, subid, condition, episode_identifier, te
       ax.tick_params(axis='x', labelsize = 22)
       ax.tick_params(axis='y', labelsize = 22)
 
-      path=f'{plot_folder}/{subid}/{condition}/{subid}_{condition}{episode_identifier}_temp_cleaning.png'
+      path=f'{plot_folder}/{subid}/{condition}/{subid}_{condition}{dataset_identifier}_temp_cleaning.png'
       plt.tight_layout()
       plt.savefig(path, bbox_inches='tight')
       plt.close()
       return path
 
-def plot_cropping(data, beginning_timestamp, end_timestamp, subid, condition, episode_identifier, directory, cutoff, add_color = False, title="Raw Data Cropping"):
+def plot_cropping(data, beginning_timestamp, end_timestamp, subid, condition, dataset_identifier, directory, cutoff, add_color = False, title="Raw Data Cropping"):
       if add_color:
             marker_colors = ['red', 'black']
       else:
@@ -151,7 +151,7 @@ def plot_cropping(data, beginning_timestamp, end_timestamp, subid, condition, ep
             ax.vlines(x = 18, ymin = -8, ymax = data['TAC'].max(), color = 'black', linestyle = '--')
             plt.text(15.2, data['TAC'].max() * 0.9, f'{cutoff}-Hour', fontsize = 28, fontstyle = "italic")
             plt.text(15.2, data['TAC'].max() * 0.8, "Cutoff", fontsize = 28, fontstyle = "italic")
-      path = f'{directory}/{subid}_{condition}{episode_identifier}_cropping.png'
+      path = f'{directory}/{subid}_{condition}{dataset_identifier}_cropping.png'
       plt.tight_layout()
       plt.savefig(path, bbox_inches='tight')
       plt.close()
@@ -194,7 +194,7 @@ def plot_cleaning_comparison(occasion, df, df_raw, time_variable, add_color = Fa
       if not os.path.exists(folder):
             os.mkdir(folder)
       
-      filename = f'cleaning - {occasion.subid} - {occasion.condition}{occasion.episode_identifier}'
+      filename = f'cleaning - {occasion.subid} - {occasion.condition}{occasion.dataset_identifier}'
       if snip:
             filename = filename + f' - snip{snip[0]}_{snip[1]}'
       full_path = f'{folder}/{filename}.png'
@@ -203,7 +203,7 @@ def plot_cleaning_comparison(occasion, df, df_raw, time_variable, add_color = Fa
       plt.close()
       return full_path
 
-def plot_smoothed_curve(df, plot_folder, subid, condition, episode_identifier, time_variable, peak, baseline_cutoff, curve_begins, curve_ends, title = "TAC Curve"):
+def plot_smoothed_curve(df, plot_folder, subid, condition, dataset_identifier, time_variable, peak, baseline_cutoff, curve_begins, curve_ends, title = "TAC Curve"):
       peak_time = df.loc[df['TAC_imputed_smooth_101']==peak, time_variable]
       # graph_cutoff = curve_ends + ((len(df) - curve_ends)*0.25)
       # df = df.loc[:graph_cutoff]
@@ -222,7 +222,7 @@ def plot_smoothed_curve(df, plot_folder, subid, condition, episode_identifier, t
       curve_tac_values = df.loc[[i for i in range(curve_begins, curve_ends)], 'TAC_imputed_smooth_101'].tolist()
       plt.fill_between(curve_timepoints, curve_tac_values, [baseline_cutoff for i in range(curve_begins, curve_ends)], color='lightgray')
 
-      path = f'{plot_folder}/{subid}/{condition}/{subid}_{condition}{episode_identifier}_smoothed_curve.png'
+      path = f'{plot_folder}/{subid}/{condition}/{subid}_{condition}{dataset_identifier}_smoothed_curve.png'
       plt.tight_layout()
       plt.savefig(path, bbox_inches='tight')
       plt.close()

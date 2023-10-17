@@ -26,7 +26,7 @@ class RenameFilesWindow(Toplevel):
     self.header.grid(row=0, column=0, padx=5, pady=(5, 10))
     self.header.config(font=(None, 14, 'bold'))
     
-    self.episodeIdentifierLabel = Label(self, text = 'Note: Episode identifiers will automatically be added to filenames \nif there are multiple data sets for a given SubID & Condition.')
+    self.episodeIdentifierLabel = Label(self, text = 'Note: Dataset IDs will automatically be added to filenames \nif there are multiple data sets for a given SubID & Condition.')
     self.episodeIdentifierLabel.config(font=(None, 9, 'italic'))
     self.episodeIdentifierLabel.grid(row=1, column=0, padx=5, pady=3)
 
@@ -78,7 +78,7 @@ class RenameFilesWindow(Toplevel):
     conditions_valid = [item in ['Unk', 'Non', 'Alc'] or item == '' for item in conditions]
     
     if any(subid_verification is False for subid_verification in subids_valid) or any(condition_verification is False for condition_verification in conditions_valid):
-      messagebox.showerror('SDM Error', f'Invalid SubIDS at rows: {[i+1 for i, bool in subids_valid if bool is False]}\nInvalid condition at rows: {[i+1 for i, bool in conditions_valid if bool is False]}')
+      messagebox.showerror('SDM Error', f'Invalid SubIDS at rows: {[i+1 for i, bool in enumerate(subids_valid) if bool is False]}\nInvalid condition at rows: {[i+1 for i, bool in enumerate(conditions_valid) if bool is False]}')
     else:
       pairings = {}
       error = False
@@ -96,25 +96,25 @@ class RenameFilesWindow(Toplevel):
           pairings[pairing].append(filename)
 
         
-      episode_identifier_required = any([len(filenames) > 1 for filenames in list(pairings.values())])
+      dataset_identifier_required = any([len(filenames) > 1 for filenames in list(pairings.values())])
 
       filename_renaming = {}
       if not error:
         for pairing, filenames in pairings.items():
           used_epi_ids = []
           for filename in filenames:
-            if matches_convention(filename, episode_identifier_required=episode_identifier_required):
+            if matches_convention(filename, dataset_identifier_required=dataset_identifier_required):
               new_filename = filename
-              if episode_identifier_required:
-                used_epi_ids.append(identify_episode_identifier(filename))
+              if dataset_identifier_required:
+                used_epi_ids.append(identify_dataset_identifier(filename))
             else:
               extension = extensions[original_filenames.index(filename)]
               subid = subids[original_filenames.index(filename)]
               condition = conditions[original_filenames.index(filename)]
-              episode_identifier = identify_episode_identifier(filename, used_epi_ids=used_epi_ids)
-              used_epi_ids.append(episode_identifier)
+              dataset_identifier = identify_dataset_identifier(filename, used_epi_ids=used_epi_ids)
+              used_epi_ids.append(dataset_identifier)
 
-              new_filename = f'{subid} {condition} {episode_identifier}.{extension}' if episode_identifier_required else f'{subid} {condition}.{extension}'
+              new_filename = f'{subid} {condition} {dataset_identifier}.{extension}' if dataset_identifier_required else f'{subid} {condition}.{extension}'
 
             current_filepath = os.path.join(self.directory, filename)
             updated_filepath = os.path.join(self.directory, new_filename)

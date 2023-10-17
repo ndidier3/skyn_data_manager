@@ -3,7 +3,7 @@ import pickle
 from datetime import date
 import xlsxwriter
 
-def export_skyn_workbook(cleaned_dataset, subid, condition, episode_identifier, predictions, save_path, simple_plot_paths, complex_plot_paths):
+def export_skyn_workbook(cleaned_dataset, subid, condition, dataset_identifier, predictions, save_path, simple_plot_paths, complex_plot_paths):
   variable_key = pd.DataFrame({'Variable/Descriptor':
       ['datetime / device timestamp', 'Time', 'time_elapsed_hours', 'potential_artifact', 'TAC', 'Cleaned', 'Greedy', 'Smooth_XYZ', 'TAC_change', 'Motion', 'Temperature C', 'device_id', 'FOR MORE INFORMATION:'],
   'Explanation':
@@ -21,7 +21,7 @@ def export_skyn_workbook(cleaned_dataset, subid, condition, episode_identifier, 
       'Device ID',
       'See Word document saved here: Z:\Groups\King\ MARS 2\ 06) Data Management\ 3) Skyn']})
     
-  writer = pd.ExcelWriter(f'{save_path}/skyn_{subid}_{condition}{episode_identifier}.xlsx', engine='xlsxwriter')
+  writer = pd.ExcelWriter(f'{save_path}/skyn_{subid}_{condition}{dataset_identifier}.xlsx', engine='xlsxwriter')
 
   cleaned_dataset.to_excel(writer, sheet_name='Data', index=False)
   variable_key.to_excel(writer, sheet_name='Variable Key', index=False)

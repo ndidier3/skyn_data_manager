@@ -23,8 +23,8 @@ def get_valid_session_info(metadata):
   df_good_data = metadata[metadata['Use_Data']=='Y']
   subid_condition_list = []
   for i, row in df_good_data.iterrows():
-      episode_identifier = '' if str(row['Episode_Identifier']) == 'nan' else row['Episode_Identifier']
-      subid_condition = str(row['SubID']) + '_' + str(row['Condition']) + episode_identifier
+      dataset_identifier = '' if str(row['Dataset_Identifier']) == 'nan' else row['Dataset_Identifier']
+      subid_condition = str(row['SubID']) + '_' + str(row['Condition']) + dataset_identifier
       subid_condition_list.append(subid_condition)
 
   return subid_condition_list
@@ -65,13 +65,13 @@ def make_date_column(timestamps):
   
   return timestamps
 
-def crop_using_timestamp(subid, condition, episode_identifier, dataset, metadata, timestamp_data, plot_directory, max_duration, skyn_download_timezone):
+def crop_using_timestamp(subid, condition, dataset_identifier, dataset, metadata, timestamp_data, plot_directory, max_duration, skyn_download_timezone):
   start_date, start_time = get_session_start_date_and_time(dataset)
   valid_session_info = get_valid_session_info(metadata)
   timestamps = make_date_column(timestamp_data)
   pass_test = {}
 
-  Subid_condition = str(subid) + '_' + condition + episode_identifier
+  Subid_condition = str(subid) + '_' + condition + dataset_identifier
   if Subid_condition in valid_session_info:
     session_timestamp = timestamps[(timestamps['SubID']==subid)]
     session_timestamp = session_timestamp[session_timestamp['Date']==start_date]
@@ -88,7 +88,7 @@ def crop_using_timestamp(subid, condition, episode_identifier, dataset, metadata
       else:
         dataset.loc[:, 'Time_Adjusted'] = dataset.loc[:, 'datetime'] + pd.Timedelta(hours=0)
       datetime_begin_drinking, datetime_end_episode = get_session_time_range(session_timestamp, max_duration)
-      cropped_plot_path = plot_cropping(dataset, datetime_begin_drinking, datetime_end_episode, subid, condition, episode_identifier, plot_directory, max_duration)
+      cropped_plot_path = plot_cropping(dataset, datetime_begin_drinking, datetime_end_episode, subid, condition, dataset_identifier, plot_directory, max_duration)
       cropped_clean_dataset = dataset[(dataset['Time_Adjusted'] > datetime_begin_drinking) & (dataset['Time_Adjusted'] < datetime_end_episode)]
       cropped_clean_dataset.reset_index(drop=True, inplace=True)
 

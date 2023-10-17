@@ -35,8 +35,8 @@ sdm_processor = skynCohortProcessor(
   subid_index_end=4 + len(path), 
   condition_index_start=6 + len(path), 
   condition_index_end=8 + len(path),
-  episode_identifier_search_index_start=10 + len(path),
-  episode_identifier_search_index_end=12 + len(path),
+  dataset_identifier_search_index_start=10 + len(path),
+  dataset_identifier_search_index_end=12 + len(path),
   max_dataset_duration=24,
   skyn_timestamps_timezone=-5
 )
