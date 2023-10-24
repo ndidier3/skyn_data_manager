@@ -445,7 +445,7 @@ class SkynDataManagerApp(Tk):
     program = self.program
     data_format = self.data_selection_method 
 
-    self.models = self.models if len(list((self.models.keys())))>0 else load_default_model()
+    #self.models = self.models if len(list((self.models.keys())))>0 else load_default_model()
 
     if data_format == 'Test':
       cohort_name = 'Test'

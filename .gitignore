@@ -1,5 +1,6 @@
 Raw/MARS/
 Raw/C4_errors/
+Raw/MARS2_C4lab
 Raw/C4_field/
 Raw/C4_lab/
 Raw/MARS - Copy/
@@ -9,6 +10,7 @@ Raw/fieldDataYW/
 Raw/testSplit/
 Resources/C4Field Metadata.xlsx
 Resources/C4Lab Metadata.xlsx
+Resources/MARS2_C4lab Metadata.xlsx
 Resources/C4 Measures/
 resources/*
 .DS_Store
