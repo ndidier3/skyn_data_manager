@@ -249,9 +249,9 @@ class skynDatasetProcessor:
     plot_path = plot_column(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.dataset_identifier, variable_name, self.time_variable)
     self.simple_plot_paths.append(plot_path)
     
-  def plot_normalized_columns(self, variables, plot_name):
-    plot_path = plot_overlaid_with_normalization(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.dataset_identifier, variables, self.time_variable, plot_name)
-    self.simple_plot_paths.append(plot_path)
+  # def plot_normalized_columns(self, variables, plot_name):
+  #   plot_path = plot_overlaid_with_normalization(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.dataset_identifier, variables, self.time_variable, plot_name)
+  #   self.simple_plot_paths.append(plot_path)
   
   def plot_temp_cleaning(self):
     plot_path = plot_temp_cleaning(self.cleaned_dataset, self.plot_folder, self.subid, self.condition, self.dataset_identifier, 'Temperature_C', self.time_variable)
@@ -282,7 +282,7 @@ class skynDatasetProcessor:
         plot_path = plot_overlaid_TAC_curves(self.cleaned_dataset, self.plot_folder, self.subid, self.condition,self.dataset_identifier, variable_grouping, self.time_variable, group_name)
         self.plot_paths.append(plot_path)
 
-  def make_prediction(self, models, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent', 'major_outlier_N', 'minor_outlier_N']):
+  def make_prediction(self, models, predictors = ['auc_per_hour', 'curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent', 'major_outlier_N', 'minor_outlier_N']):
     predictions = {}
     for version in ['Cleaned', 'Raw']:
       if version == 'Raw':

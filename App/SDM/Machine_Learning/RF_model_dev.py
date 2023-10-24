@@ -42,7 +42,7 @@ def RF_CV(features, predictors, grouping_column_name, label_column_name,
 
   return cv_stats, cv_results, incorrect, correct, predictors, n_splits, rf_optimal.best_estimator_
 
-def RF_CV_alc_vs_non(features, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent']):
+def RF_CV_alc_vs_non(features, predictors = ['auc_per_hour', 'curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent']):
   
   if 'major_outlier_N' in features.columns:
     predictors.extend(['major_outlier_N', 'minor_outlier_N'])

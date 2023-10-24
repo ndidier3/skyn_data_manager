@@ -1,8 +1,8 @@
 from SDM.Skyn_Processors.skyn_cohort_processor import skynCohortProcessor
 from datetime import date
-# from SDM.Reporting.export import load_default_model
+from SDM.Reporting.export import load_default_model
 import os
-model = None #load_default_model()
+model = load_default_model()
 cohort_name = 'test_PP_cohort'
 data_out = f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Processed_Datasets'
 graphs_out = f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Plots'

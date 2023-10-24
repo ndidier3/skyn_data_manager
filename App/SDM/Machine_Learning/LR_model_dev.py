@@ -43,7 +43,7 @@ def LR_CV(features, predictors, grouping_column_name, label_column_name,
   return cv_stats, cv_results, incorrect, correct, predictors, n_splits, lr_optimal.best_estimator_
 
 
-def LR_CV_alc_vs_non(features, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 
+def LR_CV_alc_vs_non(features, predictors = ['auc_per_hour', 'curve_auc', 'rise_rate', 'fall_duration', 
                                              'peak', 'fall_rate', 'rise_duration', 'TAC_N', 
                                              'average_tac_difference', 'tac_alteration_percent']):
   

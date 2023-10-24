@@ -17,7 +17,7 @@ class skynCohortTester:
     self.stats = cohort_processor.stats
     self.predictions = {}
 
-  def make_binary_predictions(self, predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent', 'major_outlier_N', 'minor_outlier_N']):
+  def make_binary_predictions(self, predictors = ['auc_per_hour', 'curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent', 'major_outlier_N', 'minor_outlier_N']):
     for version in ['Cleaned', 'Raw']:
       features = self.stats[version]
       if 'major_outlier_N' not in features.columns.tolist():

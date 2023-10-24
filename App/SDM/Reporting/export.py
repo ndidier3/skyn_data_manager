@@ -60,11 +60,11 @@ def load(name, folder):
   pickle_in.close()
   return object
 
-# def load_default_model():
-#   pickle_in = open('App/SDM/Default_Model/MARSRF_model.pickle', "rb")
-#   object = pickle.load(pickle_in)
-#   pickle_in.close()
-#   return {'RF_default': object}
+def load_default_model():
+  pickle_in = open('App/SDM/Default_Model/mars_c4lbRF_model_cleaned.pickle', "rb")
+  object = pickle.load(pickle_in)
+  pickle_in.close()
+  return {'RF_default': object}
 
 def export_variable_key(writer, new_model_development = True):
   variable_key = pd.read_excel('Resources/FeatureKey.xlsx', index_col='Variable Name')

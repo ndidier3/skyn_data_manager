@@ -40,7 +40,7 @@ class skynCohortProcessor:
       skyn_timestamps_timezone = -5,
       
       #model development customization
-      predictors = ['curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent', 'major_outlier_N', 'minor_outlier_N']
+      predictors = ['auc_per_hour', 'curve_auc', 'rise_rate', 'fall_duration', 'peak', 'fall_rate', 'rise_duration', 'TAC_N', 'average_tac_difference', 'tac_alteration_percent', 'major_outlier_N', 'minor_outlier_N']
       ):
     
     #data in: tac data, metadata, redcap data, etc.

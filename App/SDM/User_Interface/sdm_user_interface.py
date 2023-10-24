@@ -20,6 +20,7 @@ import os
 from pathlib import Path
 import traceback
 import pandas as pd
+import sys
 
 class SkynDataManagerApp(Tk):
   def __init__(self):
@@ -445,7 +446,7 @@ class SkynDataManagerApp(Tk):
     program = self.program
     data_format = self.data_selection_method 
 
-    #self.models = self.models if len(list((self.models.keys())))>0 else load_default_model()
+    self.models = self.models if len(list((self.models.keys())))>0 else load_default_model()
 
     if data_format == 'Test':
       cohort_name = 'Test'
@@ -606,3 +607,4 @@ class SkynDataManagerApp(Tk):
 
   def on_closing(self):
     self.destroy()
+    sys.exit(0)

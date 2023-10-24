@@ -9,8 +9,8 @@ def create_optimal_rf(cv_method = 5):
   rf = RandomForestClassifier()
   max_depth = [int(x) for x in np.linspace(10, 50, num = 11)]
   distributions = {
-    'n_estimators': [100],
-    'max_features': ["auto", "sqrt", "log2"],
+    'n_estimators': [10, 50, 100, 200, 300],
+    'max_features': [3, 5, 7],
     'max_depth': max_depth,
     'min_samples_split': [2],
     'min_samples_leaf': [1],
@@ -20,7 +20,7 @@ def create_optimal_rf(cv_method = 5):
   return rf_optimal
 
 def create_optimal_lr(cv_method=3):
-  lr = LogisticRegression(solver='liblinear', random_state=13)
+  lr = LogisticRegression(solver='liblinear', random_state=13, max_iter=1000)
   distributions = dict(C=[0.001,0.01,0.1,1,10,100,1000], penalty=['l1', 'l2'])
   lr_optimal = GridSearchCV(estimator = lr, scoring='accuracy', param_grid = distributions, cv=cv_method, n_jobs = -1)
   return lr_optimal
