@@ -118,7 +118,7 @@ class skynCohortProcessor:
       if len(self.master_dataset) == 0:
         self.master_dataset = occasion.cleaned_dataset
       else:
-        self.master_dataset = self.master_dataset.append(occasion.cleaned_dataset)
+        self.master_dataset = pd.concat([self.master_dataset, occasion.cleaned_dataset], ignore_index=True)
     self.load_stats()
     
     if not os.path.exists(self.python_object_folder):
