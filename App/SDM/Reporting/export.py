@@ -46,7 +46,7 @@ def export_skyn_workbook(cleaned_dataset, subid, condition, dataset_identifier, 
     worksheet.insert_image(image_start_cell, (plot_path))
     row_index += 20
 
-  writer.save()
+  writer.close()
 
 def save(object, filename, folder):
   out = open(f'{folder}/{filename}.pickle', "wb")

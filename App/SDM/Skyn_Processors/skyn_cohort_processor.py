@@ -333,7 +333,7 @@ class skynCohortProcessor:
         for model_name in ['random_forest', 'logistic_regression']:
           self.stats['Model_Results_Alc_vs_Non'][f'{model_name} - {dataset_version}'].to_excel(writer, index=False, sheet_name=get_model_summary_sheet_name(model_name, dataset_version))
 
-    writer.save()
+    writer.close()
   
   def iterative_near_real_time_testing(self):
   

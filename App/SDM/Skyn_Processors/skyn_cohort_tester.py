@@ -147,5 +147,5 @@ class skynCohortTester:
                               'y_scale': y_scale})
 
       counter += 1
-    writer.save()
+    writer.close()
       
