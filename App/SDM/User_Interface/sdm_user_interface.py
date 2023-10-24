@@ -507,7 +507,7 @@ class SkynDataManagerApp(Tk):
           run_procedure = messagebox.askyesno("Skyn Data Manager", f'Would you like to process Skyn datasets and calculate features for cohort "{cohort_name}"?')
           if run_procedure:
             sdm_processor.process_cohort()
-            writer = pd.ExcelWriter(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/features.xlsx')
+            writer = pd.ExcelWriter(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/features.xlsx', engine='xlsxwriter')
             sdm_processor.stats['Cleaned'].to_excel(writer, sheet_name = 'Cleaned', index=False)
             sdm_processor.stats['Raw'].to_excel(writer, sheet_name = 'Raw', index=False)
             writer.save()
@@ -599,7 +599,7 @@ class SkynDataManagerApp(Tk):
 
     finally:
       SDM_run_settings = get_sdm_run_settings(self, self.data_selection_method, program, data_out, graphs_out, analyses_out, cohort_name)
-      writer = pd.ExcelWriter(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/program_settings_{datetime.now().strftime("%H-%M-%S")}.xlsx')
+      writer = pd.ExcelWriter(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/program_settings_{datetime.now().strftime("%H-%M-%S")}.xlsx', engine='xlsxwriter')
       SDM_run_settings.to_excel(writer, sheet_name='Program Settings', index=False)
       writer.save()
       messagebox.showinfo("Skyn Data Manager", f'Program complete. Program settings saved here: Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/.')

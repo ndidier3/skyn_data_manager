@@ -23,3 +23,5 @@ notes.txt
 *.pyo
 Resources/fieldYW_Metadata.xlsx
 Resources/uf_field_Metadata.xlsx
+venv
+sdm_env
