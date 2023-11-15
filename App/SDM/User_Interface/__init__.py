@@ -1,1 +1,0 @@
-from .sdm_user_interface import SkynDataManagerApp

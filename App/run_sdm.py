@@ -1,3 +1,0 @@
-from SDM.User_Interface.sdm_user_interface import SkynDataManagerApp
-
-SkynDataManagerApp()

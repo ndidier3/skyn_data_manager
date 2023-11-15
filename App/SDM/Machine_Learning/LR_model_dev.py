@@ -4,6 +4,9 @@ from sklearn.metrics import roc_auc_score
 from SDM.Machine_Learning.model_optimization import create_optimal_lr
 from SDM.Machine_Learning.cv_custom import cv_custom
 
+from joblib import parallel_backend
+parallel_backend("threading")
+
 def LR_CV(features, predictors, grouping_column_name, label_column_name, 
           relabeling_dict = {}, #key = existing value, val = value to replace existing value (may not be needed)
           filter_dict = {} #key = column name, val = list of values to exclude (may not be needed)

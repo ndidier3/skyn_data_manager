@@ -5,6 +5,9 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import GridSearchCV
 import numpy as np
 
+from joblib import parallel_backend
+parallel_backend("threading")
+
 def create_optimal_rf(cv_method = 5):
   rf = RandomForestClassifier()
   max_depth = [int(x) for x in np.linspace(10, 50, num = 11)]

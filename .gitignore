@@ -27,3 +27,5 @@ Resources/fieldYW_Metadata.xlsx
 Resources/uf_field_Metadata.xlsx
 venv
 sdm_env
+SDM_prompt.exe
+sdm_user_interface.spec

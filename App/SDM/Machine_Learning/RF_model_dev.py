@@ -5,6 +5,9 @@ from SDM.Machine_Learning.cv_custom import cv_custom
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
 
+from joblib import parallel_backend
+parallel_backend("threading")
+
 def RF_CV(features, predictors, grouping_column_name, label_column_name, 
           relabeling_dict = {}, #key = existing value, val = value to replace existing value (may not be needed)
           filter_dict = {} #key = column name, val = list of values to exclude (may not be needed)
