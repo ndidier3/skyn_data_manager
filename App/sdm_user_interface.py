@@ -1,18 +1,15 @@
-from SDM.Skyn_Processors.skyn_cohort_processor import skynCohortProcessor
-from SDM.Skyn_Processors.skyn_dataset_processor import skynDatasetProcessor
-from SDM.Reporting.export import *
-from SDM.Configuration.configuration import get_drink_count
-from SDM.User_Interface.Frames.optional_settings_frame import OptionalSettingsFrame
-from SDM.User_Interface.Frames.data_selection_method_frame import DataSelectionMethodFrame
+from SDM.Configuration.file_management import *
+from SDM.Configuration.configuration import load_metadata
+from SDM.User_Interface.Sub_Windows.settings_window import SettingsWindow
+from SDM.User_Interface.Frames.data_loading_method_frame import DataLoadingMethodSelection
 from SDM.User_Interface.Frames.program_selection_frame import ProgramSelectionFrame
-from SDM.User_Interface.Sub_Windows.create_metadata_window import CreateMetadataWindow
-from SDM.User_Interface.Sub_Windows.filenames_confirmation_window import FilenamesConfirmationWindow
-from SDM.User_Interface.Sub_Windows.rename_files_window import RenameFilesWindow
+from SDM.User_Interface.Frames.header_menu import HeaderMenu
 from SDM.User_Interface.Utils.filename_tools import *
+from SDM.User_Interface.Utils.processor_config import *
 from SDM.User_Interface.Utils.get_sdm_run_settings import get_sdm_run_settings
 from SDM.User_Interface.Utils.get_font_size import get_font_size
 from tkinter import *
-from tkinter import filedialog, ttk
+from tkinter import filedialog, ttk, simpledialog
 from tkinter import messagebox
 from datetime import date, datetime
 import pickle
@@ -25,17 +22,24 @@ import sys
 class SkynDataManagerApp(Tk):
   def __init__(self):
     super().__init__()
-    self.geometry("1400x800")
+    self.geometry("750x500")
     self.title("SDM")
     self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    self.models = []
+    self.files_to_merge = {}
+    self.skyn_upload_timezone = 'CST'
+    self.max_dataset_duration = 24
+    self.previous_processor = None
+
+    self.header_menu = HeaderMenu(self)
 
     style = ttk.Style()
     style.configure("BW-Label", foreground="black", background="white", fontsize=14)
     style.configure("Header", foreground="black", background="white", fontsize=14)
 
-
     self.required_inputs_frame = Frame(self, highlightbackground="black", highlightthickness=3)
-    self.required_inputs_frame.grid(row=0, column=0, padx=0, pady=0)
+    self.required_inputs_frame.grid(row=0, column=0, padx=20, pady=20, sticky='ew')
     
     self.header_style = (None, get_font_size('header'), 'bold')
     self.label_style = (None, get_font_size('label'))
@@ -43,567 +47,236 @@ class SkynDataManagerApp(Tk):
     self.mainHeader = Label(self.required_inputs_frame, text = 'Skyn Data Manager', font=self.header_style)
     self.mainHeader.grid(row=0, column=1, padx=5, pady=8)
 
-    self.data_selection_method = None
-    self.data_selection_method_frame = DataSelectionMethodFrame(self.required_inputs_frame, self)
-    self.data_selection_method_frame.grid(row=1, column=1, padx=5, pady=5, sticky='w')
+    self.data_loading_method = None
+    self.data_loading_method_frame = DataLoadingMethodSelection(self.required_inputs_frame, self)
+    self.data_loading_method_frame.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
     self.program = None
     self.program_selection_frame = ProgramSelectionFrame(self.required_inputs_frame, self)
+    self.program_specs = {
+      'SP': {
+        'ProcessSignal': True,
+        'Predict': False,
+        'Train+Test': False,
+      },
+      'SP_P': {
+        'ProcessSignal': True,
+        'Predict': True,
+        'Train+Test': False
+      },
+      'SP_ML': {
+        'ProcessSignal': True,
+        'Predict': False,
+        'Train+Test': True
+      },
+      'P': {
+        'ProcessSignal': False,
+        'Predict': True,
+        'Train+Test': False
+      },
+      'ML': {
+        'ProcessSignal': False,
+        'Predict': False,
+        'Train+Test': True
+      }
+    }
 
     self.data_loading_frame = Frame(self.required_inputs_frame)
 
     self.x_separator_mid = ttk.Separator(self.required_inputs_frame, orient='horizontal')
-    self.y_separator = ttk.Separator(self.data_loading_frame, orient='vertical')
-
-    #Select data folder
-    self.selected_data = ''
-    self.selectDataLabelText = 'Select data:'
-    self.selectDataLabel = Label(self.data_loading_frame, text = self.selectDataLabelText)
-    self.selectDataButton = Button(self.data_loading_frame, width = 27, text='Select Data', command=self.select_skyn_data)
-
-    #Configure data button
-    self.configureData = Button(self.data_loading_frame, width = 27, text = 'Configure Data')
+    # self.y_separator = ttk.Separator(self.data_loading_frame, orient='vertical')
 
     #cohort name
-    self.cohortNameLabelText = 'Cohort Name:'
+    self.cohortNameLabelText = '1. Cohort Name:'
     self.cohortNameLabel = Label(self.data_loading_frame, text = self.cohortNameLabelText)
-    self.validate_cohort_name_length = self.register(lambda P: len(P) <= 10)
-    self.cohortNameEntry = Entry(self.data_loading_frame, width = 20, validate="key", validatecommand=(self.validate_cohort_name_length, "%P"))    
+    self.validate_cohort_name_length = self.register(lambda P: len(P) <= 13)
+    self.cohortNameEntry = Entry(self.data_loading_frame, width = 20, validate="key", validatecommand=(self.validate_cohort_name_length, "%P"))  
+    
+    #Select data folder
+    self.selected_data = ''
+    self.selectDataLabelText = '2. Select Data:'
+    self.selectDataLabel = Label(self.data_loading_frame, text = self.selectDataLabelText)
+    self.selectDataButton = Button(self.data_loading_frame, width = 27, text='Select Data', command=self.select_skyn_data)
+    self.selectDataButton.config(font=(None, 8), height=1)
 
     #select metadata
     self.metadata = None
-    self.metadataLabelText = 'Select metadata:'
-    self.metaselectDataLabel = Label(self.data_loading_frame, text = self.metadataLabelText)
-    self.metadataFolderButton = Button(self.data_loading_frame, width = 20, text='Select metadata (.xlsx)', command=self.open_metadata)
-    
-    #create metadata
-    self.createMetaselectDataLabelText = 'No metadata file created?'
-    self.createMetaselectDataLabel = Label(self.data_loading_frame, text = self.createMetaselectDataLabelText)
-    self.createMetadataButton = Button(self.data_loading_frame, text='Create metadata (.xlsx)', command=self.open_metadata_creator)
+    self.metadataLabelText = '3. Select Metadata:'
+    self.metadataLabel = Label(self.data_loading_frame, text = self.metadataLabelText)
+    self.metadataFolderButton = Button(self.data_loading_frame, width = 20, text='Select Metadata (.xlsx)', command=self.open_metadata, state='disabled')
+    self.metadataFolderButton.config(font=(None, 8), height=1)
 
-    self.runProgramButton = Button(self, text='RUN PROGRAM', fg='blue', command=self.run)
-    self.cohortNameEntry.bind("<FocusOut>", self.show_run_button())
+    self.runProgramButton = Button(self, text='Submit', fg='blue', command=self.open_settings)
+    self.cohortNameEntry.bind("<KeyRelease>", self.toggle_run_button)
+    self.cohortNameEntry.bind("<KeyRelease>", self.toggle_metadata_button)
 
     #LOAD FILE DIRECTLY
-    
-    self.OptionsFrame = None
-
-    self.models = {}
-    self.files_to_merge = {}
-    self.data_download_timezone = -5
-    self.timestamps_filename = None
-    self.max_dataset_duration = 24
-
-    self.previous_processor = None
-    self.subid_i_start = None
-    self.subid_i_end = None
-    self.condition_i_start = None
-    self.condition_i_end = None
-    self.dataset_identifier_i_start = None
-    self.episode_identifer_i_end = None
-    self.dataset_identifiers_required = False
-
-    self.defaults_options = {
-      'models': {},
-      'files_to_merge': {},
-      'data_download_timezone': -5,
-      'timestamps_filename': None,
-      'max_dataset_duration': 24,
-    }
 
     self.update_idletasks()
     mainloop()
   
-  def update_data_selection_method(self, selection):
+  def update_data_loading_method(self, selection):
     #possible selections are Processor, Folder, Single, or Test
     self.program = None
-    if self.OptionsFrame:
-        self.unload_optional_settings()
-    self.data_selection_method = selection
+    self.data_loading_method = selection
     self.program_selection_frame.grid_forget()
-    if self.data_selection_method != 'Processor':
-      self.program_selection_frame = ProgramSelectionFrame(self.required_inputs_frame, self)
-      self.program_selection_frame.grid(row=2, column=1, padx=5, pady=(0, 15), sticky='w')
-      self.x_separator_mid.grid(row=3, column=1, columnspan=2, sticky='ew')
+
+    self.program_selection_frame = ProgramSelectionFrame(self.required_inputs_frame, self)
+    self.program_selection_frame.grid(row=2, column=1, padx=5, pady=(0, 15), sticky='w')
+    self.x_separator_mid.grid(row=3, column=1, columnspan=2, sticky='ew')
+
     self.unload_data()
+
+    if self.data_loading_method == 'Test':
+      self.selected_data = os.path.abspath('App/SDM/TestData/') + '/'
+      self.filenames = [file for file in os.listdir(self.selected_data)]
+      self.metadata = 'Resources/Cohort Metadata TEST.xlsx'
+      self.metadata_df = pd.read_excel(self.metadata)
+
     self.refresh_user_interface()
 
   def update_program(self, selection):
     self.program = selection
+    self.selected_programs = self.program_specs[self.program]
+
     self.refresh_user_interface()
   
   def refresh_user_interface(self):  
-    if self.data_selection_method in ['Single', 'Folder', 'Processor']:
+    if self.data_loading_method in ['Single', 'Folder', 'Processor']:
       self.data_loading_frame.grid_forget()
       self.selectDataLabel.grid_forget()
       self.selectDataButton.grid_forget()
       self.data_loading_frame.grid(row=4, column=1, padx=5, pady=0)
-      self.selectDataLabel.grid(row=2, column=0, padx=(0, 50), pady=(2,0))
-      self.selectDataButton.grid(row=3, column=0, padx=(0, 50), pady=(0,7))
+      self.selectDataLabel.grid(row=0, column=1, padx=(0, 20), pady=(2,0))
+      self.selectDataButton.grid(row=1, column=1, padx=(0, 20), pady=(0,5))
     else: #Test
       self.data_loading_frame.grid_forget()
       self.selectDataLabel.grid_forget()
       self.selectDataButton.grid_forget()
-      if self.OptionsFrame:
-        self.OptionsFrame.grid_forget()
       
-    if self.data_selection_method == 'Single' or self.data_selection_method == 'Folder':
-      self.cohortNameLabel.grid(row=0, column=0, padx=(0, 50), pady=(2, 0))
-      self.cohortNameEntry.grid(row=1, column=0, padx=(0, 50), pady=(0, 5))
-      self.metaselectDataLabel.grid(row=0, column=2, padx=(50, 0), pady=(2, 0))
-      self.metadataFolderButton.grid(row=1, column=2, padx=(50, 0), pady=(0, 5))
-      self.createMetaselectDataLabel.grid(row=2, column=2, padx=(50, 0), pady=(2, 0))
-      self.createMetadataButton.grid(row=3, column=2, padx=(50, 0), pady=(0, 7))
-      self.y_separator.grid(row=0, column=1, rowspan=6, sticky='ns')
+    if self.data_loading_method == 'Single' or self.data_loading_method == 'Folder':
+      self.cohortNameLabel.grid(row=0, column=0, padx=(0, 20), pady=(2, 0))
+      self.cohortNameEntry.grid(row=1, column=0, padx=(0, 20), pady=(0, 5))
+      self.metadataLabel.grid(row=0, column=2, padx=(20, 0), pady=(2, 0))
+      self.metadataFolderButton.grid(row=1, column=2, padx=(20, 0), pady=(0, 5))
     else:
-      self.metaselectDataLabel.grid_forget()
+      self.metadataLabel.grid_forget()
       self.metadataFolderButton.grid_forget()
       self.cohortNameLabel.grid_forget()
       self.cohortNameEntry.grid_forget()
-      self.createMetaselectDataLabel.grid_forget()
-      self.createMetadataButton.grid_forget()
-      self.y_separator.grid_forget()
 
-    if self.data_selection_method == 'Single':
+    if self.data_loading_method == 'Single':
       self.selectDataButton['text'] = 'Select Dataset (.xlsx or .csv)'
       self.selectDataButton.config(width = 27)
-    elif self.data_selection_method == 'Processor':
-      self.selectDataButton['text'] = 'Select Processor (.pickle)'
-      self.selectDataButton.grid(row=3, column=0, padx=5, pady=5)
-      self.selectDataButton.config(width = 22)
+    elif self.data_loading_method == 'Processor':
+      self.selectDataLabel['text'] = 'Select SDM Processor'
+      self.selectDataButton['text'] = 'Select File (.sdm)'
+      self.selectDataButton.grid(row=1, column=1, padx=(0, 20), pady=(0,5))
+      self.selectDataButton.config(width = 24)
     else:
-      self.selectDataButton['text'] = 'Select Cohort (Folder of .xlsx and/or .csv files)'
-      self.selectDataButton.config(width = 35)
+      self.selectDataButton['text'] = 'Select Folder (.xlsx and/or .csv)'
+      self.selectDataButton.config(width = 32)
 
+    self.toggle_export_report_button()
+    self.toggle_run_button()
+
+  def toggle_export_report_button(self):
+    if self.previous_processor:
+      self.exportReportButton = Button(self, text = 'Export SDM Report', command=self.export_report)
+      self.exportReportButton.grid(row=34, column=0, pady=(30, 15), padx=(100, 0))
+    else:
+      try:
+        self.exportReportButton.grid_forget()
+      except:
+        pass
+  
+  def export_report(self):
+    if self.previous_processor:
+      self.previous_processor.export_SDM_report()
+    else:
+      messagebox.showerror('SDM Error', 'No processor loaded.')
+
+  def toggle_run_button(self):
     if self.program:
-      if self.OptionsFrame:
-        self.unload_optional_settings()
-      if self.data_selection_method != 'Test':
-        self.show_optional_settings()
-      if 'T' in self.program:
-        self.models = {}
-    else:
-      if self.OptionsFrame:
-        self.unload_optional_settings()
-
-    self.show_run_button()
-
-  def show_run_button(self):
-    if self.program and self.data_selection_method:
-      if self.data_selection_method == 'Test':
+      if (self.data_loading_method == 'Test'):
         self.runProgramButton.grid(row=35, column=0, pady=(30, 15), padx=(100, 0), sticky='w')
-      elif self.data_selection_method == 'Folder' or self.data_selection_method == 'Single':
-        print(self.selected_data, self.metadata, self.cohortNameEntry.get(), self.subid_i_start, self.subid_i_end, self.condition_i_start, self.condition_i_end)
-        if (self.selected_data and self.metadata and self.cohortNameEntry.get() and type(self.subid_i_start) == int and type(self.subid_i_end) == int and type(self.condition_i_start) == int and type(self.condition_i_end) == int):
+      elif (self.data_loading_method == 'Folder' or self.data_loading_method == 'Single') and (self.selected_data and self.metadata and self.cohortNameEntry.get()):
           self.runProgramButton.grid(row=35, column=0, pady=(30, 15), padx=(100, 0), sticky='w')
-        else:
-          self.runProgramButton.grid_forget()
-      elif self.data_selection_method == 'Processor':
-        if self.previous_processor:
+      elif (self.data_loading_method == 'Processor') and (self.previous_processor):
           self.runProgramButton.grid(row=35, column=0, pady=(30, 15), padx=(100, 0), sticky='w')
-        else:
-          self.runProgramButton.grid_forget()
       else:
         self.runProgramButton.grid_forget()
     else:
       self.runProgramButton.grid_forget()
 
-  def show_optional_settings(self):
-    self.OptionsFrame = OptionalSettingsFrame(self)
-    self.OptionsFrame.grid(row=0, column=1, padx=10, pady=0, sticky='n')
-
-  def unload_optional_settings(self):
-    self.OptionsFrame.grid_forget()
-    if list(self.defaults_options.values()) != [self.models, self.files_to_merge, self.data_download_timezone, self.timestamps_filename,  self.max_dataset_duration]:
-      self.reset_optional_settings()
-
-  def reset_optional_settings(self):
-    self.files_to_merge = {}
-    self.models = {}
-    self.timestamps_filename = None
-    self.data_download_timezone = -5
-    self.max_dataset_duration = 24
-
   def unload_data(self):
-    self.selectDataLabel['text'] = 'Select Data'
+    self.selectDataLabel['text'] = '2. Select Data'
     self.selectDataLabel.config(fg = 'black')
+    self.metadataLabel['text'] = '3. Select Metadata'
+    self.metadataLabel.config(fg = 'black')
     self.selectDataButton['text'] = self.selectDataLabelText
     self.selected_data = ''
+    self.filenames = []
     self.previous_processor = None
+    self.metadata = None
+    self.metadata_df = pd.DataFrame()
   
   def select_skyn_data(self):
-    if self.data_selection_method == 'Single':
-      skyn_dataset_file = filedialog.askopenfile(mode='r', filetypes=[('Skyn dataset','*.xlsx *.csv *.CSV')])
-      if skyn_dataset_file:
-        skyn_dataset_filename = os.path.abspath(skyn_dataset_file.name)
-        self.selected_data = skyn_dataset_filename
-        print('this gets split', skyn_dataset_filename)
-        filename=os.path.split(skyn_dataset_filename)[-1]
-        self.selectDataLabel['text'] = f'Dataset selected: {filename}'
-        skyn_dataset_file.close()
-        self.verify_filename(filename, os.path.dirname(self.selected_data))
-
-    elif self.data_selection_method == 'Processor':
-      processor_file = filedialog.askopenfile(mode='r', filetypes=[('Previous Processor', '*.pickle')])
-      if processor_file:
-        try:
-          pickle_in = open(processor_file.name, "rb") 
-          skyn_processor = pickle.load(pickle_in)
-          pickle_in.close()
-          model_avail = models_ready(skyn_processor)
-          data_avail = data_ready(skyn_processor)
-          data_avail = all([occasion.condition in ['Alc', 'Non'] for occasion in skyn_processor.occasions])
-
-          if not model_avail and not data_avail:
-            self.previous_processor = None
-            self.selected_data = ''
-            messagebox.showerror('SDM Error', 'This file does not have data processed, or data is not processsed with known labels (Alc or Non).')
-            self.select_skyn_data()
-          elif data_avail:
-            if not model_avail:
-              messagebox.showinfo('SDM', 'No models detected within file. You will not be able to make predictions using already-trained model. However, you can build a new model using this file.')
-            self.previous_processor = skyn_processor
-            self.selected_data = processor_file.name
-            self.selectDataLabel['text'] = f'Skyn processor: {str(processor_file.name.split("/")[-1])}'
-            self.selectDataLabel.config(fg = 'green')
-            if self.program_selection_frame.grid_info():
-              self.program_selection_frame.update_processor_programs(model_avail)
-            else:
-              self.program_selection_frame = ProgramSelectionFrame(self.required_inputs_frame, self)
-              self.program_selection_frame.grid(row=2, column=1, padx=5, pady=(0, 15), sticky='w')
-              self.x_separator_mid.grid(row=3, column=1, columnspan=2, sticky='ew')
-            
-        except Exception:
-          print(traceback.format_exc())
-          messagebox.showerror('SDM Error', traceback.format_exc())
-          self.selectDataLabel['text'] = f'Failed to load: {str(processor_file.name.split("/")[-1])}'
-          self.selectDataLabel.config(fg = 'red')
+    if self.data_loading_method == 'Single':
+      self.selected_data = load_skyn_dataset(self, self.selectDataLabel)
+      self.toggle_metadata_button()
+    elif self.data_loading_method == 'Processor':
+      self.selected_data = load_processor(self, self.selectDataLabel)
+      # if self.previous_processor:
+      #   self.program_selection_frame = ProgramSelectionFrame(self.required_inputs_frame, self)
+      #   self.program_selection_frame.grid(row=2, column=1, padx=5, pady=(0, 15), sticky='w')
+      #   self.x_separator_mid.grid(row=3, column=1, columnspan=2, sticky='ew')
     else:
-      cohort_data_folder = filedialog.askdirectory()
-      if cohort_data_folder:
-        self.verify_directory(cohort_data_folder + '/')
-        
-    self.show_run_button()
+      self.selected_data = load_skyn_directory(self, self.selectDataLabel)
+      self.toggle_metadata_button()
 
-  def verify_directory(self, directory):
-    print(directory)
-    self.filenames = [file for file in os.listdir(directory)]
-    self.dataset_identifiers_required = all([identify_dataset_identifier(filename) != None for filename in self.filenames])
-    self.user_confirmation = False
-    if directory_analysis_ready(directory):
-      self.parsing_indices = get_default_parsing_indices(identify_subid(self.filenames[0]), self.dataset_identifiers_required)
-      self.selected_data = directory
-      self.update_filename_parsing(self.parsing_indices)
-      confirmation_window = FilenamesConfirmationWindow(self, self.parsing_indices)
-      confirmation_window.grab_set()
-      self.wait_window(confirmation_window)
-      self.user_confirmation = confirmation_window.confirmed
-    if directory_analysis_ready(directory) and self.user_confirmation:
-      self.update_filename_parsing(self.parsing_indices)
-      self.selectDataLabel['text'] = f'Cohort Data:  {self.selected_data.split("/")[-1]}'
-      self.selectDataLabel.config(fg='green')
-    else:
-      self.selectDataLabel.config(fg='black')
-      renameFiles = RenameFilesWindow(self, directory, self.filenames)
-      renameFiles.grab_set()
-      self.wait_window(renameFiles)
-      self.select_skyn_data()
+    if not self.selected_data:
+      self.selectDataLabel['text'] = '2. Select Data' if not self.data_loading_method == 'Processor' else 'Select SDM Processor'
+      self.selectDataLabel.config(fg = 'black')
 
-  def verify_filename(self, filename, directory):
-    self.filenames = [file for file in os.listdir(directory)]
-    subid = identify_subid(filename)
-    condition = identify_condition(filename)
-    dataset_identifier = identify_dataset_identifier(filename)
-    self.dataset_identifiers_required = dataset_identifier != None
+    self.toggle_run_button()
 
-    filename_valid = identify_subid(filename) and identify_condition(filename)
-    self.user_confirmation = False
-    if filename_valid:
-      self.user_confirmation = messagebox.askyesno('SDM', f'Is data set info correct?\nSubID = {subid}\nCondition = {condition}\nDataset ID = {dataset_identifier}')
-      print('confirmed?', self.user_confirmation)
-    if filename_valid and self.user_confirmation:
-      self.parsing_indices = get_default_parsing_indices(identify_subid(filename), self.dataset_identifiers_required)
-      self.update_filename_parsing(self.parsing_indices)
-      self.selectDataLabel.config(fg='green')
-    else:
-      renameFiles = RenameFilesWindow(self, directory, self.filenames)
-      renameFiles.grab_set()
-      self.wait_window(renameFiles)
-      self.select_skyn_data()
-
-  def update_filename_parsing(self, indices):
-    self.subid_i_start = indices[0]
-    self.subid_i_end = indices[1]
-    self.condition_i_start = indices[2] 
-    self.condition_i_end = indices[3]
-    self.dataset_identifier_i_start = indices[4]
-    self.episode_identifer_i_end = indices[5]
-
-  def update_models(self, model_name, model):
-    self.models[model_name] = model
+  def update_models(self, model):
+    self.models.append(model)
 
   def reset_models(self):
-    self.models = {}
+    self.models = []
   
   def update_files_to_merge(self, files_to_merge):
     self.files_to_merge = files_to_merge
 
-  def update_crop_settings(self, max_dataset_duration, timezone, timestamps_filename):
-    self.max_dataset_duration = max_dataset_duration
-    self.data_download_timezone = timezone
-    self.timestamps_filename = timestamps_filename
+  def toggle_metadata_button(self, event=None):
+    if self.cohortNameEntry.get() and self.selected_data and (self.data_loading_method == 'Single' or self.data_loading_method == 'Folder'):
+        self.metadataFolderButton.config(state="normal")
+    else:
+        self.metadataFolderButton.config(state="disabled")
 
   def open_metadata(self):
     file = filedialog.askopenfile(mode='r', filetypes=[('Metadata Excel file','*.xlsx')])
     if file:
       metadata_file = os.path.abspath(file.name)
-      metadata = pd.read_excel(metadata_file)
-      necessary_columns = ['SubID', 'Condition', 'Dataset_Identifier','Use_Data', 'TotalDrks']
-      if all(col in metadata.columns for col in necessary_columns):
-        self.metaselectDataLabel['text'] = f'Selected metadata: {str(file.name.split("/")[-1])}'
+      metadata_df = pd.read_excel(metadata_file)
+      
+      if verify_metadata(self.filenames, metadata_df):
+        self.metadataLabel['text'] = f'Metadata: {str(file.name.split("/")[-1])}'
+        self.metadataLabel.config(fg='green')
         self.metadata = metadata_file
+        self.metadata_df = pd.read_excel(metadata_file)
       else:
-        messagebox.showerror('SDM Error', f'Metadata file must have columns: {", ".join(necessary_columns)}. \nFor example, see file: Resources/Test/Cohort Metadata TEST.xlsx')
-    
-    self.show_run_button()
+        self.metadataLabel['text'] = '3. Select Metadata'
+        self.metadataLabel.config(fg='black')
+        
+    self.toggle_run_button()    
 
-  def open_metadata_creator(self):
-    if self.cohortNameEntry.get() == '':
-      messagebox.showerror("Error", 'Missing Cohort Name') 
-    elif self.selected_data == '': 
-      messagebox.showerror("Error", 'Ensure you have selected cohort folder, selected SubID and Condition indices, and provided a Cohort Name.') 
-    elif None in [
-      self.subid_i_start, 
-      self.subid_i_end]:
-      messagebox.showerror("Error", 'Missing SubID index selections.')
-    elif None in [
-      self.condition_i_start, 
-      self.condition_i_end]:
-      messagebox.showerror("Error", 'Missing Condition index selections') 
-    else:
-      data = self.prepare_filename_data()
-      CreateMetadataWindow(data, self.cohortNameEntry.get(), self)    
-
-  def prepare_filename_data(self):
-    if self.data_selection_method == 'Single':
-      file = os.path.split(self.selected_data)[-1]
-      return {
-        'SubID': [file[int(self.subid_i_start):int(self.subid_i_end) + 1]],
-        'Condition': [file[int(self.condition_i_start): int(self.condition_i_end) + 1]],
-        'Dataset_Identifier': [file[int(self.dataset_identifier_i_start): int(self.episode_identifer_i_end)+1]] if all([self.dataset_identifier_i_start, self.episode_identifer_i_end]) else [""],
-        'Use_Data': ["Y"],
-        'TotalDrks': [""],
-        'Notes': [""]
-      }
-    else:
-      if None in [self.dataset_identifier_i_start, self.episode_identifer_i_end]:
-        dataset_identifiers = ["" for i in range(0, len(
-                                [file 
-                                  for file in os.listdir(self.selected_data) 
-                                  if (file[-3:]== 'csv') or (file[-4:] == 'xlsx')
-                                ]))
-                              ]
-      else:
-        dataset_identifiers = [file[
-                                int(self.dataset_identifier_i_start)
-                                :int(self.episode_identifer_i_end)+1] 
-                              for file in os.listdir(self.selected_data) 
-                              if (file[-3:] == 'csv') or (file[-4:] == 'xlsx')]
-      return {
-        'SubID': [file[
-                    int(self.subid_i_start)
-                    :int(self.subid_i_end)+1] 
-                  for file in os.listdir(self.selected_data) 
-                  if (file[-3:] == 'csv') or (file[-4:] == 'xlsx')],
-        'Condition': [file[
-                        int(self.condition_i_start)
-                        :int(self.condition_i_end)+1] 
-                      for file in os.listdir(self.selected_data)
-                      if (file[-3:] == 'csv') or (file[-4:] == 'xlsx')],
-        'Dataset_Identifier': dataset_identifiers,
-        'Use_Data': ["Y" for i in range(0, len(
-                      [file 
-                        for file in os.listdir(self.selected_data) 
-                        if (file[-3:]== 'csv') or (file[-4:] == 'xlsx')
-                      ]))
-                    ],
-        'TotalDrks': ["" for i in range(0, len(
-                      [file 
-                        for file in os.listdir(self.selected_data) 
-                        if (file[-3:]== 'csv') or (file[-4:] == 'xlsx')
-                      ]))
-                    ],
-        'Notes': ["" for i in range(0, len(
-                  [file 
-                    for file in os.listdir(self.selected_data) 
-                      if (file[-3:]== 'csv') or (file[-4:] == 'xlsx')
-                    ]))
-                  ]
-      }     
-
-  def run(self):
-    
-    program = self.program
-    data_format = self.data_selection_method 
-
-    self.models = self.models if len(list((self.models.keys())))>0 else load_default_model()
-
-    if data_format == 'Test':
-      cohort_name = 'Test'
-      self.selected_data = os.path.abspath('Raw/TestData/') + '/'
-      self.filenames = [file for file in os.listdir(self.selected_data)]
-      self.parsing_indices = get_default_parsing_indices(identify_subid(self.filenames[0]), True)
-      self.subid_i_start = self.parsing_indices[0]
-      self.subid_i_end = self.parsing_indices[1]
-      self.condition_i_start = self.parsing_indices[2]
-      self.condition_i_end = self.parsing_indices[3]
-      self.dataset_identifier_i_start = self.parsing_indices[4]
-      self.episode_identifer_i_end = self.parsing_indices[5]
-      self.metadata = 'Resources/Test/Cohort Metadata TEST.xlsx'
-    elif data_format == 'Processor':
-      cohort_name = self.previous_processor.cohort_name
-    else:
-      cohort_name = self.cohortNameEntry.get()
-    
-    try:
-      if not os.path.exists('Results'):
-        os.mkdir('Results')
-      if not os.path.exists(f'Results/{cohort_name}'):
-        os.mkdir(f'Results/{cohort_name}')
-      if not os.path.exists(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}'):
-        os.mkdir(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}')
-      if not os.path.exists(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Model_Performance'):
-        os.mkdir(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Model_Performance')
-    except Exception:
-          print(traceback.format_exc())
-          messagebox.showerror('Error', traceback.format_exc())
-
-    data_out = f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Processed_Datasets'
-    graphs_out = f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Plots'
-    analyses_out = f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Model_Performance'
-
-    print(self.files_to_merge)
-
-    try:
-      if data_format == 'Folder' or data_format == 'Test':
-        sdm_processor = skynCohortProcessor(
-          self.selected_data,
-          metadata_path = self.metadata,
-          cohort_name = cohort_name,
-          merge_variables = self.files_to_merge,
-          episode_start_timestamps_path=self.timestamps_filename,
-          data_out_folder=data_out,
-          graphs_out_folder=graphs_out,
-          analyses_out_folder=analyses_out,
-          subid_index_start=int(self.subid_i_start) + len(self.selected_data),
-          subid_index_end=int(self.subid_i_end) + len(self.selected_data), 
-          condition_index_start=int(self.condition_i_start) + len(self.selected_data), 
-          condition_index_end=int(self.condition_i_end) + len(self.selected_data),
-          dataset_identifier_search_index_start=int(self.dataset_identifier_i_start) + len(self.selected_data) if self.dataset_identifier_i_start else None,
-          dataset_identifier_search_index_end=int(self.episode_identifer_i_end) + len(self.selected_data) if self.episode_identifer_i_end else None,
-          max_dataset_duration=int(self.max_dataset_duration),
-          skyn_timestamps_timezone=int(self.data_download_timezone)
-        )
-        if program == 'P':
-          run_procedure = messagebox.askyesno("Skyn Data Manager", f'Would you like to process Skyn datasets and calculate features for cohort "{cohort_name}"?')
-          if run_procedure:
-            sdm_processor.process_cohort()
-            writer = pd.ExcelWriter(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/features.xlsx', engine='xlsxwriter')
-            sdm_processor.stats['Cleaned'].to_excel(writer, sheet_name = 'Cleaned', index=False)
-            sdm_processor.stats['Raw'].to_excel(writer, sheet_name = 'Raw', index=False)
-            writer.close()
-        elif program == 'PP':
-          run_procedure = messagebox.askyesno("Skyn Data Manager", f'Would you like to process Skyn datasets, calculate features and make predictions on cohort "{cohort_name}" using model(s): {", ".join([model_name for model_name in self.models.keys()])}?')
-          if run_procedure:
-            sdm_processor.process_cohort()
-            sdm_processor.make_predictions(self.models, prediction_type='binary')
-        elif program == 'PTP':
-          run_procedure = messagebox.askyesno("Skyn Data Manager", f'Using data from cohort "{cohort_name}", would you like to process Skyn datasets, calculate features, train new models and test with cross validation?')
-          if run_procedure:
-            sdm_processor.process_cohort()
-            sdm_processor.model_dev_and_test()
-            sdm_processor.create_feature_model_and_predictions_report()
-        else:
-          run_procedure = False
-          messagebox.showerror('Error', 'Invalid program selection.')
-  
-      if data_format == 'Processor':
-        sdm_processor = self.previous_processor
-        if program == 'PP':
-          run_procedure = messagebox.askyesno("Skyn Data Manager", f'Would you like to make predictions on cohort "{cohort_name}" using model(s): {", ".join([model_name for model_name in self.models.keys()])}?')
-          if run_procedure:
-            sdm_processor.make_predictions(self.models, prediction_type='binary')
-        elif program == 'PTP':
-          run_procedure = messagebox.askyesno("Skyn Data Manager", f'Using data from cohort "{cohort_name}", would you like to train new models and test with cross validation?')
-          if run_procedure:
-            sdm_processor.model_dev_and_test()
-            sdm_processor.create_feature_model_and_predictions_report()
-        else:
-          run_procedure = False
-          messagebox.showerror('Error', 'Invalid program selection.')
-      if data_format == 'Single':
-        path_length_to_folder = len("/".join(os.path.split(self.selected_data)[:-1]) + '/')
-        occasion = skynDatasetProcessor(
-          self.selected_data,
-          data_out,
-          graphs_out,
-          int(self.subid_i_start) + path_length_to_folder,
-          int(self.subid_i_end) + path_length_to_folder, 
-          int(self.condition_i_start) + path_length_to_folder, 
-          int(self.condition_i_end) + path_length_to_folder,
-          int(self.dataset_identifier_i_start) + path_length_to_folder if self.dataset_identifier_i_start else None,
-          int(self.episode_identifer_i_end) + path_length_to_folder if self.episode_identifer_i_end else None,
-          self.metadata,
-          self.timestamps_filename,
-          self.data_download_timezone,
-          self.max_dataset_duration
-        )
-        if program == 'P':
-          run_procedure = messagebox.askyesno("Skyn Data Manager", f'Would you like to make process single dataset? \nSelected data: {self.selected_data}')
-          if run_procedure:
-            metadata = pd.read_excel(self.metadata)
-            occasion.max_duration = self.max_dataset_duration
-            for dataset_version in ['Raw', 'Cleaned']:
-              try:
-                occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.dataset_identifier)
-              except:
-                pass
-            occasion.process_with_default_settings(make_plots=True)
-            occasion.plot_column('Motion')
-            occasion.plot_column('Temperature_C')
-            occasion.plot_tac_and_temp()
-            occasion.plot_temp_cleaning()
-            occasion.plot_cleaning_comparison()
-            occasion.export_workbook()
-        elif program == 'PP':
-          run_procedure = messagebox.askyesno("Skyn Data Manager", f'Would you like to make process single dataset and make predictions using model(s): {", ".join([model_name for model_name in self.models.keys()])} ? \nSelected data: {self.selected_data}')
-          if run_procedure:
-            metadata = pd.read_excel(self.metadata)
-            occasion.max_duration = self.max_dataset_duration
-            for dataset_version in ['Raw', 'Cleaned']:
-              try:
-                occasion.stats[dataset_version]['drink_total'] = get_drink_count(occasion.metadata, occasion.subid, occasion.condition, occasion.dataset_identifier)
-              except:
-                pass
-            occasion.process_with_default_settings(make_plots=True)
-            occasion.plot_column('Motion')
-            occasion.plot_column('Temperature_C')
-            occasion.plot_tac_and_temp()
-            occasion.plot_temp_cleaning()
-            occasion.plot_cleaning_comparison()
-            occasion.make_prediction(self.models) # The only difference between P and PP
-            occasion.export_workbook()
-
-    except Exception:
-      print(traceback.format_exc())
-      messagebox.showerror('Error', traceback.format_exc())
-
-    finally:
-      SDM_run_settings = get_sdm_run_settings(self, self.data_selection_method, program, data_out, graphs_out, analyses_out, cohort_name)
-      writer = pd.ExcelWriter(f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/program_settings_{datetime.now().strftime("%H-%M-%S")}.xlsx', engine='xlsxwriter')
-      SDM_run_settings.to_excel(writer, sheet_name='Program Settings', index=False)
-      writer.close()
-      messagebox.showinfo("Skyn Data Manager", f'Program complete. Program settings saved here: Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/.')
+  def open_settings(self):
+    settings = SettingsWindow(self)
+    settings.grab_set()
+    self.wait_window(settings)
 
   def on_closing(self):
     self.destroy()

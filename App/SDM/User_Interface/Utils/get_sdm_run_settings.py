@@ -16,8 +16,8 @@ def get_sdm_run_settings(self, data_format, program, data_out, graphs_out, analy
              [self.selected_data], 
              [data_out], 
              [graphs_out],
-             [self.timestamps_filename],
-             [self.data_download_timezone],
+             [self.disable_timestamp_cropping],
+             [self.skyn_upload_timezone],
              [self.max_dataset_duration]]
           ))).transpose()
     elif program == 'P':
@@ -28,15 +28,15 @@ def get_sdm_run_settings(self, data_format, program, data_out, graphs_out, analy
              [self.selected_data], 
              [data_out], 
              [graphs_out],
-             [self.timestamps_filename],
-             [self.data_download_timezone],
+             [self.disable_timestamp_cropping],
+             [self.skyn_upload_timezone],
              [self.max_dataset_duration]]
           ))).transpose()
     elif program == 'PP':
         return pd.DataFrame(dict(zip(
             ['program', 'prediction models', 'cohort name', 'raw data folder', 'processed data folder', 'graphs folder', 'ML results folder', 'Loaded already-processed data', 'files used in merging', 'chosen merge variables', 'Subject ID column key', 'Timestamps to crop pre-episode data', 'Timezone of data download', 'Max dataset duration'],
             [[program_descriptions[self.program]], 
-             [", ".join([model_name for model_name in self.models.keys()])], 
+             [", ".join([model.model_name for model in self.models])], 
              [cohort_name], 
              [self.selected_data], 
              [data_out], 
@@ -46,8 +46,8 @@ def get_sdm_run_settings(self, data_format, program, data_out, graphs_out, analy
              [' | '.join([filename for filename, info in self.files_to_merge.items()])], 
              [' | '.join([', '.join(info['variables']) for variable, info in self.files_to_merge.items()])], 
              [' | '.join([info['subid_column'] for filename, info in self.files_to_merge.items()])],
-             [self.timestamps_filename],
-             [self.data_download_timezone],
+             [self.disable_timestamp_cropping],
+             [self.skyn_upload_timezone],
              [self.max_dataset_duration]]
           ))).transpose()
     elif program == 'PTP':
@@ -63,8 +63,8 @@ def get_sdm_run_settings(self, data_format, program, data_out, graphs_out, analy
              [' | '.join([filename for filename, info in self.files_to_merge.items()])], 
              [' | '.join([', '.join(info['variables']) for variable, info in self.files_to_merge.items()])], 
              [' | '.join([info['subid_column'] for filename, info in self.files_to_merge.items()])],
-             [self.timestamps_filename],
-             [self.data_download_timezone],
+             [self.disable_timestamp_cropping],
+             [self.skyn_upload_timezone],
              [self.max_dataset_duration]]
           ))).transpose()
     

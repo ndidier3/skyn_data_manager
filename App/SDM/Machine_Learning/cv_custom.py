@@ -1,4 +1,6 @@
-def cv_custom(estimator, features, X, y):
+import pandas as pd
+
+def group_k_fold_cross_validation(cohort_processor, estimator, features, X, y):
   cv_results = {
     'subid': [],
     'y_truth': [],
@@ -18,6 +20,7 @@ def cv_custom(estimator, features, X, y):
     'FP': 0,
     'FN': 0
   }
+  # occasions_to_assess = [occasion for occasion in cohort_processor.occasions if occasion.subid in ]
   for subid in features['subid'].unique().tolist():
     #the split
     X_train = X[features['subid']!=subid]

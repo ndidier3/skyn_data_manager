@@ -1,17 +1,5 @@
-Raw/MARS/
-Raw/C4_errors/
-Raw/MARS2_C4lab
-Raw/C4_field/
-Raw/C4_lab/
-Raw/MARS - Copy/
-Raw/YW field data/
-Raw/on_hold/
-Raw/fieldDataYW/
-Raw/testSplit/
-Resources/C4Field Metadata.xlsx
-Resources/C4Lab Metadata.xlsx
-Resources/MARS2_C4Lab Metadata.xlsx
-Resources/C4 Measures/
+Raw/*
+Resources/**/
 resources/*
 .DS_Store
 /Results/*
@@ -30,3 +18,5 @@ sdm_env
 SDM_prompt.exe
 sdm_user_interface.spec
 SDM.exe
+App/run.py
+archive/

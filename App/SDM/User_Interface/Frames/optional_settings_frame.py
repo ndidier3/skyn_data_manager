@@ -2,8 +2,8 @@ from tkinter import *
 from tkinter import filedialog, StringVar, IntVar
 from tkinter.filedialog import askopenfile
 from tkinter import messagebox
-from SDM.User_Interface.Sub_Windows.crop_settings_window import CropSettingsWindow
-from SDM.User_Interface.Sub_Windows.merge_files_window import MergeFilesWindow
+from App.SDM.User_Interface.Frames.crop_settings import CropSettings
+from App.SDM.User_Interface.Frames.merge_files import MergeFiles
 from SDM.User_Interface.Sub_Windows.model_name_window import ModelNameWindow
 import pickle
 
@@ -17,13 +17,13 @@ class OptionalSettingsFrame(Frame):
     self.header.grid(row=0, column=0, padx=5, pady=(3, 7))
     self.header.config(font=(None, 12, 'bold'))
 
-    if self.parent.program != 'P' and self.parent.data_selection_method != 'Single':
+    if self.parent.program != 'P' and self.parent.data_loading_method != 'Single':
       #checkbox to enable merging other Excel datasets
       self.mergeVariablesButton = Button(self, text='Merge Files with Results', command = self.open_merge_files_window)
       self.mergeVariablesButton.grid(row=1, column=0, padx=5, pady=5)
 
     #checkbox to enable cropping of TAC datasets
-    if self.parent.data_selection_method != 'Processor':
+    if self.parent.data_loading_method != 'Processor':
       self.cropDatasetsButton = Button(self, text='Crop Datasets', command=self.open_crop_settings_window)
       self.cropDatasetsButton.grid(row=2, column=0, padx=5, pady=5)
 
@@ -36,18 +36,18 @@ class OptionalSettingsFrame(Frame):
         self.loadModelCheckbox = Checkbutton(self, text ='Check to load a different model than the built-in / default model.', variable=self.loadModel, command=self.show_model_button)
         self.loadModelCheckbox.grid(row=6, column=0, padx=5, pady=(5, 3))
 
-        self.openModelButton = Button(self, text = 'Select already-trained model (.pickle)', width = 40, command=self.open_model)
+        self.openModelButton = Button(self, text = 'Select SDM Trained Model (.sdmtm)', width = 40, command=self.open_model)
         self.clearModelsButton = Button(self, text = 'Clear all models', width = 20, command=self.reset_models)
 
         self.submittedModelsLabel = Label(self, text = 'Submitted Models:')
 
   def open_merge_files_window(self):
-    sub_window = MergeFilesWindow(self)
+    sub_window = MergeFiles(self)
     sub_window.grab_set()
     self.wait_window(sub_window)
 
   def open_crop_settings_window(self):
-    sub_window = CropSettingsWindow(self)
+    sub_window = CropSettings(self)
     sub_window.grab_set()
     self.wait_window(sub_window)
   
@@ -65,11 +65,11 @@ class OptionalSettingsFrame(Frame):
   def reset_models(self):
     self.parent.reset_models()
     self.selected_model_files = []
-    self.models = {}
+    self.models = []
     self.submittedModelsLabel['text'] = "Submitted Models: "
   
   def open_model(self):
-    file = filedialog.askopenfile(mode='r', filetypes=[('Trained Model', '*.pickle')])
+    file = filedialog.askopenfile(mode='r', filetypes=[('Trained Model', '*.sdmtm'), ('Trained Model', '*.pickle')])
     if file:
       try:
         pickle_in = open(file.name, "rb")
@@ -79,15 +79,9 @@ class OptionalSettingsFrame(Frame):
           self.selected_model_files.append(file.name)
           model = pickle.load(pickle_in)
           pickle_in.close()
-          model_name_window = ModelNameWindow(self)
-          model_name_window.grab_set()
-          self.wait_window(model_name_window)
-          model_name = model_name_window.model_name
-          if model_name == '':
-            model_name = "Model_" + str(len(self.models.keys()) + 1)
-          self.models[model_name] = model
-          self.parent.update_models(model_name, model)
-          self.submittedModelsLabel['text'] = "Submitted Models: " + ", ".join([model_name for model_name in self.models.keys()])
+          self.models.append(model)
+          self.parent.update_models(model)
+          self.submittedModelsLabel['text'] = "Submitted Models: " + ", ".join([model.model_name for model in self.models])
       except:
          messagebox.showerror('SDM Error', f'Failed to load: {str(file.name.split("/")[-1])}')
   

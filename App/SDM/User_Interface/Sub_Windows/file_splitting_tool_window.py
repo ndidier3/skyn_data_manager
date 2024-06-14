@@ -13,14 +13,14 @@ class FileSplittingToolWindow(Toplevel):
   def __init__(self, parent, main_window):
     super().__init__(parent)
 
-    self.geometry("700x600")
-    self.title('File Splitting Tool')
+    self.geometry("350x100")
+    self.title('Skyn Dataset Splitterr')
 
     self.parent = parent
     self.main_window = main_window
 
-    self.header = Label(self, text = "Complete the following prompts to split a raw Skyn dataset into multiple datasets", font = self.main_window.header_style)
-    self.header.grid(row=0, column=0, padx=2, pady=5)
+    self.header = Label(self, text = "Complete the following prompts to split a \nSkyn dataset into multiple datasets", font = self.main_window.header_style)
+    self.header.grid(row=0, column=0, padx=(8, 2), pady=5)
 
     self.frame = Frame(self)
     self.frame.grid(row=1, column=0)
@@ -67,11 +67,13 @@ class FileSplittingToolWindow(Toplevel):
     self.subidLabel = Label(self.frame, text = 'Enter SubID', font=self.main_window.label_style)
     self.subidEntry = Entry(self.frame, width = 15, validate='key', validatecommand=(validate_numeric, "%P"))
 
-
     self.executeFileSplittingButton = Button(self, text = 'Split Files', command = self.split_file)
 
   def open_file(self):
     file = filedialog.askopenfile(mode='r', filetypes=[('Skyn Dataset','*.xlsx'), ('Skyn Dataset','*.csv')])
+    self.geometry("500x500")
+    self.grab_set()
+    self.lift()
     if file:
       filepath = os.path.abspath(file.name)
       self.filepath = filepath
@@ -84,6 +86,7 @@ class FileSplittingToolWindow(Toplevel):
       self.data_to_split = update_column_names(self.data_to_split)
       self.data_to_split.sort_values(by="datetime", inplace=True)
       self.selectedFileLabel['text'] = f'Selected File: {file.name.split("/")[-1]}'
+      self.selectedFileLabel.config(fg='green')
       self.splitTimeStartLabel.grid(row=3, column=0, pady=(5,2), padx=(0,5), sticky='w')
       self.splitTimeOptionMenu.grid(row=3, column=1, pady=(5,2), padx=(5,0), sticky='e')
 
@@ -173,7 +176,7 @@ class FileSplittingToolWindow(Toplevel):
         dataset_identifiers.append(dataset_identifier)
         start_timestamps.append(min(dataset['datetime']))
         end_timestamps.append(max(dataset['datetime']))
-        filename = self.export_folder + f'DayLevel_{os.path.splitext(os.path.basename(self.filepath))[0]}/{subid} Unk {dataset_identifier}.xlsx'
+        filename = self.export_folder + f'DayLevel_{os.path.splitext(os.path.basename(self.filepath))[0]}/{subid} {dataset_identifier}.xlsx'
         dataset.to_excel(filename, index=False, sheet_name="data")
         i += 1
       
@@ -189,9 +192,5 @@ class FileSplittingToolWindow(Toplevel):
       print(traceback.format_exc())
       messagebox.showerror('SDM Error', f'Failed to split files. Error likely due to format of timestamps:\n{traceback.format_exc()}')
 
-  def open_file_splitting_tool(self):
-    sub_window = FileSplittingToolWindow(self)
-    sub_window.grab_set()
-    self.wait_window(sub_window)
 
     

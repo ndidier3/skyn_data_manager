@@ -1,5 +1,5 @@
 from SDM.User_Interface.Frames.rename_file_row import RenameFileRow
-from SDM.User_Interface.Utils.filename_tools import *
+from SDM.User_Interface.Utils.filename_tools import get_used_dataset_identifiers, extract_subid
 from tkinter import *
 from tkinter import StringVar, IntVar
 from tkinter.filedialog import askopenfile
@@ -13,10 +13,12 @@ class RenameFilesWindow(Toplevel):
   def __init__(self, parent, directory, filenames):
     super().__init__(parent)
     self.title("Rename Files")
-    self.geometry("900x1100")
+    self.geometry("1400x900")
     self.parent = parent
     self.directory = directory
     self.filenames = filenames
+    print(filenames)
+    self.used_dataset_ids_per_subid = get_used_dataset_identifiers(self.filenames)
 
     self.columnconfigure(0, weight=5)
     self.columnconfigure(1, weight=1)
@@ -26,20 +28,20 @@ class RenameFilesWindow(Toplevel):
     self.header.grid(row=0, column=0, padx=5, pady=(5, 10))
     self.header.config(font=(None, 14, 'bold'))
     
-    self.episodeIdentifierLabel = Label(self, text = 'Note: Dataset IDs will automatically be added to filenames \nif there are multiple data sets for a given SubID & Condition.')
-    self.episodeIdentifierLabel.config(font=(None, 9, 'italic'))
-    self.episodeIdentifierLabel.grid(row=1, column=0, padx=5, pady=3)
+    self.datasetIdentifierLabel = Label(self, text = 'Note: Dataset IDs will automatically be added to filenames \nif there are multiple data sets for a given SubID & Condition.')
+    self.datasetIdentifierLabel.config(font=(None, 9, 'italic'))
+    self.datasetIdentifierLabel.grid(row=1, column=0, padx=5, pady=3)
 
     self.buttons_frame = Frame(self)
     self.buttons_frame.grid(row=4, column=0)
 
-    self.submit = Button(self.buttons_frame, text = 'Rename Files (Irreversible)', width=25, command = self.rename_files)
+    self.submit = Button(self.buttons_frame, text = 'Rename All Files (Irreversible)', width=25, command = self.rename_files)
     self.submit.grid(row=0, column=0, padx=10, pady=2, sticky='w')
 
     self.close = Button(self.buttons_frame, text = 'Close', width=7, command=self.destroy)
     self.close.grid(row=0, column=1, padx=10, pady=2)
 
-    self.rows_frame = Frame(self, height=800, width=600, highlightbackground="black", highlightthickness=2)
+    self.rows_frame = Frame(self, height=800, width=800, highlightbackground="black", highlightthickness=2)
     self.rows_frame.grid(row=10, column=0, padx=5, pady=5, sticky="nsew")
 
     self.canvas = Canvas(self.rows_frame)
@@ -60,88 +62,57 @@ class RenameFilesWindow(Toplevel):
 
     self.renaming_widgets = {}
     for i, filename in enumerate(self.filenames):
-      self.renaming_widgets[filename] = RenameFileRow(self.inner_frame, filename, i)
+      used_ids = self.used_dataset_ids_per_subid[extract_subid(filename)]
+      self.renaming_widgets[filename] = RenameFileRow(self.inner_frame, self, filename, i, self.directory, used_ids)
       self.renaming_widgets[filename].grid(row=i, column=0, pady=2, padx=2, sticky='w')
     
     self.inner_frame.update_idletasks()
     self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
-
   def rename_files(self):
-    original_filenames = [widget.filename for widget in list(self.renaming_widgets.values())]
-    filenames_valid = [widget.filename_valid for widget in list(self.renaming_widgets.values())]
-    subids = [int(widget.subidEntry.get()) if widget.subidEntry.get().isnumeric() else widget.subidEntry.get() for widget in list(self.renaming_widgets.values())]
-    conditions = [widget.condition.get() for widget in list(self.renaming_widgets.values())]
-    extensions = [widget.filename.split('.')[-1] for widget in list(self.renaming_widgets.values())]
-
-    subids_valid = [isinstance(subid, int) or subid == '' for subid in subids]
-    conditions_valid = [item in ['Unk', 'Non', 'Alc'] or item == '' for item in conditions]
-    
-    if any(subid_verification is False for subid_verification in subids_valid) or any(condition_verification is False for condition_verification in conditions_valid):
-      messagebox.showerror('SDM Error', f'Invalid SubIDS at rows: {[i+1 for i, bool in enumerate(subids_valid) if bool is False]}\nInvalid condition at rows: {[i+1 for i, bool in enumerate(conditions_valid) if bool is False]}')
+    if not all([widget.filename_valid for widget in list(self.renaming_widgets.values())]):
+      messagebox.showerror('SDM Guidance', 'Renaming did not occur. Please revise all invalid filenames. \nSubIDs must consist of 4-6 numeric numbers.\nEpisode Identifier must consist of 1-3 numeric numbers.')
     else:
-      pairings = {}
-      error = False
-      for i, filename in enumerate(original_filenames):
-        pairing = str(subids[i]) + str(conditions[i])
-        if subids[i] == ''  or conditions[i] == '':
-          pass # if both subid and condition are not provided, do not include in renaming
-        elif len(str(subids[i])) < 3 and pairing != '':
-          messagebox.showerror('SDM Error', f'SubID in row {i+1} is less than 3 digits.\n SubIDs must be between 3 and 6 digits long.')
-          error = True
-          break
-        elif pairing not in list(pairings.keys()):
-          pairings[pairing] = [filename]
-        elif pairing != '':
-          pairings[pairing].append(filename)
-
-        
-      dataset_identifier_required = any([len(filenames) > 1 for filenames in list(pairings.values())])
+      original_filenames = [widget.filename for widget in list(self.renaming_widgets.values())]
+      new_filenames = [widget.new_filename for widget in list(self.renaming_widgets.values())]
 
       filename_renaming = {}
-      if not error:
-        for pairing, filenames in pairings.items():
-          used_epi_ids = []
-          for filename in filenames:
-            if matches_convention(filename, dataset_identifier_required=dataset_identifier_required):
-              new_filename = filename
-              if dataset_identifier_required:
-                used_epi_ids.append(identify_dataset_identifier(filename))
-            else:
-              extension = extensions[original_filenames.index(filename)]
-              subid = subids[original_filenames.index(filename)]
-              condition = conditions[original_filenames.index(filename)]
-              dataset_identifier = identify_dataset_identifier(filename, used_epi_ids=used_epi_ids)
-              used_epi_ids.append(dataset_identifier)
+      for i, filename in enumerate(original_filenames):
+        if filename != new_filenames[i]:
+          current_filename = os.path.join(self.directory, filename)
+          new_filename = os.path.join(self.directory, new_filenames[i])
+          filename_renaming[current_filename] = new_filename
+          if os.path.exists(current_filename):
+            try:
+              os.rename(current_filename, new_filename)
+            except:
+              print(traceback.format_exc())
+              messagebox.showerror('Error', traceback.format_exc())
+          
+      self.filenames = [file for file in os.listdir(self.directory)]
+      self.used_dataset_ids_per_subid = get_used_dataset_identifiers(self.filenames)
+      for widget in self.renaming_widgets.values():
+        widget.grid_forget() 
+      self.renaming_widgets = {}
+      for i, filename in enumerate(self.filenames):
+        used_ids = self.used_dataset_ids_per_subid[extract_subid(filename)]
+        self.renaming_widgets[filename] = RenameFileRow(self.inner_frame, self, filename, i, self.directory, used_ids)
+        self.renaming_widgets[filename].grid(row=2+i, column=0, pady=2, padx=2, sticky='w')
+      filenames_df = pd.DataFrame({
+        'Previous Filename': list(filename_renaming.keys()),
+        'New Filename': list(filename_renaming.values()),
+        })
+      if not os.path.exists('Results/File_Renaming/'):
+        os.mkdir('Results/File_Renaming/')
+      filepath = 'Results/File_Renaming/' + f'{self.directory.split("/")[-2]}_renaming_{date.today().strftime("%m.%d.%Y")}{datetime.now().strftime("%H-%M-%S")}.xlsx'
+      print(filenames_df)
+      filenames_df.to_excel(filepath, index=False)
+      messagebox.showinfo('SDM Update', f'Previous and new filenames are recorded in excel file located here: {filepath}')
 
-              new_filename = f'{subid} {condition} {dataset_identifier}.{extension}' if dataset_identifier_required else f'{subid} {condition}.{extension}'
-
-            current_filepath = os.path.join(self.directory, filename)
-            updated_filepath = os.path.join(self.directory, new_filename)
-            filename_renaming[current_filepath] = updated_filepath
-            if os.path.exists(current_filepath) and current_filepath != updated_filepath:
-              try:
-                os.rename(current_filepath, updated_filepath)
-              except:
-                print(traceback.format_exc())
-                messagebox.showerror('Error', traceback.format_exc())
-        
-        self.filenames = [file for file in os.listdir(self.directory)]
-        for widget in self.renaming_widgets.values():
-          widget.grid_forget() 
-        self.renaming_widgets = {}
-        for i, filename in enumerate(self.filenames):
-          self.renaming_widgets[filename] = RenameFileRow(self.inner_frame, filename, i)
-          self.renaming_widgets[filename].grid(row=2+i, column=0, pady=2, padx=2, sticky='w')
-        filenames_df = pd.DataFrame({
-          'Previous Filename': list(filename_renaming.keys()),
-           'New Filename': list(filename_renaming.values()),
-          })
-        if not os.path.exists('Results/File_Renaming/'):
-          os.mkdir('Results/File_Renaming/')
-        filepath = 'Results/File_Renaming/' + f'{self.directory.split("/")[-2]}_renaming_{date.today().strftime("%m.%d.%Y")}{datetime.now().strftime("%H-%M-%S")}.xlsx'
-        print(filenames_df)
-        filenames_df.to_excel(filepath, index=False)
-        messagebox.showinfo('SDM Update', f'Previous and new filenames are recorded in excel file located here: {filepath}')
-
+  def update_used_dataset_ids(self):
+    filenames = [widget.new_filename for widget in list(self.renaming_widgets.values())]
+    self.used_dataset_ids_per_subid = get_used_dataset_identifiers(filenames)
+    print(self.used_dataset_ids_per_subid)
+    for widget in list(self.renaming_widgets.values()):
+      widget.used_dataset_ids = self.used_dataset_ids_per_subid[extract_subid(widget.new_filename)]
       
