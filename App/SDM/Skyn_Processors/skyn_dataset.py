@@ -302,7 +302,7 @@ class skynDataset:
         counts = df['device_on_pred'].value_counts()
       except:
         temp_cutoff = 27
-        self.device_removal_detection_method = f'Temp Cutoff ({temp_cutoff} Celcius)'
+        self.device_removal_detection_method = f'Temp Cutoff ({temp_cutoff} Celsius)'
         df.loc[:, 'device_on_pred'] = df.apply(lambda row: 1 if row['Temperature_C'] > temp_cutoff else 0, axis=1)
         counts = df['device_on_pred'].value_counts()
     else:

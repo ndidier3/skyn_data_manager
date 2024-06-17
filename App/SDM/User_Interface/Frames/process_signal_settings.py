@@ -54,7 +54,7 @@ class ProcessSignalSettings(Frame):
     self.deviceRemovalDetectionLabel = Label(self, text='Select method for detection device removal.')
     self.deviceRemovalDetection = StringVar(self)
     self.deviceRemovalDetection.set('Built-in Algorithm')
-    self.deviceRemovalDetectionDropdown = OptionMenu(self, self.deviceRemovalDetection, *['Built-in Algorithm', 'Temp Cutoff (30 Celcius)', 'Temp Cutoff (29 Celcius)', 'Temp Cutoff (28 Celcius)', 'Temp Cutoff (27 Celcius)', 'Temp Cutoff (26 Celcius)', 'Temp Cutoff (25 Celcius)'])
+    self.deviceRemovalDetectionDropdown = OptionMenu(self, self.deviceRemovalDetection, *['Built-in Algorithm', 'Temp Cutoff (30 Celsius)', 'Temp Cutoff (29 Celsius)', 'Temp Cutoff (28 Celsius)', 'Temp Cutoff (27 Celsius)', 'Temp Cutoff (26 Celsius)', 'Temp Cutoff (25 Celsius)'])
 
     self.majorThresholdLabel.grid(column=0, row=2, pady=(2,0), padx=(35,10), sticky='w')
     self.majorThresholdDropdown.grid(column=0, row=3, pady=(2, 5), padx=(35,10), sticky='w')
