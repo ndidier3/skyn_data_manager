@@ -128,9 +128,9 @@ class SkynDataManagerApp(Tk):
     self.unload_data()
 
     if self.data_loading_method == 'Test':
-      self.selected_data = os.path.abspath('App/SDM/TestData/') + '/'
+      self.selected_data = os.path.abspath('Inputs/Skyn_Data/TestData/') + '/'
       self.filenames = [file for file in os.listdir(self.selected_data)]
-      self.metadata = 'Inputs/Cohort Metadata TEST.xlsx'
+      self.metadata = 'Inputs/Metadata/Cohort Metadata TEST.xlsx'
       self.metadata_df = pd.read_excel(self.metadata)
 
     self.refresh_user_interface()
