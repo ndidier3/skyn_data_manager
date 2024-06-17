@@ -85,8 +85,8 @@ class CreateMetadataWindow(Toplevel):
       self.selected_text_list = [i for i in self.excludeSubidsListbox.curselection()]
       self.folder_metadata['Use_Data'] = [self.folder_metadata['Use_Data'][i] if i not in self.selected_text_list else 'N' for i in range(0, len(self.folder_metadata['Use_Data']))]
       meta_df = pd.DataFrame(self.folder_metadata)
-      meta_df.to_excel(f'Resources/{self.cohortNameEntry.get()}_Metadata.xlsx', index=False)
-      messagebox.showinfo('Success', f'File created: Resources/{self.cohortNameEntry.get()}_Metadata.xlsx')
+      meta_df.to_excel(f'Inputs/{self.cohortNameEntry.get()}_Metadata.xlsx', index=False)
+      messagebox.showinfo('Success', f'File created: Inputs/{self.cohortNameEntry.get()}_Metadata.xlsx')
       self.destroy()
     except Exception:
       print(traceback.format_exc())

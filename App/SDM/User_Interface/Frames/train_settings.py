@@ -69,7 +69,7 @@ class TrainSettings(Frame):
     self.note2.config(font=(None, 8))
     self.note2.grid(column=1, row=12, pady=(0, 0), padx=20, sticky='w')
 
-    self.note3 = Label(self, text='For more details on features, see Resources')
+    self.note3 = Label(self, text='For more details on features, see Inputs')
     self.note3.config(font=(None, 8))
     self.note3.grid(column=1, row=13, pady=(0, 5), padx=20, sticky='w')
 

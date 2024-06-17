@@ -23,7 +23,7 @@ class DataLoadingMethodSelection(Frame):
     self.loadPreviousProcessorRadiobutton = Radiobutton(self, text = 'Load a previously saved SDM processor (.sdm).', command=self.update_data_loading_method, variable=self.var, value = 'Processor', font=self.main_window.label_style)
     self.loadPreviousProcessorRadiobutton.grid(row=4, column=0, padx=5, pady=1, sticky='w')
 
-    self.runTestRadiobutton = Radiobutton(self, text='Load example data (Folder = Raw/Test/) with default settings.', command=self.update_data_loading_method, variable=self.var, value='Test', font=self.main_window.label_style)
+    self.runTestRadiobutton = Radiobutton(self, text='Load test data with default settings.', command=self.update_data_loading_method, variable=self.var, value='Test', font=self.main_window.label_style)
     self.runTestRadiobutton.grid(row=5, column=0, padx=5, pady=1, sticky='w')
   
   def update_data_loading_method(self):

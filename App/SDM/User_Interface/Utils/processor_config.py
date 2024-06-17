@@ -188,7 +188,7 @@ def create_processor(settings_window, sdm_interface):
     if data_format == 'Test':
       sdm_processor = skynCohort(
         os.path.abspath('App/SDM/TestData/') + '/',
-        metadata_path = 'Resources/Test/Cohort Metadata TEST.xlsx',
+        metadata_path = 'Inputs/Cohort Metadata TEST.xlsx',
         cohort_name = 'Test',
         merge_variables = {},
         disable_crop_start = False,
