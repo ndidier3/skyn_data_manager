@@ -1,5 +1,3 @@
-from SDM.Skyn_Processors.skyn_cohort import skynCohort
-from SDM.Skyn_Processors.skyn_dataset import skynDataset
 from SDM.User_Interface.Frames.model_selection import ModelSelection
 from SDM.User_Interface.Frames.crop_settings import CropSettings
 from SDM.User_Interface.Frames.process_signal_settings import ProcessSignalSettings
@@ -63,6 +61,7 @@ class SettingsWindow(Toplevel):
         if self.sdm_interface.selected_programs['Predict']:
           if processor.valid_occasion:
             processor.make_prediction(self.ModelSelectionFrame.selected_models)
+            messagebox.showinfo('SDM', f'SDM complete. See Results/Test')
           else:
             messagebox.showerror('SDM', f'Unable to make prediction; dataset is invalid due to {processor.invalid_reason}')
           processor.export_workbook()
@@ -75,6 +74,7 @@ class SettingsWindow(Toplevel):
           processor.make_predictions_using_default_models(self.ModelSelectionFrame.selected_models)
         if self.sdm_interface.selected_programs['Train+Test']:
           processor.train_models_using_episode_features(self.TrainSettingsFrame.selected_models)
+        messagebox.showinfo('SDM', f'SDM complete. See Results/{self.sdm_interface.cohortNameEntry.get()}')
 
     #IF PREVIOUS PROCESSOR
     except Exception:
