@@ -34,11 +34,11 @@ class ProgramSelectionFrame(Frame):
       self.makePredictionsRadiobutton = Radiobutton(self, text = text, command=self.update_program, variable=self.var, value = value, font=self.main_window.label_style)
       self.makePredictionsRadiobutton.grid(row=3, column=0, padx=5, pady=1, sticky='w')
 
-    if self.main_window.data_loading_method != 'Single':
-      value = 'SP_ML' if self.signal_processing else 'ML'
-      text = 'Process TAC signal, train new model, and make predictions using new model.' if self.signal_processing else 'Train new model and make predictions using new model.'
-      self.modelTrainingRadiobutton = Radiobutton(self, text = text, command=self.update_program, variable=self.var, value = value, font=self.main_window.label_style)
-      self.modelTrainingRadiobutton.grid(row=4, column=0, padx=5, pady=1, sticky='w')
+    # if self.main_window.data_loading_method != 'Single':
+    #   value = 'SP_ML' if self.signal_processing else 'ML'
+    #   text = 'Process TAC signal, train new model, and make predictions using new model.' if self.signal_processing else 'Train new model and make predictions using new model.'
+    #   self.modelTrainingRadiobutton = Radiobutton(self, text = text, command=self.update_program, variable=self.var, value = value, font=self.main_window.label_style)
+    #   self.modelTrainingRadiobutton.grid(row=4, column=0, padx=5, pady=1, sticky='w')
       
     self.main_window = main_window
     self.program = self.main_window.program

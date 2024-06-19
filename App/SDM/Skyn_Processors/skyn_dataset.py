@@ -1,14 +1,14 @@
-from .skyn_datapoint import skynDatapoint
-from ..Configuration.configuration import *
-from ..Crop.crop import *
-from ..Signal_Processing.smooth_signal import *
-from ..Signal_Processing.remove_outliers import *
-from ..Signal_Processing.impute import impute_tac_in_gaps, impute
-from ..Visualization.plotting import *
-from ..Feature_Engineering.tac_features import *
-from ..Configuration.file_management import *
-from ..Documenting.dataset_workbook import export_skyn_workbook
-from ..Signal_Processing.revise_incomplete_features import revise_fall_features, revise_rise_features
+from SDM.Skyn_Processors.skyn_datapoint import skynDatapoint
+from SDM.Configuration.configuration import *
+from SDM.Crop.crop import *
+from SDM.Signal_Processing.smooth_signal import *
+from SDM.Signal_Processing.remove_outliers import *
+from SDM.Signal_Processing.impute import impute_tac_in_gaps, impute
+from SDM.Visualization.plotting import *
+from SDM.Feature_Engineering.tac_features import *
+from SDM.Configuration.file_management import *
+from SDM.Documenting.dataset_workbook import export_skyn_workbook
+from SDM.Signal_Processing.revise_incomplete_features import revise_fall_features, revise_rise_features
 import pandas as pd
 import numpy as np
 import traceback

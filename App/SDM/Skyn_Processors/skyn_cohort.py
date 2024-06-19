@@ -1,15 +1,15 @@
-from .skyn_cohort_tester import skynCohortTester
-from .skyn_dataset import skynDataset
-from ..Configuration.configuration import *
-from ..Visualization.plotting import *
-from ..Configuration.file_management import *
-from ..Documenting.cohort_workbook import SDM_Report
-from ..Machine_Learning.model_optimization import *
-from ..Machine_Learning.pca import *
-from ..Machine_Learning.feature_estimator import train_feature_estimator
-from ..Feature_Engineering.tac_features import *
-from ..Machine_Learning.binary_model_dev import *
-from ..User_Interface.Utils.filename_tools import extract_subid, extract_dataset_identifier
+from SDM.Skyn_Processors.skyn_cohort_tester import skynCohortTester
+from SDM.Skyn_Processors.skyn_dataset import skynDataset
+from SDM.Configuration.configuration import *
+from SDM.Visualization.plotting import *
+from SDM.Configuration.file_management import *
+from SDM.Documenting.cohort_workbook import SDM_Report
+# from ..Machine_Learning.model_optimization import *
+# from ..Machine_Learning.pca import *
+# from ..Machine_Learning.feature_estimator import train_feature_estimator
+from SDM.Feature_Engineering.tac_features import *
+# from ..Machine_Learning.binary_model_dev import *
+from SDM.User_Interface.Utils.filename_tools import extract_subid, extract_dataset_identifier
 import glob
 import pandas as pd
 import fnmatch
@@ -182,50 +182,50 @@ class skynCohort:
     if export_report:
       self.export_SDM_report()
 
-  def create_feature_estimators(self):
-    fall_rate_model = train_feature_estimator(self, predictors=['relative_peak_CLN', 'rise_duration_CLN', 'rise_rate_CLN'], outcome='fall_rate_CLN')
-    self.feature_estimators['fall_rate'] = fall_rate_model
+  # def create_feature_estimators(self):
+  #   fall_rate_model = train_feature_estimator(self, predictors=['relative_peak_CLN', 'rise_duration_CLN', 'rise_rate_CLN'], outcome='fall_rate_CLN')
+  #   self.feature_estimators['fall_rate'] = fall_rate_model
 
-    fall_duration_model = train_feature_estimator(self, predictors=['relative_peak_CLN', 'rise_duration_CLN', 'rise_rate_CLN'], outcome='fall_duration_CLN')
-    self.feature_estimators['fall_duration'] = fall_duration_model
+  #   fall_duration_model = train_feature_estimator(self, predictors=['relative_peak_CLN', 'rise_duration_CLN', 'rise_rate_CLN'], outcome='fall_duration_CLN')
+  #   self.feature_estimators['fall_duration'] = fall_duration_model
 
-    rise_rate_model = train_feature_estimator(self, predictors=['relative_peak_CLN', 'fall_duration_CLN', 'fall_rate_CLN'], outcome='rise_rate_CLN')
-    self.feature_estimators['fall_rate'] = rise_rate_model
+  #   rise_rate_model = train_feature_estimator(self, predictors=['relative_peak_CLN', 'fall_duration_CLN', 'fall_rate_CLN'], outcome='rise_rate_CLN')
+  #   self.feature_estimators['fall_rate'] = rise_rate_model
 
-    rise_duration_model = train_feature_estimator(self, predictors=['relative_peak_CLN', 'fall_duration_CLN', 'fall_rate_CLN'], outcome='rise_duration_CLN')
-    self.feature_estimators['fall_duration'] = rise_duration_model
+  #   rise_duration_model = train_feature_estimator(self, predictors=['relative_peak_CLN', 'fall_duration_CLN', 'fall_rate_CLN'], outcome='rise_duration_CLN')
+  #   self.feature_estimators['fall_duration'] = rise_duration_model
 
-  def train_device_removal_model(self, exclude_beginning=10, exclude_ending=10, holdout=0.3, model_name = 'worn_vs_removed_RF'):
+  # def train_device_removal_model(self, exclude_beginning=10, exclude_ending=10, holdout=0.3, model_name = 'worn_vs_removed_RF'):
     
-    grouped_df = self.master_dataset.groupby('Full_Identifier')
-    first_10_indices = grouped_df.head(exclude_beginning).index
-    last_10_indices = grouped_df.tail(exclude_ending).index
-    indices_for_model_training = first_10_indices.union(last_10_indices)
-    data_for_model_training = self.master_dataset.loc[~self.master_dataset.index.isin(indices_for_model_training)]
-    self.master_dataset['device_removal_model'] = 'excluded'
-    self.master_dataset.loc[~self.master_dataset.index.isin(indices_for_model_training), 'device_removal_model'] = 'included'
+  #   grouped_df = self.master_dataset.groupby('Full_Identifier')
+  #   first_10_indices = grouped_df.head(exclude_beginning).index
+  #   last_10_indices = grouped_df.tail(exclude_ending).index
+  #   indices_for_model_training = first_10_indices.union(last_10_indices)
+  #   data_for_model_training = self.master_dataset.loc[~self.master_dataset.index.isin(indices_for_model_training)]
+  #   self.master_dataset['device_removal_model'] = 'excluded'
+  #   self.master_dataset.loc[~self.master_dataset.index.isin(indices_for_model_training), 'device_removal_model'] = 'included'
 
-    model = train_and_test_model_with_holdout(data_for_model_training, ['temp','temp_a_pre','temp_b_pre','temp_c_pre','temp_a_post','temp_b_post','temp_c_post','temp_mean_change_pre','temp_mean_change_post','temp_change_pre','temp_change_post','motion','motion_a_pre','motion_b_pre','motion_c_pre','motion_a_post','motion_b_post','motion_c_post','motion_mean_change_pre','motion_mean_change_post','motion_change_pre','motion_change_post'],
-                                              holdout=holdout,
-                                              model_name=model_name)
-    if holdout > 0:
-      model.feature_importance = plot_rf_feature_importances(model, model_name, self.model_figures_folder)
+  #   model = train_and_test_model_with_holdout(data_for_model_training, ['temp','temp_a_pre','temp_b_pre','temp_c_pre','temp_a_post','temp_b_post','temp_c_post','temp_mean_change_pre','temp_mean_change_post','temp_change_pre','temp_change_post','motion','motion_a_pre','motion_b_pre','motion_c_pre','motion_a_post','motion_b_post','motion_c_post','motion_mean_change_pre','motion_mean_change_post','motion_change_pre','motion_change_post'],
+  #                                             holdout=holdout,
+  #                                             model_name=model_name)
+  #   if holdout > 0:
+  #     model.feature_importance = plot_rf_feature_importances(model, model_name, self.model_figures_folder)
 
-      self.master_dataset = self.master_dataset.merge(model.cv_results['All_Features'], how='outer', on='Row_ID', suffixes=('', '_right'))
-      self.master_dataset = self.master_dataset.drop(columns=[col for col in self.master_dataset.columns if col.endswith('_right')])
+  #     self.master_dataset = self.master_dataset.merge(model.cv_results['All_Features'], how='outer', on='Row_ID', suffixes=('', '_right'))
+  #     self.master_dataset = self.master_dataset.drop(columns=[col for col in self.master_dataset.columns if col.endswith('_right')])
 
-      for occasion in self.occasions:
-        occasion.dataset = self.master_dataset[self.master_dataset['Full_Identifier']==occasion.full_identifier]
-        if occasion.full_identifier in model.cv_results['Training_Features']['Full_Identifier'].tolist():
-          occasion.device_removal_detection_method = 'ground_truth'
-        else:
-          occasion.device_removal_detection_method = 'model'
+  #     for occasion in self.occasions:
+  #       occasion.dataset = self.master_dataset[self.master_dataset['Full_Identifier']==occasion.full_identifier]
+  #       if occasion.full_identifier in model.cv_results['Training_Features']['Full_Identifier'].tolist():
+  #         occasion.device_removal_detection_method = 'ground_truth'
+  #       else:
+  #         occasion.device_removal_detection_method = 'model'
 
-        occasion.plot_device_removal()
+  #       occasion.plot_device_removal()
 
-    self.models.append(model)
-    save_to_computer(self, self.cohort_name, self.python_object_folder)
-    save_to_computer(model, model_name, self.python_object_folder, extension='sdmtm')
+  #   self.models.append(model)
+  #   save_to_computer(self, self.cohort_name, self.python_object_folder)
+  #   save_to_computer(model, model_name, self.python_object_folder, extension='sdmtm')
 
   def load_features(self, force_refresh=True):
     
@@ -300,21 +300,21 @@ class skynCohort:
     else:
       self.invalid_features = pd.DataFrame(invalid_features)
     
-  def export_feature_plots(self, ground_truth_variable='condition', filter={}):
-    #invalid occasion are removed within plot function
-    plot_folder = plot_box_whisker(self.features, self.predictors, ground_truth_variable, self.model_figures_folder, self.cohort_name, filter=filter)
+  # def export_feature_plots(self, ground_truth_variable='condition', filter={}):
+  #   #invalid occasion are removed within plot function
+  #   plot_folder = plot_box_whisker(self.features, self.predictors, ground_truth_variable, self.model_figures_folder, self.cohort_name, filter=filter)
 
-  def principal_component_analysis(self):
-    explained_variances = PCA_with_features(self.features, self.predictors)
-    self.PCA = explained_variances
+  # def principal_component_analysis(self):
+  #   explained_variances = PCA_with_features(self.features, self.predictors)
+  #   self.PCA = explained_variances
 
-  def cross_validation(self, model_name, model_design):
-    print('Training ' + model_name + ' ' + model_design)
-    CV_group_k_fold(model_design, model_name, self)
+  # def cross_validation(self, model_name, model_design):
+  #   print('Training ' + model_name + ' ' + model_design)
+  #   CV_group_k_fold(model_design, model_name, self)
     
-    if 'RF' in model_name:
-      index_of_model = next((i for i, m in enumerate(self.models) if m.model_name == model_name), None)
-      self.models[index_of_model].feature_importance = plot_rf_feature_importances(self.models[index_of_model], model_name, self.model_figures_folder)
+  #   if 'RF' in model_name:
+  #     index_of_model = next((i for i, m in enumerate(self.models) if m.model_name == model_name), None)
+  #     self.models[index_of_model].feature_importance = plot_rf_feature_importances(self.models[index_of_model], model_name, self.model_figures_folder)
   
   #in development
   def iterative_near_real_time_testing(self):

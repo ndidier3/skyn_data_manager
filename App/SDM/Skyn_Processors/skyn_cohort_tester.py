@@ -1,4 +1,4 @@
-from ..Configuration.file_management import *
+from SDM.Configuration.file_management import *
 import pandas as pd
 import xlsxwriter
 import numpy as np
