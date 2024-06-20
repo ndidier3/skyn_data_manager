@@ -16,8 +16,6 @@ def CV_group_k_fold(model_design, model_name, cohort_processor):
   non_predictor_columns = list(set([grouping_column_name, ground_truth_column] + list(filter.keys()) + additional_columns))
   features = cohort_processor.features[non_predictor_columns + cohort_processor.training_features].reset_index(drop=True)
 
-  features.to_excel('features_c4_lab.xlsx')
-
   #removing unwanted subjects/datasets
   features, excluded = filter_features(features, filter)
 
@@ -45,10 +43,6 @@ def CV_group_k_fold(model_design, model_name, cohort_processor):
 
   excluded[f'pred_{model_name}'] = 'excluded'
   all_features = pd.concat([features, excluded])
-
-  incorrect.to_excel(f'test_incorrect_{model_name}.xlsx')
-  correct.to_excel(f'test_correct_{model_name}.xlsx')
-  excluded.to_excel(f'test_excluded_{model_name}.xlsx')
 
   cv_results = {
     'Prediction_Features': cohort_processor.training_features,
@@ -158,7 +152,6 @@ def train_and_test_model_with_holdout(features, predictors, model_name='worn_vs_
 
   non_predictor_columns = list(set([grouping_column_name, ground_truth_column] + list(filter.keys()) + additional_columns))
   features = features[non_predictor_columns + predictors].reset_index(drop=True)
-  features.to_excel('features_device_training.xlsx')
   if len(ground_truth_labels) > 0:
     features.loc[:, ground_truth_column] = [ground_truth_labels[c] for c in features[ground_truth_column].tolist()]
 

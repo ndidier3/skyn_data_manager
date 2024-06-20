@@ -96,9 +96,6 @@ class TrainSettings(Frame):
       if (i+1) % 8 == 0:
         col_idx += 1
 
-  def get_model_name(type, outcome, option):
-    return type + '_' + outcome if outcome != 'Custom' else type + '_' + option
-  
   def update_model_selections(self):
     model_outcomes = ['Alc_vs_Non', 'Alc_vs_Non', 'Binge', 'Binge', 'Custom', 'Custom']
     model_types = ['RF', 'LR', 'RF', 'LR', 'RF', 'LR']
@@ -106,7 +103,7 @@ class TrainSettings(Frame):
     
     for i, option in enumerate(options):
       if option:
-        model_name = self.get_model_name(model_types[i], model_outcomes[i], option)
+        model_name = model_types[i] + '_' + model_outcomes[i] if model_outcomes[i] != 'Custom' else model_types[i] + '_' + option
         if model_name not in self.selected_models:
           self.selected_models.append(model_name)
 
