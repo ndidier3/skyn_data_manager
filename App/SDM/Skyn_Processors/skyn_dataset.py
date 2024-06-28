@@ -389,12 +389,12 @@ class skynDataset:
             self.dataset['Duration_Hrs'] = self.dataset['Duration_Hrs'] - self.dataset['Duration_Hrs'].min()
             break
 
-      if self.dataset['Duration_Hrs'].max() < 1 or (drop_count * self.sampling_rate) > 90:
+      if self.dataset['Duration_Hrs'].max() < 1 or (drop_count * self.sampling_rate) > (len(self.dataset) / 3):
         self.dataset = backup_dataset
         curve_threshold = get_curve_threshold(self.dataset, tac_variable, self.baseline_range)
         peak = get_peak(self.dataset, tac_variable)
         floor = self.dataset[tac_variable].min()
-        curve_threshold = curve_threshold = (peak + floor) / 2
+        curve_threshold = (peak + floor) / 2
         # self.valid_occasion = 0
         # self.invalid_reason = f'Unable to ascertain valid curve threshold. Curve threshold is established by the first {self.baseline_range} values, and must be half way (or lower) between peak TAC and floor TAC. SDM will attempt to trim the dataset until curve threshold is valid, but if too much data is trimmed, then dataset is considered invalid.' 
 
@@ -402,6 +402,7 @@ class skynDataset:
       curve_threshold = get_curve_threshold(self.dataset, tac_variable, self.baseline_range)
 
     self.stats[f'curve_threshold_{dataset_version}'] = curve_threshold
+    
     
   def get_episode_features(self, dataset_version='RAW'):
     
