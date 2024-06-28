@@ -14,7 +14,7 @@ class FileSplittingToolWindow(Toplevel):
     super().__init__(parent)
 
     self.geometry("350x100")
-    self.title('Skyn Dataset Splitterr')
+    self.title('Skyn Dataset Splitter')
 
     self.parent = parent
     self.main_window = main_window
@@ -176,7 +176,7 @@ class FileSplittingToolWindow(Toplevel):
         dataset_identifiers.append(dataset_identifier)
         start_timestamps.append(min(dataset['datetime']))
         end_timestamps.append(max(dataset['datetime']))
-        filename = self.export_folder + f'DayLevel_{os.path.splitext(os.path.basename(self.filepath))[0]}/{subid} {dataset_identifier}.xlsx'
+        filename = self.export_folder + f'DayLevel_{os.path.splitext(os.path.basename(self.filepath))[0]}/{subid}_{dataset_identifier}.xlsx'
         dataset.to_excel(filename, index=False, sheet_name="data")
         i += 1
       
