@@ -232,7 +232,11 @@ def configure_raw_data(self):
 
     df_raw = df_raw[['SubID', 'Dataset_Identifier', 'Episode_Identifier', 'Full_Identifier', 'Row_ID'] + [col for col in df_raw.columns.tolist() if col not in ['SubID', 'Dataset_Identifier', 'Episode_Identifier', 'Full_Identifier', 'Row_ID']]]
 
-    self.sampling_rate = get_sampling_rate(df_raw, 'datetime')
+    sampling_rate = get_sampling_rate(df_raw, 'datetime')
+    if sampling_rate > 1:
+        print('reached123')
+        df_raw = reduce_sampling_rate(df_raw, 'datetime')
+
     df_raw = get_time_elapsed(df_raw, 'datetime')
 
     df_raw = remove_junk_columns(df_raw)
@@ -311,3 +315,18 @@ def determine_post_cleaning_validity(self):
         return self.valid_occasion, self.invalid_reason
 
     return self.valid_occasion, self.invalid_reason
+
+def reduce_sampling_rate(raw_data, timestamp_column, cutoff_sec = 59):
+    last_index = 0
+    indices_to_keep = [last_index]
+
+    for i, row in raw_data.iterrows():
+        if i > 0:
+            duration_diff = (raw_data.loc[i, timestamp_column] - raw_data.loc[last_index, timestamp_column]).total_seconds()
+            if duration_diff >= cutoff_sec:
+                indices_to_keep.append(i)
+                last_index = i
+
+    reduced_data = raw_data.loc[indices_to_keep].reset_index(drop=True)
+
+    return reduced_data
