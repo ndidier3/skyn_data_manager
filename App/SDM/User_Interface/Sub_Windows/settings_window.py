@@ -61,10 +61,12 @@ class SettingsWindow(Toplevel):
         if self.sdm_interface.selected_programs['Predict']:
           if processor.valid_occasion:
             processor.make_prediction(self.ModelSelectionFrame.selected_models)
-            messagebox.showinfo('SDM', f'SDM complete. See Results/Test')
-          else:
-            messagebox.showerror('SDM', f'Unable to make prediction; dataset is invalid due to {processor.invalid_reason}')
+        if processor.valid_occasion:
           processor.export_workbook()
+          messagebox.showinfo('SDM', f'SDM complete.')
+        else:
+          processor.export_workbook()
+          messagebox.showerror('SDM', f'Unable to make prediction; dataset is invalid due to {processor.invalid_reason}')
     
       if self.sdm_interface.data_loading_method in ['Folder', 'Test', 'Processor']:
         if self.sdm_interface.selected_programs['ProcessSignal']:

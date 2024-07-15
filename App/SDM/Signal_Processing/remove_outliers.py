@@ -189,7 +189,7 @@ def impute_artifacts(df, test_range, time_variable, extreme_outliers, major_thre
                   outlier_counter['major'].remove(index + index_ticker)
                 
               if ~any(threshold_tests) or ((index + index_ticker) == len(tac_list)):
-                tac_list_current, not_imputable = impute(df, tac_list_current, time_variable, index_check_count, how='both', threshold=False, gap_proportional_limit=0.5)
+                tac_list_current, not_imputable = impute(df, tac_list_current, time_variable, index_check_count, how='left', threshold=False, gap_proportional_limit=0.5)
                 if len(not_imputable) > 0:
                   for i in not_imputable:
                     cannot_impute.append(i)

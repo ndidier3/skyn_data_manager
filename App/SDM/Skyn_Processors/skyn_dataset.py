@@ -320,7 +320,7 @@ class skynDataset:
         
     df_copy = df.copy()
     tac_removed_device_off = df.apply(lambda row: row['TAC'] if row['device_on_pred'] == 1 else np.nan, axis=1)
-    imputed_tac_list, not_imputable = impute(df_copy, tac_removed_device_off.tolist(), 'Duration_Hrs', {}, override_index_check_count=True, extend_missing_idx=15, gap_proportional_limit=0.9)
+    imputed_tac_list, not_imputable = impute(df_copy, tac_removed_device_off.tolist(), 'Duration_Hrs', {}, override_index_check_count=True, extend_missing_idx=15, gap_proportional_limit=0.9, how = 'flex')
 
     imputed_tac_list = [tac if tac > 0 else 0 for tac in imputed_tac_list]
     df['TAC_device_off'] = imputed_tac_list

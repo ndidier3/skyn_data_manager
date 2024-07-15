@@ -29,7 +29,7 @@ class ProcessSignalSettings(Frame):
     self.minorThresholdLabel = Label(self, text='Minor Cleaning Threshold')
     self.minorThreshold = DoubleVar(self)
     self.minorThreshold.set(0.5)
-    self.minorThresholdDropdown = OptionMenu(self, self.minorThreshold, *[round(0.3 + 0.05*i, 3) for i in range(0, 11)])
+    self.minorThresholdDropdown = OptionMenu(self, self.minorThreshold, *[round(0.3 + 0.05*i, 3) for i in range(0, 12)])
     self.minorThreshold.trace_add("write", self.validate_threshold_selections)
 
     #Smooth Signal 
