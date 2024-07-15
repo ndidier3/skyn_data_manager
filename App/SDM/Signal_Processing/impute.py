@@ -1,11 +1,10 @@
-from bdb import Breakpoint
 import pandas as pd
 import numpy as np
 from SDM.Feature_Engineering.tac_features import *
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
 import scipy.interpolate
-from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
+from sklearn.gaussian_process.kernels import DotProduct, Matern, ConstantKernel
 import math
 
 def impute_tac_in_gaps(df, tac_variable, time_elapsed_variable, sampling_rate, hours_elapsed_threshold):
@@ -50,7 +49,7 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
   #get a list of indices where artifacts have been removed
   missing_idx = [i for (i, tac) in enumerate(tac_list) if np.isnan([tac])]
 
-  #artifact gap cannot take more than 20% of dataset
+  #artifact gap cannot take more than X% of dataset
   gap_limit = len(df) * gap_proportional_limit
 
   #create a list of each gap
@@ -143,22 +142,33 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
         data_before_gap.loc[outlier_indices['before'], 'TAC'] = np.nan
         data_after_gap.loc[outlier_indices['after'], 'TAC'] = np.nan
         data_around_gap = pd.concat([data_before_gap, data_after_gap])
-
-        key = {
-          'left': data_before_gap,
-          'right': data_after_gap,
-          'both': data_around_gap
-        }
-        training_data = key[how]
+        
+        if how == 'flex':
+          remaining_duration = df_prior['Duration_Hrs'].max() - data_after_gap['Duration_Hrs'].min()
+          TAC_diff_gap = data_after_gap.loc[min(data_after_gap.index.tolist()), 'TAC']  - data_before_gap.loc[max(data_before_gap.index.tolist()), 'TAC']
+          local_peak = get_peak(df, 'TAC', window={'index': max(data_before_gap.index.tolist()), 'window': 100})
+          TAC_diff_gap_too_big = (abs(TAC_diff_gap) / local_peak) > 0.5 and TAC_diff_gap > 10
+          if remaining_duration < 1 or TAC_diff_gap_too_big:
+            training_data = data_before_gap
+          else:
+            training_data = data_around_gap
+        else:
+          key = {
+            'left': data_before_gap,
+            'right': data_after_gap,
+            'both': data_around_gap
+          }
+          training_data = key[how]
         x = training_data[~pd.isna(training_data[variable])][time_variable]
         y = training_data[~pd.isna(training_data[variable])][variable]
         x_with_gap = df[front_index:back_index][time_variable]      
 
         # 4 models can be attempted
         # if model fails to bring value below artifact threshold, then next model will be attempted
-
+        
         if max_impute_attempts == 1:
-          model = GaussianProcessRegressor(kernel=DotProduct(), random_state=0).fit(x.to_numpy().reshape(-1, 1), y)
+          kernel = Matern(length_scale=0.4, nu=0.3, length_scale_bounds=(1e-3, 1e3)) * ConstantKernel(constant_value=5)
+          model = GaussianProcessRegressor(kernel = kernel, random_state=0).fit(x.to_numpy().reshape(-1, 1), y)
           predictions = model.predict(x_with_gap.to_numpy().reshape(-1, 1))
           data_to_insert = predictions[front_ticker:front_ticker+(last_missing_id-first_missing_id+1)]
           tac_list[first_missing_id:last_missing_id+1] = data_to_insert
@@ -173,7 +183,7 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
           data_to_insert = predictions[front_ticker:front_ticker+(last_missing_id-first_missing_id+1)]
           tac_list[first_missing_id:last_missing_id+1] = data_to_insert
         else:
-          model = GaussianProcessRegressor(kernel=DotProduct(), random_state=0).fit(x.to_numpy().reshape(-1, 1), y)
+          model = GaussianProcessRegressor(kernel = DotProduct(), random_state=0).fit(x.to_numpy().reshape(-1, 1), y)
           predictions = model.predict(x_with_gap.to_numpy().reshape(-1, 1))
           data_to_insert = predictions[front_ticker:front_ticker+(last_missing_id-first_missing_id+1)]
           tac_list[first_missing_id:last_missing_id+1] = data_to_insert
@@ -183,6 +193,8 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
       else:
         for i in gap:
           cannot_impute.append(i)
+
+  tac_list = [tac if tac >= 0 else 0 for tac in tac_list]
 
   return tac_list, cannot_impute
   

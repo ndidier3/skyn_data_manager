@@ -23,11 +23,13 @@ def update_column_names(df):
             'Firmware version': 'Firmware Version',
             'tac (ug/L)': 'TAC ug/L(air)',
             'temperature (C)': 'Temperature_C',
+            'Temperature (C)': 'Temperature_C',
             'Temperature C': 'Temperature_C',
             'Temperature LSB': 'Temperature_C',
             'motion (g)': 'Motion',
             'Motion LSB': 'Motion',
-            'device id': 'device_id'
+            'device id': 'device_id',
+            'device.id': 'device_id'
         }, 
             inplace=True,
             errors='ignore'
@@ -57,6 +59,8 @@ def configure_timestamp_column(df):
         df['datetime'] = df['datetime_with_timezone'].dt.tz_localize(None)
     elif not df['datetime_without_timezone'].isna().all():
         df['datetime'] = df['datetime_without_timezone']
+    else:
+        df['datetime'] = pd.to_datetime(df['datetime'])
     
     # Drop the intermediate columns
     df.drop(['datetime_with_timezone', 'datetime_without_timezone'], axis=1, inplace=True)

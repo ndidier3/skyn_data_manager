@@ -13,7 +13,7 @@ class CreateMetadataWindow(Toplevel):
   def __init__(self, main_window):
     super().__init__(main_window)
     self.main_window = main_window
-    self.geometry("300x200")
+    self.geometry("400x300")
 
     #FRAME
     self.metadata_frame = Frame(self, width=600, height=800, highlightbackground="black", highlightthickness=2)
