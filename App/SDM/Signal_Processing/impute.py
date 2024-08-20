@@ -143,7 +143,9 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
         data_after_gap.loc[outlier_indices['after'], 'TAC'] = np.nan
         data_around_gap = pd.concat([data_before_gap, data_after_gap])
         
-        if how == 'flex':
+        if len(data_after_gap) == 0:
+          how = 'left'
+        elif how == 'flex':
           remaining_duration = df_prior['Duration_Hrs'].max() - data_after_gap['Duration_Hrs'].min()
           TAC_diff_gap = data_after_gap.loc[min(data_after_gap.index.tolist()), 'TAC']  - data_before_gap.loc[max(data_before_gap.index.tolist()), 'TAC']
           local_peak = get_peak(df, 'TAC', window={'index': max(data_before_gap.index.tolist()), 'window': 100})
@@ -152,7 +154,8 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
             training_data = data_before_gap
           else:
             training_data = data_around_gap
-        else:
+
+        if how != 'flex':
           key = {
             'left': data_before_gap,
             'right': data_after_gap,
