@@ -154,7 +154,8 @@ def impute(df_prior, tac_list, time_variable, index_check_count, knot_proportion
             training_data = data_before_gap
           else:
             training_data = data_around_gap
-        else:
+
+        if how != 'flex':
           key = {
             'left': data_before_gap,
             'right': data_after_gap,
