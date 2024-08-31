@@ -130,5 +130,5 @@ class RenameFileRow(Frame):
           print(traceback.format_exc())
           messagebox.showerror('Error', traceback.format_exc())
     else:
-      messagebox.showerror('SDM Guidance', 'Renaming did not occur. \nSubIDs must consist of 4-6 numeric numbers.\nDataset Identifier must consist of 1-3 numeric numbers.')
+      messagebox.showerror('SDM Guidance', 'Renaming did not occur. \nSubIDs must consist of 3-6 numeric numbers.\nDataset Identifier must consist of 1-3 numeric numbers.')
   
