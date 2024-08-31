@@ -71,7 +71,7 @@ class RenameFilesWindow(Toplevel):
 
   def rename_files(self):
     if not all([widget.filename_valid for widget in list(self.renaming_widgets.values())]):
-      messagebox.showerror('SDM Guidance', 'Renaming did not occur. Please revise all invalid filenames. \nSubIDs must consist of 4-6 numeric numbers.\nEpisode Identifier must consist of 1-3 numeric numbers.')
+      messagebox.showerror('SDM Guidance', 'Renaming did not occur. Please revise all invalid filenames. \nSubIDs must consist of 3-6 numeric numbers.\nEpisode Identifier must consist of 1-3 numeric numbers.')
     else:
       original_filenames = [widget.filename for widget in list(self.renaming_widgets.values())]
       new_filenames = [widget.new_filename for widget in list(self.renaming_widgets.values())]
