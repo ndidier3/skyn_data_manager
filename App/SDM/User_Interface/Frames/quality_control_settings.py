@@ -42,7 +42,7 @@ class QualityControlSettings(Frame):
 
     self.max_percentage_inactive = IntVar(self)
     self.max_percentage_inactive.set(round(self.max_percentage_inactive_default))
-    self.max_percentage_inactive_options = list(range(25, 75))
+    self.max_percentage_inactive_options = list(range(10, 75))
     self.max_percentage_inactive_dropdown = OptionMenu(self, self.max_percentage_inactive, *self.max_percentage_inactive_options)
     self.max_percentage_inactive_dropdown.grid(row=6, column=0, padx=20, pady=(3, 7), sticky='w')
 
