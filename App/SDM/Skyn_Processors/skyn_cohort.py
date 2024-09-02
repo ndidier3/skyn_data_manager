@@ -9,7 +9,7 @@ from ..Machine_Learning.pca import *
 from ..Machine_Learning.feature_estimator import train_feature_estimator
 from ..Feature_Engineering.tac_features import *
 from ..Machine_Learning.binary_model_dev import *
-from ..User_Interface.Utils.filename_tools import extract_subid, extract_dataset_identifier
+from ..User_Interface.Utils.filename_tools import *
 import glob
 import pandas as pd
 import fnmatch
@@ -41,7 +41,10 @@ class skynCohort:
     self.data_folder = data_folder
     self.cohort_name = cohort_name
     self.metadata_path = metadata_path
-    self.metadata = pd.read_excel(self.metadata_path)
+    if self.metadata_path == '':
+      self.metadata = pd.DataFrame(create_metadata_from_cohort_folder(data_folder))
+    else:
+      self.metadata = configure_timestamps(pd.read_excel(self.metadata_path))
     self.cohort_identifiers = get_cohort_full_identifiers(self.metadata)
     self.duplicate_identifiers = len(self.cohort_identifiers) != len(set(self.cohort_identifiers))
     self.merge_variables = merge_variables
@@ -112,7 +115,7 @@ class skynCohort:
         dataset_identifier = extract_dataset_identifier(os.path.basename(path))
         matching_episode_ids = self.metadata[(self.metadata['SubID'] == int(subid)) & (self.metadata['Dataset_Identifier'] == int(dataset_identifier))]['Episode_Identifier'].tolist()
         for episode_identifier in matching_episode_ids:
-          occasion = skynDataset(path, self.data_out_folder, self.graphs_out_folder, int(subid), int(dataset_identifier), ('e' + str(episode_identifier)), self.metadata_path, self.disable_crop_start, self.disable_crop_end, self.skyn_upload_timezone)
+          occasion = skynDataset(path, self.data_out_folder, self.graphs_out_folder, int(subid), int(dataset_identifier), ('e' + str(episode_identifier)), self.disable_crop_start, self.disable_crop_end, self.skyn_upload_timezone, metadata_path = self.metadata_path, metadata = self.metadata)
           occasion.max_duration = self.max_dataset_duration
           occasion.major_cleaning_threshold = self.major_cleaning_threshold
           occasion.minor_cleaning_threshold = self.minor_cleaning_threshold

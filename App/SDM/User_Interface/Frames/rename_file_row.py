@@ -9,12 +9,14 @@ class RenameFileRow(Frame):
     self.parent = parent
     self.filename = filename
     self.pending_filename = filename
-    self.used_dataset_ids = used_dataset_ids
+    self.used_dataset_ids = used_dataset_ids.copy()
     self.filename_valid = matches_filename_convention(self.filename, self.used_dataset_ids, assess_new=False) 
     self.new_filename = self.filename
     self.extension = extract_file_extension(self.filename)
     self.directory = directory
     self.original_dataset_identifier = extract_dataset_identifier(self.filename, self.used_dataset_ids, assess_new=False)
+    if self.original_dataset_identifier in self.used_dataset_ids:
+      self.used_dataset_ids.remove(self.original_dataset_identifier)
 
     self.configure(highlightthickness=0)
     self.row_idx = Label(self, text=i+1)
@@ -38,7 +40,7 @@ class RenameFileRow(Frame):
     self.subidLabel.config(font=(None, 8, 'normal'))
     self.subidLabel.grid(row=0, column=4, pady=0, padx=5)
 
-    validate_numeric = self.register(lambda P: (P.isdigit() and len(P) <= 6) or len(P) == 0)
+    validate_numeric = self.register(lambda P: (P.lstrip('0').isdigit() and len(P) <= 6) or len(P) == 0)
     self.subid_text = StringVar()
     self.subid_text.set(extract_subid(self.filename))
     self.subidEntry = Entry(self, width=7, validate='key', validatecommand=(validate_numeric, "%P"), text = self.subid_text)
@@ -105,14 +107,16 @@ class RenameFileRow(Frame):
       subid_no_change = (extract_subid(self.pending_filename) == extract_subid(self.new_filename))
       dataset_id_no_change = (extract_dataset_identifier(self.pending_filename) == extract_dataset_identifier(self.new_filename))
       self.only_additional_text_is_different = subid_no_change and dataset_id_no_change 
-      if self.only_additional_text_is_different:
-        if dataset_identifier in self.used_dataset_ids:
-          self.used_dataset_ids.remove(dataset_identifier)
+      # if self.only_additional_text_is_different and (dataset_identifier in self.used_dataset_ids):
+      #   self.used_dataset_ids.remove(dataset_identifier)
+
       self.pending_filename = self.new_filename
       self.filename_valid = matches_filename_convention(self.new_filename, self.used_dataset_ids, assess_new=True)
       self.filenameLabel['text'] = f'Revised Filename: {self.new_filename}'
       self.filenameLabel['fg'] = 'red' if not self.filename_valid else 'green'
       self.parent.update_used_dataset_ids()
+      #remove the present dataset ids from used IDs, else changes to this filename will have conflict
+      self.used_dataset_ids.remove(extract_dataset_identifier(self.new_filename))
   
   def rename_file(self):
     if self.filename_valid:
@@ -130,5 +134,5 @@ class RenameFileRow(Frame):
           print(traceback.format_exc())
           messagebox.showerror('Error', traceback.format_exc())
     else:
-      messagebox.showerror('SDM Guidance', 'Renaming did not occur. \nSubIDs must consist of 3-6 numeric numbers.\nDataset Identifier must consist of 1-3 numeric numbers.')
+      messagebox.showerror('SDM Guidance', 'Renaming did not occur. \nSubIDs must consist of 3-6 numeric characters.\nDataset Identifier must consist of 1-3 numeric characters.')
   

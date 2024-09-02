@@ -31,8 +31,10 @@ class CropSettings(Frame):
     self.maxDatasetDurationEntry = Entry(self, text = self.maxDatasetDuration, width = 6, validate="key", validatecommand=(self.validate_max_dataset_duration, "%P"))
     self.maxDatasetDurationEntry.grid(row=2, column=0, padx=20, pady=(2, 5), sticky='w')
 
-
-    self.crop_start_timestamps_available = self.sdm_interface.metadata_df['Crop Begin Date'].notnull().any() and self.sdm_interface.metadata_df['Crop Begin Time'].notnull().any()
+    if len(self.sdm_interface.metadata_df):
+      self.crop_start_timestamps_available = self.sdm_interface.metadata_df['Crop Begin Date'].notnull().any() and self.sdm_interface.metadata_df['Crop Begin Time'].notnull().any()
+    else:
+      self.crop_start_timestamps_available = False
 
     self.disableCropStartText = "Crop datasets at START, using timestamps detected in metadata."
     self.disableCropStart = IntVar(self)
@@ -41,7 +43,10 @@ class CropSettings(Frame):
     if self.crop_start_timestamps_available:
       self.disableCropStartCheckbox.grid(row=3, column=0, padx=10, pady=5, sticky='w')
 
-    self.crop_end_timestamps_available = self.sdm_interface.metadata_df['Crop End Date'].notnull().any() and self.sdm_interface.metadata_df['Crop End Time'].notnull().any()
+    if len(self.sdm_interface.metadata_df):
+      self.crop_end_timestamps_available = self.sdm_interface.metadata_df['Crop End Date'].notnull().any() and self.sdm_interface.metadata_df['Crop End Time'].notnull().any()
+    else:
+      self.crop_end_timestamps_available = False
     self.disableCropEndText = "Crop datasets at END, using timestamps detected in metadata."
     self.disableCropEnd = IntVar(self)
     self.disableCropEnd.set(1 if self.crop_end_timestamps_available else 0)

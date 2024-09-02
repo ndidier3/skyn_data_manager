@@ -54,26 +54,31 @@ class SkynDataManagerApp(Tk):
     self.program = None
     self.program_selection_frame = ProgramSelectionFrame(self.required_inputs_frame, self)
     self.program_specs = {
+      #signal processing only
       'SP': {
         'ProcessSignal': True,
         'Predict': False,
         'Train+Test': False,
       },
+      #signal processing and predictions
       'SP_P': {
         'ProcessSignal': True,
         'Predict': True,
         'Train+Test': False
       },
+      #signal processing and model training
       'SP_ML': {
         'ProcessSignal': True,
         'Predict': False,
         'Train+Test': True
       },
+      #predictions only
       'P': {
         'ProcessSignal': False,
         'Predict': True,
         'Train+Test': False
       },
+      #model training only
       'ML': {
         'ProcessSignal': False,
         'Predict': False,
@@ -100,7 +105,7 @@ class SkynDataManagerApp(Tk):
     self.selectDataButton.config(font=(None, 8), height=1)
 
     #select metadata
-    self.metadata = None
+    self.metadata = ''
     self.metadataLabelText = '3. Select Metadata:'
     self.metadataLabel = Label(self.data_loading_frame, text = self.metadataLabelText)
     self.metadataFolderButton = Button(self.data_loading_frame, width = 20, text='Select Metadata (.xlsx)', command=self.open_metadata, state='disabled')
@@ -200,7 +205,7 @@ class SkynDataManagerApp(Tk):
     if self.program:
       if (self.data_loading_method == 'Test'):
         self.runProgramButton.grid(row=35, column=0, pady=(30, 15), padx=(100, 0), sticky='w')
-      elif (self.data_loading_method == 'Folder' or self.data_loading_method == 'Single') and (self.selected_data and self.metadata and self.cohortNameEntry.get()):
+      elif (self.data_loading_method == 'Folder' or self.data_loading_method == 'Single') and (self.selected_data and self.cohortNameEntry.get()):
           self.runProgramButton.grid(row=35, column=0, pady=(30, 15), padx=(100, 0), sticky='w')
       elif (self.data_loading_method == 'Processor') and (self.previous_processor):
           self.runProgramButton.grid(row=35, column=0, pady=(30, 15), padx=(100, 0), sticky='w')
@@ -218,7 +223,7 @@ class SkynDataManagerApp(Tk):
     self.selected_data = ''
     self.filenames = []
     self.previous_processor = None
-    self.metadata = None
+    self.metadata = ''
     self.metadata_df = pd.DataFrame()
   
   def select_skyn_data(self):

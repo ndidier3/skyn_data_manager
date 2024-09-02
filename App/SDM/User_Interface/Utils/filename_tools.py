@@ -1,8 +1,9 @@
 import os
 import re
+import numpy as np
 
 def is_subid_valid(subid):
-  return (3 < len(str(subid))) and (7 > len(str(subid))) and (subid.isnumeric())
+  return (2 < len(str(subid))) and (7 > len(str(subid))) and (subid.isnumeric())
 
 def is_dataset_id_valid(episode_id, used_ids, assess_new=False):
   try:
@@ -20,7 +21,6 @@ def is_dataset_id_valid(episode_id, used_ids, assess_new=False):
 def matches_filename_convention(filename, used_ids, assess_new=False):
   subid = extract_subid(filename)
   dataset_id = extract_dataset_identifier(filename)
-
   return (is_subid_valid(subid)) and (is_dataset_id_valid(dataset_id, used_ids, assess_new))
 
 def stringify_dataset_id(dataset_identifier):
@@ -121,17 +121,18 @@ def create_metadata_from_cohort_folder(cohort_folder):
     default_parsing_idx = get_parsing_indices(files[0])
 
     return {
-      'SubID': [file[int(default_parsing_idx[0]):int(default_parsing_idx[1])+1] for file in files],
+      'SubID': [int(file[int(default_parsing_idx[0]):int(default_parsing_idx[1])+1]) for file in files],
       'Dataset_Identifier': 
-                [file[int(default_parsing_idx[2]):int(default_parsing_idx[3])+1] for file in files],
+                [int(file[int(default_parsing_idx[2]):int(default_parsing_idx[3])+1]) for file in files],
       'Episode_Identifier': [1 for file in files],
       'Use_Data': ["Y" for i in range(0, len(files))],
       'Condition': [attempt_condition_extraction(file) for file in files],
-      'TotalDrks': ["" for file in files],
-      'Crop Begin Date': ["" for file in files],
-      'Crop Begin Time': ["" for file in files],
-      'Crop End Date': ["" for file in files],
-      'Crop End Time': ["" for file in files],
+      'TotalDrks': [np.nan for file in files],
+      'Crop Begin Date': [np.nan for file in files],
+      'Crop Begin Time': [np.nan for file in files],
+      'Crop End Date': [np.nan for file in files],
+      'Crop End Time': [np.nan for file in files],
+      'Time Zone': [np.nan for file in files],
       'Notes': ["" for file in files], 
     }
 
