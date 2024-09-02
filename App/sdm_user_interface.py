@@ -282,11 +282,11 @@ class SkynDataManagerApp(Tk):
         self.metadata = metadata_file
         self.metadata_df = pd.read_excel(metadata_file)
       else:
-        self.metadataLabel['text'] = '3. Select Metadata'
+        self.metadataLabel['text'] = '3. Select Metadata (none loaded)'
         self.metadataLabel.config(fg='black')
+        self.metadata = ''
+        self.metadata_df = pd.DataFrame()
         
-    self.toggle_run_button()    
-
   def open_settings(self):
     settings = SettingsWindow(self)
     settings.grab_set()
