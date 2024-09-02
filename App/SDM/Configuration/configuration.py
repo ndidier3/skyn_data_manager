@@ -41,7 +41,7 @@ def rename_TAC_column(df):
     df.drop('TAC LSB', axis=1, inplace=True, errors='ignore')
     return df
 
-def multiple_device_ids(df):
+def includes_multiple_device_ids(df):
     return len(df['device_id'].unique()) > 1
 
 def normalize_column(series):
@@ -184,8 +184,7 @@ def standardize_date_column_YMD(timestamps, column_name='Crop Begin Date', new_c
   
     return timestamps
 
-def configure_timestamps(metadata_path):
-    metadata = pd.read_excel(metadata_path)
+def configure_timestamps(metadata):
     # metadata = metadata[metadata['Use_Data']=="Y"]
     metadata.reset_index(inplace=True, drop=True)
     # try:

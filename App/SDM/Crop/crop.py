@@ -12,7 +12,7 @@ then impute values prior to go back in time
 
 """
 
-def skyn_start_date(dataset):
+def get_start_date_time(dataset):
   """provide dataframe, function returns date and time, separately. Assumes dataframe is already sorted by datetime column"""
   datetime_start = dataset.loc[0, 'datetime']
   datetime_start = datetime.strptime(str(datetime_start), '%Y-%m-%d %H:%M:%S') 

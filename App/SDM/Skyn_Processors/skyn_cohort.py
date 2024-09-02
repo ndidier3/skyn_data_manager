@@ -1,15 +1,15 @@
-from SDM.Skyn_Processors.skyn_cohort_tester import skynCohortTester
-from SDM.Skyn_Processors.skyn_dataset import skynDataset
-from SDM.Configuration.configuration import *
-from SDM.Visualization.plotting import *
-from SDM.Configuration.file_management import *
-from SDM.Documenting.cohort_workbook import SDM_Report
+from .skyn_cohort_tester import skynCohortTester
+from .skyn_dataset import skynDataset
+from ..Configuration.configuration import *
+from ..Visualization.plotting import *
+from ..Configuration.file_management import *
+from ..Documenting.cohort_workbook import SDM_Report
 # from ..Machine_Learning.model_optimization import *
 # from ..Machine_Learning.pca import *
 # from ..Machine_Learning.feature_estimator import train_feature_estimator
-from SDM.Feature_Engineering.tac_features import *
+from ..Feature_Engineering.tac_features import *
 # from ..Machine_Learning.binary_model_dev import *
-from SDM.User_Interface.Utils.filename_tools import extract_subid, extract_dataset_identifier
+from ..User_Interface.Utils.filename_tools import *
 import glob
 import pandas as pd
 import fnmatch
@@ -41,7 +41,10 @@ class skynCohort:
     self.data_folder = data_folder
     self.cohort_name = cohort_name
     self.metadata_path = metadata_path
-    self.metadata = pd.read_excel(self.metadata_path)
+    if self.metadata_path == '':
+      self.metadata = pd.DataFrame(create_metadata_from_cohort_folder(data_folder))
+    else:
+      self.metadata = configure_timestamps(pd.read_excel(self.metadata_path))
     self.cohort_identifiers = get_cohort_full_identifiers(self.metadata)
     self.duplicate_identifiers = len(self.cohort_identifiers) != len(set(self.cohort_identifiers))
     self.merge_variables = merge_variables
@@ -112,7 +115,7 @@ class skynCohort:
         dataset_identifier = extract_dataset_identifier(os.path.basename(path))
         matching_episode_ids = self.metadata[(self.metadata['SubID'] == int(subid)) & (self.metadata['Dataset_Identifier'] == int(dataset_identifier))]['Episode_Identifier'].tolist()
         for episode_identifier in matching_episode_ids:
-          occasion = skynDataset(path, self.data_out_folder, self.graphs_out_folder, int(subid), int(dataset_identifier), ('e' + str(episode_identifier)), self.metadata_path, self.disable_crop_start, self.disable_crop_end, self.skyn_upload_timezone)
+          occasion = skynDataset(path, self.data_out_folder, self.graphs_out_folder, int(subid), int(dataset_identifier), ('e' + str(episode_identifier)), self.disable_crop_start, self.disable_crop_end, self.skyn_upload_timezone, metadata_path = self.metadata_path, metadata = self.metadata)
           occasion.max_duration = self.max_dataset_duration
           occasion.major_cleaning_threshold = self.major_cleaning_threshold
           occasion.minor_cleaning_threshold = self.minor_cleaning_threshold
@@ -154,33 +157,33 @@ class skynCohort:
   #   self.load_features(force_refresh=refresh_stats)
   #   self.cross_validation(model_name)
 
-  def train_models_using_episode_features(self, model_names, force_refresh=False, save_processor=True, save_models=True, export_report=True):
-    # self.load_features(force_refresh=force_refresh)
+  # def train_models_using_episode_features(self, model_names, force_refresh=False, save_processor=True, save_models=True, export_report=True):
+  #   # self.load_features(force_refresh=force_refresh)
 
-    for model_name in model_names:
-      if model_name == 'RF_Alc_vs_Non'or model_name == 'LR_Alc_vs_Non':
-          self.cross_validation(model_name, 'Alc_vs_Non')
-          self.export_feature_plots(ground_truth_variable='condition')
+  #   for model_name in model_names:
+  #     if model_name == 'RF_Alc_vs_Non'or model_name == 'LR_Alc_vs_Non':
+  #         self.cross_validation(model_name, 'Alc_vs_Non')
+  #         self.export_feature_plots(ground_truth_variable='condition')
 
-      if model_name == 'RF_AUD' or model_name == 'LR_AUD':
-        self.cross_validation(model_name, 'AUD_vs_Not')
-        self.export_feature_plots(ground_truth_variable='AUD')
+  #     if model_name == 'RF_AUD' or model_name == 'LR_AUD':
+  #       self.cross_validation(model_name, 'AUD_vs_Not')
+  #       self.export_feature_plots(ground_truth_variable='AUD')
 
-      if model_name == 'RF_Binge' or model_name == 'LR_Binge':
-          self.cross_validation(model_name, 'Light_vs_Heavy')
-          self.export_feature_plots(ground_truth_variable='binge', filter={'binge': ["None"]})
+  #     if model_name == 'RF_Binge' or model_name == 'LR_Binge':
+  #         self.cross_validation(model_name, 'Light_vs_Heavy')
+  #         self.export_feature_plots(ground_truth_variable='binge', filter={'binge': ["None"]})
 
-    self.load_features(force_refresh=force_refresh)
+  #   self.load_features(force_refresh=force_refresh)
 
-    if save_processor:
-      save_to_computer(self, self.cohort_name, self.python_object_folder)
+  #   if save_processor:
+  #     save_to_computer(self, self.cohort_name, self.python_object_folder)
 
-    if save_models:
-      for model in self.models:
-        save_to_computer(model, self.cohort_name + model.model_name, self.python_object_folder, extension='sdmtm')
+  #   if save_models:
+  #     for model in self.models:
+  #       save_to_computer(model, self.cohort_name + model.model_name, self.python_object_folder, extension='sdmtm')
 
-    if export_report:
-      self.export_SDM_report()
+  #   if export_report:
+  #     self.export_SDM_report()
 
   # def create_feature_estimators(self):
   #   fall_rate_model = train_feature_estimator(self, predictors=['relative_peak_CLN', 'rise_duration_CLN', 'rise_rate_CLN'], outcome='fall_rate_CLN')

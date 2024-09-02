@@ -14,7 +14,7 @@ import numpy as np
 import traceback
 
 class skynDataset:
-  def __init__(self, path, data_out_folder, graphs_out_folder, subid, dataset_identifier, episode_identifier='e1', metadata_path = None, disable_crop_start = True, disable_crop_end = True, skyn_upload_timezone = 'CST', max_duration = 18, metadata = None):
+  def __init__(self, path, data_out_folder, graphs_out_folder, subid, dataset_identifier, episode_identifier='e1', disable_crop_start = True, disable_crop_end = True, skyn_upload_timezone = 'CST', max_duration = 18, metadata_path = '', metadata = pd.DataFrame()):
     self.path = path
 
     #Subid, Dataset ID, Episode ID
@@ -23,13 +23,25 @@ class skynDataset:
     self.episode_identifier = episode_identifier
 
     #COHORT METADATA
-    self.metadata = metadata if metadata else configure_timestamps(metadata_path) if metadata_path != None else pd.DataFrame(columns=['SubID', 'Condition', 'Dataset_Identifier', 'Episode_Identifier', 'Use_Data', 'Notes', 'Crop Begin Date', 'Crop Begin Time', 'Crop End Date', 'Crop End Time', 'Time Zone'])
+    if len(metadata) > 0:
+      self.metadata = metadata
+    else:
+      try:
+        self.metadata = configure_timestamps(pd.read_excel(metadata_path))
+      except:
+        self.metadata = pd.DataFrame(
+          columns=['SubID', 'Condition', 'Dataset_Identifier', 'Episode_Identifier', 'Use_Data', 'Notes', 'Crop Begin Date', 'Crop Begin Time', 'Crop End Date', 'Crop End Time', 'Time Zone'],
+          data=[[self.subid, 'Unk', self.dataset_identifier, self.episode_identifier, 'Y', '', '', '', '', '', '']]
+        )
+    
     self.metadata_index = get_metadata_index(self)
-    self.event_timestamps = get_event_timestamps(self, metadata_path)
+    self.event_timestamps = get_event_timestamps(self, metadata_path) #will return {} if no path
 
-    #outcomes/variables of interest
+    #outcomes/variables of interest/self-reported info
     self.condition = load_metadata(self, column='Condition')
-    self.drinks = 0 if self.condition == 'Non' else load_metadata(self, column='TotalDrks')
+    if self.condition != 'Non' or self.condition != 'Alc':
+      self.condition = 'Unk'
+    self.drinks = load_metadata(self, column='TotalDrks')
     self.sex = load_metadata(self, column='Sex')
     self.binge = is_binge(self)
     self.aud = load_metadata(self, column='AUD')
@@ -38,8 +50,6 @@ class skynDataset:
     #Full Identifier, cohort info
     self.full_identifier = get_full_identifier(self.subid, self.dataset_identifier, self.episode_identifier)
     self.cohort_full_identifiers = get_cohort_full_identifiers(self.metadata)
-    self.cohort = None
-    self.study_title = None
 
     #load data
     self.unprocessed_dataset = load_dataset(self)
@@ -47,7 +57,7 @@ class skynDataset:
     self.dataset = configure_raw_data(self)
 
     #DISABLE
-    self.disabled_by_multiple_device_ids = multiple_device_ids(self.dataset)
+    self.disabled_by_multiple_device_ids = includes_multiple_device_ids(self.dataset)
 
     #CROPPING INFO
     self.begin = self.dataset['datetime'].min()
@@ -64,7 +74,7 @@ class skynDataset:
     self.skyn_upload_timezone = skyn_upload_timezone
     self.crop_begin_adjustment = 0
     self.crop_end_adjustment = 0
-    self.device_start_date, self.device_start_datetime = skyn_start_date(self.dataset)
+    self.device_start_date, self.device_start_datetime = get_start_date_time(self.dataset)
     self.crop_begin = None #updated after cropping
     self.crop_end = None #updated after cropping
     self.baseline_corrected = False
@@ -93,8 +103,8 @@ class skynDataset:
     # self.smoothing_window = nearest_odd(51/self.sampling_rate)
     self.smoothing_window = 51
 
-    """gaps with less duration than this threshold will be filled"""
-    self.gap_fill_duration_threshold = 0.5 #hours
+    """gaps in data shorter than this duration will be filled via imputation"""
+    self.gap_fill_max_duration = 0.5 #hours
 
     #these two thresholds represent proportion between consecutive TAC differences and local peak 
     self.major_cleaning_threshold = 0.8 
@@ -206,7 +216,7 @@ class skynDataset:
     #CLEANING STEP 3: Fill in "gaps" (i.e. missing data)
     df = self.dataset.copy()
     if (len(df) * self.sampling_rate) > 60:
-      df = impute_tac_in_gaps(df, 'TAC', 'Duration_Hrs', self.sampling_rate, self.gap_fill_duration_threshold)
+      df = impute_tac_in_gaps(df, 'TAC', 'Duration_Hrs', self.sampling_rate, self.gap_fill_max_duration)
     if 'gap_imputed' not in self.dataset.columns:
       df['gap_imputed'] = [0 for i in range(0, len(df))]
       df['TAC_gaps_filled'] = df['TAC']

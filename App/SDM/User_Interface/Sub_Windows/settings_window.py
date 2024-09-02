@@ -30,14 +30,13 @@ class SettingsWindow(Toplevel):
     tabControl = ttk.Notebook(tab_frame)
 
     self.ProcessSignalSettingsFrame = ProcessSignalSettings(tabControl, self)
-
     self.ModelSelectionFrame = ModelSelection(tabControl, self)
     self.TrainSettingsFrame = TrainSettings(tabControl, self)
     self.QualityControlFrame = QualityControlSettings(tabControl, self)
     if self.sdm_interface.data_loading_method != 'Processor':
       self.CropSettingsFrame = CropSettings(tabControl, self)
 
-    if self.sdm_interface.selected_programs['ProcessSignal']: 
+    if self.sdm_interface.selected_programs['ProcessSignal']:
       tabControl.add(self.CropSettingsFrame, text='Cropping & Timestamps')
       tabControl.add(self.ProcessSignalSettingsFrame, text='Signal Processing')
       tabControl.add(self.QualityControlFrame, text='Quality Control')
@@ -45,7 +44,6 @@ class SettingsWindow(Toplevel):
       tabControl.add(self.ModelSelectionFrame, text='Model Selection')
     if self.sdm_interface.selected_programs['Train+Test']:
       tabControl.add(self.TrainSettingsFrame, text='Model Training')
-
     tabControl.pack(expand=1, fill="both")
 
     submitButton = Button(self, text='Launch SDM', command=self.run)
@@ -72,7 +70,6 @@ class SettingsWindow(Toplevel):
         if self.sdm_interface.selected_programs['ProcessSignal']:
           processor.process_cohort()
         if self.sdm_interface.selected_programs['Predict']:
-          print('reached intial predict')
           processor.make_predictions_using_default_models(self.ModelSelectionFrame.selected_models)
         if self.sdm_interface.selected_programs['Train+Test']:
           processor.train_models_using_episode_features(self.TrainSettingsFrame.selected_models)

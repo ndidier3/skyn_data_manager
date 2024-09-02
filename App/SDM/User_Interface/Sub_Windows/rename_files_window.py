@@ -28,10 +28,6 @@ class RenameFilesWindow(Toplevel):
     self.header.grid(row=0, column=0, padx=5, pady=(5, 10))
     self.header.config(font=(None, 14, 'bold'))
     
-    self.datasetIdentifierLabel = Label(self, text = 'Note: Dataset IDs will automatically be added to filenames \nif there are multiple data sets for a given SubID & Condition.')
-    self.datasetIdentifierLabel.config(font=(None, 9, 'italic'))
-    self.datasetIdentifierLabel.grid(row=1, column=0, padx=5, pady=3)
-
     self.buttons_frame = Frame(self)
     self.buttons_frame.grid(row=4, column=0)
 
@@ -71,7 +67,7 @@ class RenameFilesWindow(Toplevel):
 
   def rename_files(self):
     if not all([widget.filename_valid for widget in list(self.renaming_widgets.values())]):
-      messagebox.showerror('SDM Guidance', 'Renaming did not occur. Please revise all invalid filenames. \nSubIDs must consist of 3-6 numeric numbers.\nEpisode Identifier must consist of 1-3 numeric numbers.')
+      messagebox.showerror('SDM Guidance', 'Renaming did not occur. \nSubIDs must consist of 3-6 numeric numbers.\nEpisode Identifier must consist of 1-3 numeric numbers. Do NOT use leading zeros.')
     else:
       original_filenames = [widget.filename for widget in list(self.renaming_widgets.values())]
       new_filenames = [widget.new_filename for widget in list(self.renaming_widgets.values())]

@@ -27,7 +27,7 @@ def verify_metadata(filenames, metadata):
       messagebox.showerror('SDM Error', f'No matching metadata for SubID: {subid}, Dataset ID: {dataset_id} ')
       return False
     elif len(episode_ids) != len(set(episode_ids)):
-      messagebox.showerror('SDM Error', f'Duplicaate episode IDs ({", ".join(episode_ids)}) for SubID: {subid}, Dataset ID: {dataset_id} ')
+      messagebox.showerror('SDM Error', f'Duplicate episode IDs ({", ".join(episode_ids)}) for SubID: {subid}, Dataset ID: {dataset_id} ')
       return False
     
   return True
@@ -153,15 +153,14 @@ def verify_processor(processor_file, min_datasets_required):
     pickle_in = open(processor_file.name, "rb") 
     skyn_processor = pickle.load(pickle_in)
     pickle_in.close()
+    
     data_avail = processor_data_ready(skyn_processor, min_datasets_required)
-  
     if not data_avail:
       messagebox.showerror('SDM Error', 'This file does not have processed Skyn data.')
       return None
     
-    data_avail = all([occasion.condition in ['Alc', 'Non', 'Unk'] for occasion in skyn_processor.occasions])
-
-    if not data_avail:
+    conditions_valid = all([occasion.condition in ['Alc', 'Non', 'Unk'] for occasion in skyn_processor.occasions])
+    if not conditions_valid:
       messagebox.showerror('SDM Error', 'Datasets are not assigned valid "Condition" labels in Metadata. Labels must be: Alc, Non, or Unk.')
       return None
     
@@ -218,6 +217,8 @@ def create_processor(settings_window, sdm_interface):
     elif data_format == 'Single':
       subid = extract_subid(os.path.basename(sdm_interface.selected_data))
       dataset_identifier = extract_dataset_identifier(os.path.basename(sdm_interface.selected_data))
+
+      #ADD-NO-METADATA-LOGIC
 
       matching_metadata = sdm_interface.metadata_df.loc[((sdm_interface.metadata_df['SubID']==str(subid)) | (sdm_interface.metadata_df['SubID']==int(subid))) & ((sdm_interface.metadata_df['Dataset_Identifier']==str(dataset_identifier)) | (sdm_interface.metadata_df['Dataset_Identifier'] == int(dataset_identifier)))].reset_index(drop=True)
       matching_episode_ids = [int(val) for val in matching_metadata['Episode_Identifier'].tolist() if val]
