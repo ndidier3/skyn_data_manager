@@ -56,7 +56,9 @@ def modify_filenames_with_randomization(directory_path, randomization_filepath, 
             print('new filename: ', new_filename)
             os.rename(directory_absolute_path + filename, directory_absolute_path + new_filename)
 
-def generate_random_id(length=4):
-  characters = string.ascii_letters + string.digits  # Letters and digits
-  random_id = ''.join(random.choice(characters) for _ in range(length))
-  return random_id
+def generate_random_id(length=6):
+    first_digit = random.choice(string.digits[1:])  # Choose from '1' to '9'
+    remaining_digits = ''.join(random.choice(string.digits) for _ in range(length - 1))
+    random_id = first_digit + remaining_digits
+    
+    return random_id
