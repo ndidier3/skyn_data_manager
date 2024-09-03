@@ -47,7 +47,7 @@ class TrainSettings(Frame):
 
     self.CustomRFOutcome = StringVar(self)
     self.CustomRFOutcome.set('')
-    self.CustomRFDropdown = OptionMenu(self.ModelTypeFrame, self.CustomRFOutcome, *self.binary_columns)
+    self.CustomRFDropdown = OptionMenu(self.ModelTypeFrame, self.CustomRFOutcome, *self.binary_columns, command=self.set_custom_rf)
 
     self.CustomLR = IntVar(self)
     self.CustomLRCheckbutton = Checkbutton(self.ModelTypeFrame, text='Custom (Logistic Regression)', variable=self.CustomLR, command=self.update_model_selections)
@@ -55,7 +55,7 @@ class TrainSettings(Frame):
 
     self.CustomLROutcome = StringVar(self)
     self.CustomLROutcome.set('')
-    self.CustomLRDropdown = OptionMenu(self.ModelTypeFrame, self.CustomLROutcome, *self.binary_columns)
+    self.CustomLRDropdown = OptionMenu(self.ModelTypeFrame, self.CustomLROutcome, *self.binary_columns, command=self.set_custom_lr)
 
     self.features_header = Label(self, text='Choose Features:')
     self.features_header.config(font=(None, 12, 'bold'))
@@ -102,10 +102,13 @@ class TrainSettings(Frame):
     options = [self.AlcNonRF.get(), self.AlcNonLR.get(), self.BingeRF.get(), self.BingeLR.get(), self.CustomRFOutcome.get(), self.CustomLROutcome.get()]
     
     for i, option in enumerate(options):
-      if option:
-        model_name = model_types[i] + '_' + model_outcomes[i] if model_outcomes[i] != 'Custom' else model_types[i] + '_' + option
+      model_name = model_types[i] + '_' + model_outcomes[i] if model_outcomes[i] != 'Custom' else model_types[i] + '_' + option
+      if (isinstance(option, int) and option == 1) or (isinstance(option, str) and option != ''):
         if model_name not in self.selected_models:
           self.selected_models.append(model_name)
+      else:
+        if model_name in self.selected_models:
+          self.selected_models.remove(model_name)
 
     if self.CustomRF.get():
       self.CustomRFDropdown.grid(row=6, column=0, pady=0, padx=20, sticky='w')
@@ -117,22 +120,8 @@ class TrainSettings(Frame):
     else:
       self.CustomLRDropdown.grid_forget()
   
-  def unclick_model(self, name):
-    self.selected_models.remove(name)
-
-    if name == 'RF_Alc_vs_Non':
-      self.AlcNonRF.set(0)
-    elif name == 'LR_Alc_vs_Non':
-      self.AlcNonLR.set(0)
-    elif name == 'RF_Binge':
-      self.BingeRF.set(0)
-    elif name == 'LR_Binge':
-      self.BingeLR.set(0)
-    elif 'RF' in name:
-      self.CustomRF.set(0)
-    elif 'LR' in name:
-      self.CustomLR.set(0)
-
-
-
-      
+  def set_custom_rf(self, val):
+    self.CustomRFOutcome.set(val)
+  
+  def set_custom_lr(self, val):
+    self.CustomLROutcome.set(val)

@@ -172,6 +172,8 @@ class skynCohort:
       if model_name == 'RF_Binge' or model_name == 'LR_Binge':
           self.cross_validation(model_name, 'Light_vs_Heavy')
           self.export_feature_plots(ground_truth_variable='binge', filter={'binge': ["None"]})
+      
+      #Custom Variable Creation Not READY
 
     self.load_features(force_refresh=force_refresh)
 

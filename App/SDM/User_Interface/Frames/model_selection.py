@@ -6,7 +6,6 @@ from tkinter import messagebox
 import pandas as pd
 import os
 
-
 class ModelSelection(Frame):
   def __init__(self, tab, settings_window):
     super().__init__(settings_window)
@@ -41,9 +40,14 @@ class ModelSelection(Frame):
     options = [self.AlcNonRF.get(), self.AlcNonLR.get(), self.BingeRF.get(), self.BingeLR.get()]
     
     for i, option in enumerate(options):
+      model = load_default_model(model_outcomes[i], model_types[i])
       if option == 1:
-        model = load_default_model(model_outcomes[i], model_types[i])
-        if model not in self.selected_models:
+        already_saved = any(selected_model.model_name == model.model_name for selected_model in self.selected_models)
+        if not already_saved:
           self.selected_models.append(model)
+      else:
+        index_to_remove = next((index for index, selected_model in enumerate(self.selected_models) if selected_model.model_name == model.model_name), None)
+        if index_to_remove is not None:
+          self.selected_models.pop(index_to_remove)
 
     self.sdm_interface.models = self.selected_models
