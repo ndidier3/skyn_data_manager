@@ -39,7 +39,7 @@ class skynDataset:
 
     #outcomes/variables of interest/self-reported info
     self.condition = load_metadata(self, column='Condition')
-    if self.condition != 'Non' or self.condition != 'Alc':
+    if self.condition != 'Non' and self.condition != 'Alc':
       self.condition = 'Unk'
     self.drinks = load_metadata(self, column='TotalDrks')
     self.sex = load_metadata(self, column='Sex')

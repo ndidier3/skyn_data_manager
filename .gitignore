@@ -5,6 +5,7 @@ build/
 App/SDM.egg-info/
 setup.py
 test.py
+pyinstaller_command.txt
 notes.txt
 *.pyc
 *.pyo
