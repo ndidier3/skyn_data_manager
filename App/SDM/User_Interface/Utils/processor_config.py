@@ -217,9 +217,6 @@ def create_processor(settings_window, sdm_interface):
     elif data_format == 'Single':
       subid = extract_subid(os.path.basename(sdm_interface.selected_data))
       dataset_identifier = extract_dataset_identifier(os.path.basename(sdm_interface.selected_data))
-
-      #ADD-NO-METADATA-LOGIC
-
       matching_metadata = sdm_interface.metadata_df.loc[((sdm_interface.metadata_df['SubID']==str(subid)) | (sdm_interface.metadata_df['SubID']==int(subid))) & ((sdm_interface.metadata_df['Dataset_Identifier']==str(dataset_identifier)) | (sdm_interface.metadata_df['Dataset_Identifier'] == int(dataset_identifier)))].reset_index(drop=True)
       matching_episode_ids = [int(val) for val in matching_metadata['Episode_Identifier'].tolist() if val]
 
@@ -295,29 +292,29 @@ def load_settings(settings_window):
     return {
       'major_cleaning_threshold': 
       settings_window.ProcessSignalSettingsFrame.majorThreshold.get(),
-    'minor_cleaning_threshold': 
-      settings_window.ProcessSignalSettingsFrame.minorThreshold.get(),
-    'smoothing_window': 
-      settings_window.ProcessSignalSettingsFrame.smoothingWindow.get(),
-    'device_removal_detection_method': 
-      settings_window.ProcessSignalSettingsFrame.deviceRemovalDetection.get(),
-    'max_duration': 
-      settings_window.CropSettingsFrame.maxDatasetDuration.get(),
-    'skyn_upload_timezone': 
-      settings_window.CropSettingsFrame.timezoneUpload.get(),
-    'disable_crop_start': 
-      settings_window.CropSettingsFrame.disableCropStart.get() if settings_window.CropSettingsFrame.crop_start_timestamps_available else 1,
-    'disable_crop_end': 
-      settings_window.CropSettingsFrame.disableCropEnd.get() if settings_window.CropSettingsFrame.crop_end_timestamps_available else 1,
-    'min_duration_active': 
-      settings_window.QualityControlFrame.min_duration_active.get() / 60,
-    'max_percentage_inactive': 
-      settings_window.QualityControlFrame.max_percentage_inactive.get(),
-    'max_percentage_imputed': 
-      settings_window.QualityControlFrame.max_percentage_imputed.get(),
-    'training_features': 
-      [key for key, val in settings_window.TrainSettingsFrame.predictor_checkboxes.items() if val.get()] if settings_window.sdm_interface.selected_programs['Train+Test'] else settings_window.TrainSettingsFrame.predictor_options,
-    }
+      'minor_cleaning_threshold': 
+        settings_window.ProcessSignalSettingsFrame.minorThreshold.get(),
+      'smoothing_window': 
+        settings_window.ProcessSignalSettingsFrame.smoothingWindow.get(),
+      'device_removal_detection_method': 
+        settings_window.ProcessSignalSettingsFrame.deviceRemovalDetection.get(),
+      'max_duration': 
+        settings_window.CropSettingsFrame.maxDatasetDuration.get(),
+      'skyn_upload_timezone': 
+        settings_window.CropSettingsFrame.timezoneUpload.get(),
+      'disable_crop_start': 
+        settings_window.CropSettingsFrame.disableCropStart.get() if settings_window.CropSettingsFrame.crop_start_timestamps_available else 1,
+      'disable_crop_end': 
+        settings_window.CropSettingsFrame.disableCropEnd.get() if settings_window.CropSettingsFrame.crop_end_timestamps_available else 1,
+      'min_duration_active': 
+        settings_window.QualityControlFrame.min_duration_active.get() / 60,
+      'max_percentage_inactive': 
+        settings_window.QualityControlFrame.max_percentage_inactive.get(),
+      'max_percentage_imputed': 
+        settings_window.QualityControlFrame.max_percentage_imputed.get(),
+      'training_features': 
+        [key for key, val in settings_window.TrainSettingsFrame.predictor_checkboxes.items() if val.get()] if settings_window.sdm_interface.selected_programs['Train+Test'] else settings_window.TrainSettingsFrame.predictor_options,
+      }
   else:
     return {
       'models': 
