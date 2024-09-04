@@ -25,16 +25,18 @@ class skynDataset:
     #COHORT METADATA
     if len(metadata) > 0:
       self.metadata = metadata
-    else:
-      try:
-        self.metadata = configure_timestamps(pd.read_excel(metadata_path))
-      except:
-        self.metadata = pd.DataFrame(
+      self.metadata_index = get_metadata_index(self)
+    elif metadata_path == '':
+      self.metadata = pd.DataFrame(
           columns=['SubID', 'Condition', 'Dataset_Identifier', 'Episode_Identifier', 'Use_Data', 'Notes', 'Crop Begin Date', 'Crop Begin Time', 'Crop End Date', 'Crop End Time', 'Time Zone'],
-          data=[[self.subid, 'Unk', self.dataset_identifier, self.episode_identifier, 'Y', '', '', '', '', '', '']]
+          data=[[self.subid, 'Unk', self.dataset_identifier, int(self.episode_identifier[1:]), 'Y', '', '', '', '', '', '']]
         )
+      self.metadata = configure_timestamps(self.metadata)
+      self.metadata_index = 0
+    else:
+      self.metadata = configure_timestamps(pd.read_excel(metadata_path))
+      self.metadata_index = get_metadata_index(self)
     
-    self.metadata_index = get_metadata_index(self)
     self.event_timestamps = get_event_timestamps(self, metadata_path) #will return {} if no path
 
     #outcomes/variables of interest/self-reported info
@@ -604,7 +606,7 @@ class skynDataset:
     predictions = {}
     for model in models:
       try:
-        data = np.array([self.stats[feature] for feature in model.predictors]).reshape(1, -1)
+        data = pd.DataFrame([self.stats[feature] for feature in model.predictors], index=model.predictors).T
         prediction = model.predict(data)
         if model.outcome == 'condition':
           predictions[model.model_name + '_prediction'] = 'Alc' if prediction==1 else 'Non'
@@ -615,7 +617,7 @@ class skynDataset:
         elif model.outcome == 'binge':
           predictions[model.model_name + '_prediction'] = 'Heavy' if prediction==1 else 'Light'
           if self.binge != "None" and self.binge != "Unk":
-            predictions[model.model_name + '_self_report_or_ground_truth_confirmed'] = 'yes (correct)' if predictions[model.model_name + '_prediction'] == self.condition else 'no (incorrect)'
+            predictions[model.model_name + '_self_report_or_ground_truth_confirmed'] = 'yes (correct)' if predictions[model.model_name + '_prediction'] == self.binge else 'no (incorrect)'
           elif self.binge == 'None':
             predictions[model.model_name + '_self_report_or_ground_truth_confirmed'] = 'Cannot confirm - Binge prediction may not be relevant. Self-report/ground truth is non-alcohol episode.'
           else:
