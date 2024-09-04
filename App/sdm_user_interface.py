@@ -1,18 +1,3 @@
-import sys
-import os
-
-# Determine the base path depending on whether the script is bundled by PyInstaller
-if getattr(sys, 'frozen', False):
-    # If bundled, use sys._MEIPASS as the base path
-    base_path = sys._MEIPASS
-else:
-    # If running normally, use the current directory
-    base_path = os.path.abspath(os.path.dirname(__file__))
-
-# Append the directory containing your modules to sys.path
-print(base_path)
-sys.path.append(base_path)
-
 from SDM.Configuration.file_management import *
 from SDM.Configuration.configuration import load_metadata
 from SDM.User_Interface.Sub_Windows.settings_window import SettingsWindow
@@ -27,6 +12,7 @@ from tkinter import *
 from tkinter import filedialog, ttk, simpledialog
 from tkinter import messagebox
 import pandas as pd
+import sys
 
 class SkynDataManagerApp(Tk):
   def __init__(self):
@@ -295,5 +281,3 @@ class SkynDataManagerApp(Tk):
   def on_closing(self):
     self.destroy()
     sys.exit(0)
-
-SkynDataManagerApp()
