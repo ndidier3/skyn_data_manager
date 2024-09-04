@@ -286,5 +286,3 @@ class SkynDataManagerApp(Tk):
   def on_closing(self):
     self.destroy()
     sys.exit(0)
-
-SkynDataManagerApp()
