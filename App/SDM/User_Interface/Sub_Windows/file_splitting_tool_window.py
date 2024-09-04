@@ -2,12 +2,14 @@ from tkinter import *
 from tkinter import filedialog, StringVar, IntVar
 from tkinter.filedialog import askopenfile
 from tkinter import messagebox
+from tkinter import ttk
 import pandas as pd
 import os
 import traceback
 from SDM.Configuration.configuration import update_column_names
 from SDM.Configuration.modify_filenames import generate_random_id
 from SDM.Configuration.split_skyn_dataset import *
+from SDM.User_Interface.Frames.subid_entries_per_email import SubidEntriesPerEmail
 
 class FileSplittingToolWindow(Toplevel):
   def __init__(self, parent, main_window):
@@ -27,20 +29,20 @@ class FileSplittingToolWindow(Toplevel):
 
     self.data_to_split = pd.DataFrame()
     self.selectFileButton = Button(self.frame, text = "Select File to Split", command = self.open_file)
-    self.selectedFileLabel = Label(self.frame, text = "", font=self.main_window.label_style)
+    self.selectedFileLabel = Label(self.frame, text = "")
     self.selectedFileLabel.grid(row=1, column=0, pady=(5,2), padx=(0,5), sticky='w')
     self.selectFileButton.grid(row=1, column=1, pady=(5,2), padx=(5,0), sticky='e')
 
     self.split_time_options = [str(i+1) + ':00' for i in range(0, 24)]
     self.split_time = StringVar()
     self.split_time.set(None)
-    self.splitTimeStartLabel = Label(self.frame, text = 'Select the hour of the day where splitting should occur.', font=self.main_window.label_style)
+    self.splitTimeStartLabel = Label(self.frame, text = 'Select the hour of the day where splitting should occur.')
     self.splitTimeOptionMenu = OptionMenu(self.frame, self.split_time, *self.split_time_options, command=self.show_interval_options)
 
     self.interval_options = ['Day-Level']
     self.interval = StringVar()
     self.interval.set(None)
-    self.intervalLabel = Label(self.frame, text = f'Select frequency at which the data should be split at {self.split_time.get()}', font=self.main_window.label_style)
+    self.intervalLabel = Label(self.frame, text = f'Select frequency at which the data should be split at {self.split_time.get()}')
     self.intervalOptionMenu = OptionMenu(self.frame, self.interval, *self.interval_options, command = self.show_remaining_prompts)
 
     self.subidAssignmentMethods = {
@@ -58,14 +60,11 @@ class FileSplittingToolWindow(Toplevel):
     self.validate_numeric = self.register(lambda P: (P.isdigit() and len(P) <= 6) or len(P) == 0)
     self.subidLabel = Label(self.frame, text = 'Enter SubID', font=self.main_window.label_style)
     self.subidEntry = Entry(self.frame, width = 15, validate='key', validatecommand=(self.validate_numeric, "%P"))
-
-    self.assign_subid_by_email_table = LabelFrame(self)
-
+    
     self.executeFileSplittingButton = Button(self, text = 'Split Files', command = self.split_file)
 
   def open_file(self):
     file = filedialog.askopenfile(mode='r', filetypes=[('Skyn Dataset','*.xlsx'), ('Skyn Dataset','*.csv')])
-    self.geometry("900x600")
     self.grab_set()
     self.lift()
     if file:
@@ -76,13 +75,24 @@ class FileSplittingToolWindow(Toplevel):
         self.data_to_split = pd.read_csv(filepath)
       else:
         self.data_to_split = pd.read_excel(filepath)
+      try:
+        self.data_to_split = update_column_names(self.data_to_split)
+        self.data_to_split.sort_values(by="datetime", inplace=True)
+        self.selectedFileLabel['text'] = f'Selected File: {file.name.split("/")[-1]}'
+        self.selectedFileLabel.config(fg='green')
+        self.splitTimeStartLabel.grid(row=3, column=0, pady=(5,2), padx=(0,5), sticky='w')
+        self.splitTimeOptionMenu.grid(row=3, column=1, pady=(5,2), padx=(5,0), sticky='e')
+      except:
+        messagebox.showerror('SDM Error', 'File failed to load.')
+        self.data_to_split = pd.DataFrame()
 
-      self.data_to_split = update_column_names(self.data_to_split)
-      self.data_to_split.sort_values(by="datetime", inplace=True)
-      self.selectedFileLabel['text'] = f'Selected File: {file.name.split("/")[-1]}'
-      self.selectedFileLabel.config(fg='green')
-      self.splitTimeStartLabel.grid(row=3, column=0, pady=(5,2), padx=(0,5), sticky='w')
-      self.splitTimeOptionMenu.grid(row=3, column=1, pady=(5,2), padx=(5,0), sticky='e')
+    if len(self.data_to_split):
+      try:
+        emails = self.data_to_split['email'].unique().tolist()
+        self.subid_entries_per_email_frame = SubidEntriesPerEmail(self, emails)
+        self.geometry("900x900")
+      except:
+        messagebox.showinfo('SDM Message', 'Email column NOT found in dataset.')
 
   def show_interval_options(self, val):
     self.split_time.set(val)
@@ -119,38 +129,26 @@ class FileSplittingToolWindow(Toplevel):
       if key == 1:
         self.subidLabel.grid(row=12, column = 0, pady=(5,2), padx=(30,5), sticky='w')
         self.subidEntry.grid(row=12, column=1, pady=(5,2), padx=(5,0), sticky='e')
-        self.assign_subid_by_email_table.grid_forget()
+        self.subid_entries_per_email_frame.grid_forget()
       else:
         self.subidLabel.grid_forget()
         self.subidEntry.grid_forget()
 
       if key == 3:
-        self.show_assign_subid_by_email_table()
+        self.subid_entries_per_email_frame.grid(row=15, column=0, pady=(20, 2), padx=(0, 5), sticky="nsew")
         self.subidLabel.grid_forget()
         self.subidEntry.grid_forget()
       else:
-        self.assign_subid_by_email_table.grid_forget()
+        self.subid_entries_per_email_frame.grid_forget()
     else:
       self.subidLabel.grid_forget()
       self.subidEntry.grid_forget()
-      self.assign_subid_by_email_table.grid_forget()
-
-  def show_assign_subid_by_email_table(self):
-    self.assign_subid_by_email_table.grid(row=15, column=0, pady=(20, 2), padx=(0, 5), sticky='w', columnspan=2)
-    Label(self.assign_subid_by_email_table, text="Email", font=self.main_window.label_style).grid(row=0, column=0, sticky="w", padx=3, pady=3)
-    Label(self.assign_subid_by_email_table, text="SubID", font=self.main_window.label_style).grid(row=0, column=1, sticky="w", padx=3, pady=3)
-
-    emails = self.data_to_split['email'].unique()
-    self.subid_entries_per_email = {}
-
-    for i, email in enumerate(emails):
-      Label(self.assign_subid_by_email_table, text=email, font=self.main_window.label_style).grid(row=i+1, column=0, sticky="w", padx=3, pady=1)
-      entry = Entry(self.assign_subid_by_email_table, width=10, validate='key', validatecommand=(self.validate_numeric, "%P"))
-      entry.grid(row=i+1, column=1, sticky="w", padx=3, pady=1)
-      self.subid_entries_per_email[email] = entry
-
+      self.subid_entries_per_email_frame.grid_forget()
+  
   def split_file(self):
     key = self.subidAssignmentMethods[self.subidAssignmentMethodVar.get()]
+    subid_entries_per_email = self.subid_entries_per_email_frame.subid_entries_per_email
+
     if key == 1 or key == 2:
       try:
         datasets = split_skyn_dataset(self.data_to_split, self.split_time.get())
@@ -189,7 +187,7 @@ class FileSplittingToolWindow(Toplevel):
     if key == 3 or key == 4:
       try:
         if key == 3:
-          for email, entry in self.subid_entries_per_email.items():
+          for email, entry in subid_entries_per_email.items():
               subid = entry.get()
               if not subid or not subid.isdigit() or len(subid) > 6:
                   messagebox.showerror('SDM Error', f'Please ensure all SubIDs are filled in correctly with up to 6 digits for each email.')
@@ -209,7 +207,7 @@ class FileSplittingToolWindow(Toplevel):
         i = 1
         for email, datasets in datasets_by_email.items():
             for timeframe, dataset in datasets.items():
-                subid = self.subid_entries_per_email[email].get() if key == 3 else generate_random_id()
+                subid = subid_entries_per_email[email].get() if key == 3 else generate_random_id()
                 subids.append(subid)
                 emails.append(email)
                 dataset_identifier = f"{i:03d}"  # Pad the identifier to 3 digits
