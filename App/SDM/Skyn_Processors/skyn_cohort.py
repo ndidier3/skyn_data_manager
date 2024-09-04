@@ -42,7 +42,7 @@ class skynCohort:
     self.cohort_name = cohort_name
     self.metadata_path = metadata_path
     if self.metadata_path == '':
-      self.metadata = pd.DataFrame(create_metadata_from_cohort_folder(data_folder))
+      self.metadata = configure_timestamps(pd.DataFrame(create_metadata_from_cohort_folder(data_folder)))
     else:
       self.metadata = configure_timestamps(pd.read_excel(self.metadata_path))
     self.cohort_identifiers = get_cohort_full_identifiers(self.metadata)

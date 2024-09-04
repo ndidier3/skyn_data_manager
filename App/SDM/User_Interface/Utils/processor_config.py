@@ -217,8 +217,13 @@ def create_processor(settings_window, sdm_interface):
     elif data_format == 'Single':
       subid = extract_subid(os.path.basename(sdm_interface.selected_data))
       dataset_identifier = extract_dataset_identifier(os.path.basename(sdm_interface.selected_data))
-      matching_metadata = sdm_interface.metadata_df.loc[((sdm_interface.metadata_df['SubID']==str(subid)) | (sdm_interface.metadata_df['SubID']==int(subid))) & ((sdm_interface.metadata_df['Dataset_Identifier']==str(dataset_identifier)) | (sdm_interface.metadata_df['Dataset_Identifier'] == int(dataset_identifier)))].reset_index(drop=True)
-      matching_episode_ids = [int(val) for val in matching_metadata['Episode_Identifier'].tolist() if val]
+      
+      if sdm_interface.metadata != '':
+        matching_metadata = sdm_interface.metadata_df.loc[((sdm_interface.metadata_df['SubID']==str(subid)) | (sdm_interface.metadata_df['SubID']==int(subid))) & ((sdm_interface.metadata_df['Dataset_Identifier']==str(dataset_identifier)) | (sdm_interface.metadata_df['Dataset_Identifier'] == int(dataset_identifier)))].reset_index(drop=True)
+        matching_episode_ids = [int(val) for val in matching_metadata['Episode_Identifier'].tolist() if val]
+      else:
+        matching_metadata = []
+        matching_episode_ids = []
 
       #Find episode identifier in metadata; if multiple, user must choose
       episode_identifier = None
@@ -229,8 +234,10 @@ def create_processor(settings_window, sdm_interface):
           episode_identifier_registered = episode_identifier in matching_episode_ids
           if episode_identifier_registered:
             break
-      else:
+      elif len(matching_metadata) == 1:
         episode_identifier = str(matching_episode_ids[0])
+      else:
+        episode_identifier = 1
 
       if not episode_identifier:
         messagebox.showerror('SDM Error', f'Episode Identifier could not be loaded from metadata. Please check metadata: {sdm_interface.metadata}')
@@ -243,11 +250,11 @@ def create_processor(settings_window, sdm_interface):
           int(subid),
           int(dataset_identifier),
           'e' + str(episode_identifier),
-          sdm_interface.metadata,
           False,
           False,
           'CST',
-          24
+          24,
+          metadata_path = sdm_interface.metadata,
         )
 
   else:
