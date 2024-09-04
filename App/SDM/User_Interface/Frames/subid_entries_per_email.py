@@ -2,7 +2,7 @@ from tkinter import *
 from tkinter import StringVar
 
 class SubidEntriesPerEmail(LabelFrame):
-  def __init__(self, parent, emails, height=500):
+  def __init__(self, parent, emails, height=400):
     super().__init__(parent, height=height)
 
     self.subid_entries_per_email = {}
