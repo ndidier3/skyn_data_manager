@@ -1,15 +1,15 @@
-from .skyn_cohort_tester import skynCohortTester
-from .skyn_dataset import skynDataset
-from ..Configuration.configuration import *
-from ..Visualization.plotting import *
-from ..Configuration.file_management import *
-from ..Documenting.cohort_workbook import SDM_Report
+from SDM.Skyn_Processors.skyn_cohort_tester import skynCohortTester
+from SDM.Skyn_Processors.skyn_dataset import skynDataset
+from SDM.Configuration.configuration import *
+from SDM.Visualization.plotting import *
+from SDM.Configuration.file_management import *
+from SDM.Documenting.cohort_workbook import SDM_Report
 # from ..Machine_Learning.model_optimization import *
 # from ..Machine_Learning.pca import *
 # from ..Machine_Learning.feature_estimator import train_feature_estimator
-from ..Feature_Engineering.tac_features import *
+from SDM.Feature_Engineering.tac_features import *
 # from ..Machine_Learning.binary_model_dev import *
-from ..User_Interface.Utils.filename_tools import *
+from SDM.User_Interface.Utils.filename_tools import *
 import glob
 import pandas as pd
 import fnmatch
