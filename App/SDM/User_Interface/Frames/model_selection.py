@@ -34,6 +34,9 @@ class ModelSelection(Frame):
     self.BingeLRCheckbutton.grid(row=6, column=0, padx=10, pady=5, sticky='w')
 
   def update_model_selections(self):
+    """
+    to do: move this function to when the app runs
+    """
     
     model_outcomes = ['Alc_vs_Non', 'Alc_vs_Non', 'Binge', 'Binge']
     model_types = ['RF', 'LR', 'RF', 'LR']
