@@ -6,8 +6,12 @@ def split_skyn_dataset(data_to_split, split_time):
   data_to_split['datetime'] = configure_timestamp_column(data_to_split)
   data_to_split.sort_values(by='datetime', inplace=True)
 
+  unique_days = data_to_split['datetime'].dt.date.unique().tolist()
+  day_before = unique_days[0] - timedelta(days=1)
+  unique_days = [day_before] + unique_days
+
   datasets = {}
-  for unique_day in data_to_split['datetime'].dt.date.unique().tolist():
+  for unique_day in unique_days:
     hour, minute = map(int, split_time.split(':'))
     start = datetime(unique_day.year, unique_day.month, unique_day.day, hour, minute)
     end = start + timedelta(hours=24)
@@ -28,7 +32,11 @@ def split_skyn_dataset_by_email(data_to_split, split_time):
     for email, group in email_groups:
         datasets = {}
 
-        for unique_day in group['datetime'].dt.date.unique().tolist():
+        unique_days = group['datetime'].dt.date.unique().tolist()
+        day_before = unique_days[0] - timedelta(days=1)
+        unique_days = [day_before] + unique_days
+
+        for unique_day in unique_days:
             hour, minute = map(int, split_time.split(':'))
             start = datetime(unique_day.year, unique_day.month, unique_day.day, hour, minute)
             end = start + timedelta(hours=24)
