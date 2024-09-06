@@ -28,11 +28,14 @@ class SubidEntriesPerEmail(LabelFrame):
     Label(self.grid_frame, text="Email").grid(row=0, column=0, padx=10, pady=5)
     Label(self.grid_frame, text="SubID").grid(row=0, column=1, padx=10, pady=5)
 
+    self.validate_numeric = self.register(lambda P: (P.isdigit() and len(P) <= 6) or len(P) == 0)
+
     # Populate grid with email labels and SubID entries
     for i, email in enumerate(emails, start=1):
       Label(self.grid_frame, text=email).grid(row=i, column=0, padx=10, pady=5, sticky="w")
       subid_var = StringVar()
-      entry = Entry(self.grid_frame, textvariable=subid_var)
+      entry = Entry(self.grid_frame, textvariable=subid_var,
+                    validate="key", validatecommand=(self.validate_numeric, '%P'))
       entry.grid(row=i, column=1, padx=10, pady=5, sticky="w")
       self.subid_entries_per_email[email] = subid_var
 
