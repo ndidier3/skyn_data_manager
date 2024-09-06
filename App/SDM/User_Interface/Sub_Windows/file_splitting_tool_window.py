@@ -152,7 +152,7 @@ class FileSplittingToolWindow(Toplevel):
     if key == 1 or key == 2:
       try:
         datasets = split_skyn_dataset(self.data_to_split, self.split_time.get())
-        subid = self.subidEntry.get() if (self.subidEntry.get() and key == 2) else None
+        subid = self.subidEntry.get() if (self.subidEntry.get() and key == 1) else None
         subids = []
         dataset_identifiers = []
         start_timestamps = []
