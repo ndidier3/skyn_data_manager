@@ -226,7 +226,7 @@ class FileSplittingToolWindow(Toplevel):
             'End_Timestamp': end_timestamps
         })
         split_details.to_excel(self.export_folder + f'Split_Details_{os.path.splitext(os.path.basename(self.filepath))[0]}.xlsx', index=False)
-
+        self.attributes('-topmost', True)
         messagebox.showinfo('SDM Update', f'Split files are saved here: {output_folder}/')
 
       except:
