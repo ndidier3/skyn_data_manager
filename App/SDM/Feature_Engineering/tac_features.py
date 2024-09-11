@@ -27,10 +27,11 @@ def get_peak(df, variable, window = {}):
       index = window['index']
       previous_window = window_length if (index - window_length) > 0 else (index - 1)
       post_window = window_length if (index + window_length) < len(df) else ((len(df) - window_length) - 1)
-      return df.loc[index-previous_window:index+post_window, variable].max()
+      peak = df.loc[index-previous_window:index+post_window, variable].max()
     else:
       tac = df[variable]
-      return tac.max()
+      peak = tac.max()
+    return peak if peak > 0.5 else 1 # prevent extremely low peaks for division purposes in getting relative peak changes
   else:
     return None
 
