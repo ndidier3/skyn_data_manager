@@ -55,7 +55,7 @@ class SettingsWindow(Toplevel):
 
       if self.sdm_interface.data_loading_method == 'Single':
         if self.sdm_interface.selected_programs['ProcessSignal']:
-          processor.process_with_default_settings(make_plots=True, export=~self.sdm_interface.selected_programs['Predict'])
+          processor.process_as_single_episode(make_plots=True, export=~self.sdm_interface.selected_programs['Predict'])
         if self.sdm_interface.selected_programs['Predict']:
           if processor.valid_occasion:
             processor.make_prediction(self.ModelSelectionFrame.selected_models)

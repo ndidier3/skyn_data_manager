@@ -4,6 +4,7 @@ from ..Crop.crop import *
 from ..Signal_Processing.smooth_signal import *
 from ..Signal_Processing.remove_outliers import *
 from ..Signal_Processing.impute import impute_tac_in_gaps, impute
+from ..Signal_Processing.filling_gaps import identify_and_fill_gaps
 from ..Visualization.plotting import *
 from ..Feature_Engineering.tac_features import *
 from ..Configuration.file_management import *
@@ -14,7 +15,7 @@ import numpy as np
 import traceback
 
 class skynDataset:
-  def __init__(self, path, data_out_folder, graphs_out_folder, subid, dataset_identifier, episode_identifier='e1', disable_crop_start = True, disable_crop_end = True, skyn_upload_timezone = 'CST', max_duration = 18, metadata_path = '', metadata = pd.DataFrame()):
+  def __init__(self, path, data_out_folder, graphs_out_folder, subid, dataset_identifier, episode_identifier='e1', disable_crop_start = True, disable_crop_end = True, skyn_upload_timezone = 'CST', max_duration = 100000, metadata_path = '', metadata = pd.DataFrame()):
     self.path = path
 
     #Subid, Dataset ID, Episode ID
@@ -70,8 +71,8 @@ class skynDataset:
     self.cropping_timestamp_available_begin = timestamp_available(self, 'Begin')
     self.cropping_timestamp_available_end = timestamp_available(self, 'End')
 
-    self.crop_start_with_timestamps = (~disable_crop_start) and self.cropping_timestamp_available_begin
-    self.crop_end_with_timestamps = (~disable_crop_end) and self.cropping_timestamp_available_end
+    self.crop_start_with_timestamps = (not disable_crop_start) and self.cropping_timestamp_available_begin
+    self.crop_end_with_timestamps = (not disable_crop_end) and self.cropping_timestamp_available_end
     
     self.skyn_upload_timezone = skyn_upload_timezone
     self.crop_begin_adjustment = 0
@@ -124,14 +125,34 @@ class skynDataset:
 
     #MODEL PREDICTIONS
     self.predictions = {}
+  
+  def process_as_multiple_episodes(self):
+    print(self.subid)
+    print(self.dataset_identifier)
     
-  def process_with_default_settings(self, make_plots=False, export=True):
+    self.dataset['TAC_Raw'] = self.dataset['TAC'].tolist()
+
+    self.valid_occasion, self.invalid_reason = determine_initial_validity(self)
+
+    if self.valid_occasion:
+      #reassign negative values
+      df = self.dataset.copy()
+      negative_TAC_reassigned = [tac if tac >= 0 else 0 for tac in df['TAC'].tolist()]
+      df['TAC'] = negative_TAC_reassigned
+      df['TAC_negative_reassigned'] = negative_TAC_reassigned
+      df['negative_reassigned_zero'] = [1 if tac >= 0 else 0 for tac in df['TAC'].tolist()]
+      self.dataset = df
+
+      df = self.dataset.copy()
+      df = identify_and_fill_gaps(df) #currently using defaults of 30 min gaps, 15 min required before and after gap
+      df.to_excel(f'test_ND_{self.subid}.xlsx')
+
+  def process_as_single_episode(self, make_plots=False, export=True):
     create_output_folders(self)
 
     print(self.subid)
     print(self.dataset_identifier)
     print(self.episode_identifier)
-    print(self.metadata)
 
     self.dataset['TAC_Raw'] = self.dataset['TAC'].tolist()
 
@@ -161,6 +182,7 @@ class skynDataset:
     if self.valid_occasion:
       self.clean_tac_signal()
       self.smooth_tac_signal(self.smoothing_window, 3, ['TAC', 'TAC_processed'])
+      self.dataset.to_csv(f'test_{self.subid}.csv')
       self.valid_occasion, self.invalid_reason = determine_post_cleaning_validity(self)
 
     if self.valid_occasion:
@@ -209,10 +231,10 @@ class skynDataset:
 
     #CLEANING STEP 2: Reassign negative values to 0
     df = self.dataset.copy()
-    negative_TAC_reassigned = [tac if tac > 0 else 0 for tac in df['TAC'].tolist()]
+    negative_TAC_reassigned = [tac if tac >= 0 else 0 for tac in df['TAC'].tolist()]
     df['TAC'] = negative_TAC_reassigned
     df['TAC_negative_reassigned'] = negative_TAC_reassigned
-    df['negative_reassigned_zero'] = [1 if tac > 0 else 0 for tac in df['TAC'].tolist()]
+    df['negative_reassigned_zero'] = [1 if tac >= 0 else 0 for tac in df['TAC'].tolist()]
     self.dataset = df
 
     #CLEANING STEP 3: Fill in "gaps" (i.e. missing data)
@@ -232,10 +254,15 @@ class skynDataset:
     else:
       extreme_outliers = []
       self.dataset['extreme_outlier'] = [0 for i in range(0, len(self.dataset))]
+      self.dataset['TAC_extreme_values_imputed'] = [tac for tac in df['TAC_gaps_filled']]
 
     #CLEANING STEP 5: Impute values where device is removed
     if self.device_removal_detection_method:
       self.detect_device_removal()
+    else:
+      self.dataset['device_on_pred'] = ['' for i in range(0, len(self.dataset))]
+      self.dataset['TAC_device_off'] = [tac for tac in self.dataset['TAC_extreme_values_imputed']]
+      self.dataset['TAC_device_off_imputed'] = [0 for i in range(0, len(self.dataset))]
     
     #CLEANING STEP 6: Impute environmental artifacts and excessive noise/jumps
     df = self.dataset.copy()

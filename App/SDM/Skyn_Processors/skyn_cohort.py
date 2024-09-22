@@ -126,7 +126,7 @@ class skynCohort:
           occasion.min_duration_active = self.min_duration_active
           occasion.max_percentage_inactive = self.max_percentage_inactive
           occasion.max_percentage_imputed = self.max_percentage_imputed
-          occasion.process_with_default_settings(make_plots=True)
+          occasion.process_as_single_episode(make_plots=True)
           self.occasions.append(occasion) if occasion.valid_occasion else self.invalid_occasions.append(occasion)
           if len(self.master_dataset) == 0 and len(occasion.dataset) > 0:
             self.master_dataset = occasion.dataset

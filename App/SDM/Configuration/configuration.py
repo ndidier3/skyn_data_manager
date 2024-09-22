@@ -237,7 +237,6 @@ def configure_raw_data(self):
 
     sampling_rate = get_sampling_rate(df_raw, 'datetime')
     if sampling_rate > 1:
-        print('reached123')
         df_raw = reduce_sampling_rate(df_raw, 'datetime')
 
     df_raw = get_time_elapsed(df_raw, 'datetime')
@@ -280,8 +279,8 @@ def determine_initial_validity(self):
       self.invalid_reason = 'Not in metadata' if self.valid_occasion == 0 else None
 
     if self.valid_occasion:
-        self.valid_occasion = 1 if load_metadata(self, 'Use_Data') == 'Y' else 0
-        self.invalid_reason = f'Excluded within Metadata [Use_Data = N]. Note: {self.metadata_note}' if self.valid_occasion == 0 else None
+      self.valid_occasion = 1 if load_metadata(self, 'Use_Data') == 'Y' else 0
+      self.invalid_reason = f'Excluded within Metadata [Use_Data = N]. Note: {self.metadata_note}' if self.valid_occasion == 0 else None
     
     if self.valid_occasion:
       self.valid_occasion = 0 if self.disabled_by_multiple_device_ids else 1
