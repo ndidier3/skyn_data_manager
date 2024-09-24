@@ -195,16 +195,25 @@ def configure_timestamps(metadata):
     #     return metadata
 
 def create_output_folders(self):
+    # Create the main data output folder, including all necessary parent directories
     if not os.path.exists(self.data_out_folder):
-      os.mkdir(self.data_out_folder)
+        os.makedirs(self.data_out_folder, exist_ok=True)
+    
+    # Create the plot folder, including all necessary parent directories
     if not os.path.exists(self.plot_folder):
-      os.mkdir(self.plot_folder)
+        os.makedirs(self.plot_folder, exist_ok=True)
+
+    # Create subid plot folder within the plot folder
     subid_plot_folder = f'{self.plot_folder}/{self.subid}/'
     if not os.path.exists(subid_plot_folder):
-      os.mkdir(subid_plot_folder)
+        os.makedirs(subid_plot_folder, exist_ok=True)
+
+    # Create the full plot folder with condition if applicable
     full_plot_folder = f'{self.plot_folder}/{self.subid}/{self.dataset_identifier}{self.condition if self.condition else ""}/'
     if not os.path.exists(full_plot_folder):
-      os.mkdir(full_plot_folder)
+        os.makedirs(full_plot_folder, exist_ok=True)
+
+    # Update the plot folder attribute
     self.plot_folder = full_plot_folder
 
 def load_dataset(self):

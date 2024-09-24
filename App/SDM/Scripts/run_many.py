@@ -1,19 +1,43 @@
 from SDM.Skyn_Processors.skyn_dataset import skynDataset
 from datetime import date
 import pandas as pd
+import os
 
-main_dir = '/Users/nathandidier/Desktop/Repositories/skyn_data_manager/Inputs/Skyn_Data/ACE'
+"""
+>midnight cutoffs
+>add negative value counts
+>add negative <-10 counts
+
+"""
+
+# main_dir = '/Users/nathandidier/Desktop/Repositories/skyn_data_manager/Inputs/Skyn_Data/ACE'
+main_dir = '/users/ndidier/SDM/skyn_data_manager/Inputs/Skyn_Data/ACE'
 cohort_name = 'ACE'
 
-results_dir = f'Users/nathandidier/Desktop/Repositories/skyn_data_manager/Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}'
+# results_dir = f'Users/nathandidier/Desktop/Repositories/skyn_data_manager/Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}'
+results_dir = f'/users/ndidier/SDM/skyn_data_manager/Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}'
 data_out = f'{results_dir}/Processed_Datasets'
 graphs_out = f'{results_dir}/Plots'
 analyses_out = f'{results_dir}/Model_Performance'
 
-subids = [121, 127, 134, 141, 146, 147, 149, 150, 151, 153]
+if not os.path.exists(f'/users/ndidier/SDM/skyn_data_manager/Results/{cohort_name}'):
+  os.mkdir(f'/users/ndidier/SDM/skyn_data_manager/Results/{cohort_name}')
+  print('results path exists: ', os.path.exists(f'/users/ndidier/SDM/skyn_data_manager/Results/{cohort_name}'))
+if not os.path.exists(f'/users/ndidier/SDM/skyn_data_manager/Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}'):
+  os.mkdir(f'/users/ndidier/SDM/skyn_data_manager/Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}')
+if not os.path.exists(data_out):
+  os.mkdir(data_out)
+if not os.path.exists(graphs_out):
+  os.mkdir(graphs_out)
+if not os.path.exists(analyses_out):
+  os.mkdir(analyses_out)
+
+#153 left out
+subids = [121, 127, 134, 141, 146, 147, 149, 150, 151, 155, 157, 159, 160, 161, 162, 165]
 
 datasets = []
 for subid in subids:
+  print(subid)
   sdm_processor = skynDataset(
     f'{main_dir}/{subid}_001.csv',
     data_out,

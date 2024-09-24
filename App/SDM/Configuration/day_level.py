@@ -44,7 +44,10 @@ def get_day_level_indices(df, day_start_hour = 7):
   
   return day_start_end_indices
 
-def create_day_level_dataframe(skyn_days):
-  data = [{attr: value for attr, value in day.__dict__.items() if attr != 'day_dataset'} for day in skyn_days]
-
-  return pd.DataFrame(data)
+def create_day_level_dataframe(skyn_days, subid, dataset_identifier):
+  data = pd.DataFrame([{attr: value for attr, value in day.__dict__.items() if attr != 'day_dataset'} for day in skyn_days])
+  data['SubID'] = subid
+  data['Dataset_ID'] = dataset_identifier
+  data['DayNo'] = [i for i in range(0, len(data))]
+  data = data[['SubID', 'Dataset_ID', 'DayNo'] + [col for col in data.columns if col not in ['SubID', 'Dataset_ID', 'DayNo']]]
+  return data

@@ -161,7 +161,7 @@ class skynDataset:
         day = skynDay(self.dataset, start, end)
         self.days.append(day)
 
-      self.day_level_data = create_day_level_dataframe(self.days)
+      self.day_level_data = create_day_level_dataframe(self.days, self.subid, self.dataset_identifier)
       
       self.dataset.to_excel(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx')
       self.day_level_data.to_excel(f'{self.data_out_folder}/dayLevel_{self.subid}.xlsx')
