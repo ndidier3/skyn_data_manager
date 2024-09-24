@@ -1,13 +1,18 @@
 from .skyn_datapoint import skynDatapoint
 from ..Configuration.configuration import *
+from ..Configuration.day_level import get_day_level_indices, create_day_level_dataframe
+from ..Configuration.file_management import *
 from ..Crop.crop import *
 from ..Signal_Processing.smooth_signal import *
 from ..Signal_Processing.remove_outliers import *
 from ..Signal_Processing.impute import impute_tac_in_gaps, impute
-from ..Signal_Processing.filling_gaps import identify_and_fill_gaps
+from ..Signal_Processing.fill_device_off_gaps import fill_device_off_gaps
+from ..Signal_Processing.label_device_nonwear import label_device_nonwear
+from ..Signal_Processing.label_signal_stability import *
+from ..Skyn_Processors.skyn_day import skynDay
 from ..Visualization.plotting import *
 from ..Feature_Engineering.tac_features import *
-from ..Configuration.file_management import *
+from ..Feature_Engineering.row_features import generate_row_features
 from ..Documenting.dataset_workbook import export_skyn_workbook
 from ..Signal_Processing.revise_incomplete_features import revise_fall_features, revise_rise_features
 import pandas as pd
@@ -125,27 +130,41 @@ class skynDataset:
 
     #MODEL PREDICTIONS
     self.predictions = {}
+
+    #Day Level
+    self.days = []
+    self.day_level_data = pd.DataFrame()
   
   def process_as_multiple_episodes(self):
     print(self.subid)
     print(self.dataset_identifier)
+    create_output_folders(self)
     
+    self.dataset['tac_change'] = self.dataset['TAC'].diff()
+
+    #TAW_Raw keeps the original raw, while TAC will be cleaned eventually 
     self.dataset['TAC_Raw'] = self.dataset['TAC'].tolist()
 
     self.valid_occasion, self.invalid_reason = determine_initial_validity(self)
 
     if self.valid_occasion:
-      #reassign negative values
-      df = self.dataset.copy()
-      negative_TAC_reassigned = [tac if tac >= 0 else 0 for tac in df['TAC'].tolist()]
-      df['TAC'] = negative_TAC_reassigned
-      df['TAC_negative_reassigned'] = negative_TAC_reassigned
-      df['negative_reassigned_zero'] = [1 if tac >= 0 else 0 for tac in df['TAC'].tolist()]
-      self.dataset = df
+      self.dataset = fill_device_off_gaps(self.dataset)
+      self.dataset['Duration_Hrs'] = (self.dataset['datetime'] - self.dataset['datetime'].iloc[0]).dt.total_seconds() / 3600
+      self.dataset = generate_row_features(self)
+      self.dataset = label_device_nonwear(self.dataset)
+      self.dataset = label_signal_stability(self.dataset)
+      self.dataset = label_signal_stability_when_device_equipped(self.dataset)
 
-      df = self.dataset.copy()
-      df = identify_and_fill_gaps(df) #currently using defaults of 30 min gaps, 15 min required before and after gap
-      df.to_excel(f'test_ND_{self.subid}.xlsx')
+      day_start_end_pairs = get_day_level_indices(self.dataset)
+
+      for start, end in day_start_end_pairs:
+        day = skynDay(self.dataset, start, end)
+        self.days.append(day)
+
+      self.day_level_data = create_day_level_dataframe(self.days)
+      
+      self.dataset.to_excel(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx')
+      self.day_level_data.to_excel(f'{self.data_out_folder}/dayLevel_{self.subid}.xlsx')
 
   def process_as_single_episode(self, make_plots=False, export=True):
     create_output_folders(self)
@@ -502,44 +521,7 @@ class skynDataset:
             self.invalid_reason = 'feature engineering failed'
       
   def get_row_features(self):
-
-    labels_off_on = []
-    temp = []
-    motion = []
-
-    if len(list(self.event_timestamps.keys())) > 0:
-      self.label_device_removed_with_timestamps()
-    else:
-      self.dataset['device_on'] = ['unk' for i in range(0, len(self.dataset))]
-
-    for i, row in self.dataset.iterrows():
-      temp.append(skynDatapoint('Temperature_C', 'datetime', i, self.dataset, 10, self.sampling_rate, label=row['device_on'], use_after=True, use_before=True))
-      motion.append(skynDatapoint('Motion', 'datetime', i, self.dataset, 10, self.sampling_rate, label=row['device_on'], use_after=True, use_before=True))
-      labels_off_on.append(row['device_on'])
-
-    self.dataset['device_on'] = labels_off_on
-    self.dataset['temp'] = [t.value if hasattr(t, 'value') else np.nan for t in temp]
-    self.dataset['temp_a_pre'] = [t.a_pre if hasattr(t, 'a_pre') else np.nan for t in temp]
-    self.dataset['temp_b_pre'] = [t.b_pre if hasattr(t, 'b_pre') else np.nan for t in temp]
-    self.dataset['temp_c_pre'] = [t.c_pre if hasattr(t, 'c_pre') else np.nan for t in temp]
-    self.dataset['temp_a_post'] = [t.a_post if hasattr(t, 'a_post') else np.nan for t in temp]
-    self.dataset['temp_b_post'] = [t.b_post if hasattr(t, 'b_post') else np.nan for t in temp]
-    self.dataset['temp_c_post'] = [t.c_post if hasattr(t, 'c_post') else np.nan for t in temp]
-    self.dataset['temp_mean_change_pre'] = [t.mean_change_before if hasattr(t, 'mean_change_before') else np.nan for t in temp]
-    self.dataset['temp_mean_change_post'] = [t.mean_change_after if hasattr(t, 'mean_change_after') else np.nan for t in temp]
-    self.dataset['temp_change_pre'] = [t.difference_from_prior if hasattr(t, 'difference_from_prior') else np.nan for t in temp]
-    self.dataset['temp_change_post'] = [t.difference_from_next if hasattr(t, 'difference_from_next') else np.nan for t in temp]
-    self.dataset['motion'] = [m.value if hasattr(m, 'value') else np.nan for m in motion]
-    self.dataset['motion_a_pre'] = [m.a_pre if hasattr(m, 'a_pre') else np.nan for m in motion]
-    self.dataset['motion_b_pre'] = [m.b_pre if hasattr(m, 'b_pre') else np.nan for m in motion]
-    self.dataset['motion_c_pre'] = [m.c_pre if hasattr(m, 'c_pre') else np.nan for m in motion]
-    self.dataset['motion_a_post'] = [m.a_post if hasattr(m, 'a_post') else np.nan for m in motion]
-    self.dataset['motion_b_post'] = [m.b_post if hasattr(m, 'b_post') else np.nan for m in motion]
-    self.dataset['motion_c_post'] = [m.c_post if hasattr(m, 'c_post') else np.nan for m in motion]
-    self.dataset['motion_mean_change_pre'] = [m.mean_change_before if hasattr(m, 'mean_change_before') else np.nan for m in motion]
-    self.dataset['motion_mean_change_post'] = [m.mean_change_after if hasattr(m, 'mean_change_after') else np.nan for m in motion]
-    self.dataset['motion_change_pre'] = [m.difference_from_prior if hasattr(m, 'difference_from_prior') else np.nan for m in motion]
-    self.dataset['motion_change_post'] = [m.difference_from_next if hasattr(m, 'difference_from_next') else np.nan for m in motion]
+    generate_row_features(self)
 
   # MAKE PLOTS   
   def plot_official_tac(self):

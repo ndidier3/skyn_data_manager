@@ -1,19 +1,20 @@
 from SDM.Skyn_Processors.skyn_dataset import skynDataset
-import os
 from datetime import date
 
-SDM_path = os.path.expanduser('~/SDM/skyn_data_manager')
-cohort_name = 'Test'
-data_out = f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Processed_Datasets'
-graphs_out = f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Plots'
-analyses_out = f'Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Model_Performance'
+# Path to the main directory
+main_dir = '/Users/nathandidier/Desktop/Repositories/skyn_data_manager/Inputs/Skyn_Data/ACE'
 
+cohort_name = 'ACE'
+
+data_out = f'Users/nathandidier/Desktop/Repositories/skyn_data_manager/Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Processed_Datasets'
+graphs_out = f'Users/nathandidier/Desktop/Repositories/skyn_data_manager/Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Plots'
+analyses_out = f'Users/nathandidier/Desktop/Repositories/skyn_data_manager/Results/{cohort_name}/{date.today().strftime("%m.%d.%Y")}/Model_Performance'
 
 sdm_processor = skynDataset(
-  'Inputs/Skyn_Data/Test_ND/5001 001 Alc.xlsx',
+  f'{main_dir}/121_001.csv',
   data_out,
   graphs_out,
-  5001,
+  121,
   1,
   'e' + str(1),
   False,
