@@ -238,6 +238,9 @@ def configure_raw_data(self):
     except:
         df_raw["datetime"] = pd.to_datetime(df_raw["datetime"])
 
+    # Drop timezone information
+    df_raw["datetime"] = df_raw["datetime"].dt.tz_localize(None)
+
     df_raw = df_raw.sort_values(by="datetime", ignore_index=True)
     df_raw.reset_index(inplace=True, drop=True)
     df_raw['Row_ID'] = df_raw['Full_Identifier'].astype(str) + '_' + df_raw.index.astype(str)

@@ -14,13 +14,10 @@ then impute values prior to go back in time
 
 def get_start_date_time(dataset):
   """provide dataframe, function returns date and time, separately. Assumes dataframe is already sorted by datetime column"""
-  datetime_start = dataset.loc[0, 'datetime']
-  datetime_start = datetime.strptime(str(datetime_start), '%Y-%m-%d %H:%M:%S') 
-    
-  start_date = datetime_start.date()
-  start_time = datetime_start.time()
+  start_date = dataset['datetime'].min().date()
+  start_time = dataset['datetime'].min().time()
   
-  return start_date, datetime_start
+  return start_date, dataset['datetime'].min()
 
 def get_session_start_and_end(self, session_timestamp, crop_end_adjustment = 0, crop_begin_adjustment=0, start_date_column='Crop Begin Date', end_date_column="Crop End Date"):
   """provide metadata/timestamp row and max duration (integer, in hours),

@@ -9,6 +9,7 @@ from ..Signal_Processing.impute import impute_tac_in_gaps, impute
 from ..Signal_Processing.fill_device_off_gaps import fill_device_off_gaps
 from ..Signal_Processing.label_device_nonwear import label_device_nonwear
 from ..Signal_Processing.label_signal_stability import *
+from ..Signal_Processing.label_negative_values import label_negative_values
 from ..Skyn_Processors.skyn_day import skynDay
 from ..Visualization.plotting import *
 from ..Feature_Engineering.tac_features import *
@@ -154,9 +155,9 @@ class skynDataset:
       self.dataset = label_device_nonwear(self.dataset)
       self.dataset = label_signal_stability(self.dataset)
       self.dataset = label_signal_stability_when_device_equipped(self.dataset)
+      self.dataset = label_negative_values(self.dataset)
 
-      day_start_end_pairs = get_day_level_indices(self.dataset)
-
+      day_start_end_pairs = get_day_level_indices(self.dataset, day_start_hour=0)
       for start, end in day_start_end_pairs:
         day = skynDay(self.dataset, start, end)
         self.days.append(day)
