@@ -17,6 +17,7 @@ starting_standard_columns = ['datetime', 'device_id', 'Firmware Version', 'TAC u
 def update_column_names(df):
     df.rename(columns = {
             'device timestamp': 'datetime',
+            'device_timestamp': 'datetime',
             'Timestamp': 'datetime',
             'Device Serial Number': 'device_id',
             'firmware version': 'Firmware Version',

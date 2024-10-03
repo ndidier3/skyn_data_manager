@@ -2,6 +2,32 @@ import os
 import pandas as pd
 import string
 import random
+from SDM.User_Interface.Utils.filename_tools import extract_subid, stringify_dataset_id
+
+def standardize_filename(filename, dataset_id, text=''):
+  """ rewrites filename with standard format of <subid>_<dataset-ID>_<optional-text>.<extension> """
+  subid = extract_subid(filename)
+  dataset_id = stringify_dataset_id(dataset_id)
+  _, ext = os.path.splitext(filename)
+
+  if len(text):
+    return f'{subid}_{dataset_id}_{text}{ext}'
+  else:
+    return f'{subid}_{dataset_id}{ext}'
+  
+def standardize_filenames_within_folder(folder_path, dataset_id = 1, text=''):
+
+  filenames = os.listdir(folder_path)
+  
+  for filename in filenames:
+    _, ext = os.path.splitext(filename)
+    if ext == '.xlsx' or ext == '.csv':
+      new_filename = standardize_filename(filename, dataset_id, text=text)
+      old_filepath = os.path.join(folder_path, filename)
+      new_filepath = os.path.join(folder_path, new_filename)
+      print(old_filepath)
+      print(new_filepath)
+      os.rename(old_filepath, new_filepath)
 
 def modify_filenames(directory_path, insert_index, insert_character):
 
