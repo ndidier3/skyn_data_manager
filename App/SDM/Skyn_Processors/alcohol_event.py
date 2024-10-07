@@ -20,7 +20,7 @@ class alcoholEvent:
     Therefore, device_worn_duration will be the duration when device is turned on AND worn.
     """
     self.device_worn_duration = self.event_dataset['device_worn'].sum() / 60
-    self.device_turned_on_percentage_of_device_on = (self.device_worn_duration / self.device_turned_on_duration) if self.device_turned_on_duration > 0 else 0
+    self.device_worn_percentage_of_device_on = (self.device_worn_duration / self.device_turned_on_duration) if self.device_turned_on_duration > 0 else 0
     self.device_worn_percentage_of_day = self.device_worn_duration / 24
 
     self.negative_duration = self.event_dataset['negative_tac'].sum() / 60

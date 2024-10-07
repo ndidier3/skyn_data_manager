@@ -16,4 +16,36 @@ definitions = [
   'TAC is below -10 Celcius'
 ]
 
-signal_quality_feature_key = pd.DataFrame(dict(zip(signal_quality_features, definitions)))
+signal_quality_feature_key = pd.DataFrame({
+    'Feature': signal_quality_features,
+    'Definition': definitions
+  })
+
+signal_quality_aggregate_features = [
+  'Dataset_ID',
+  'DayNo',
+  'device_turned_on_duration',
+  'device_turned_on_percentage_of_day',
+  'device_worn_duration',
+  'device_worn_percentage_of_device_on',
+  'device_worn_percentage_of_day',
+  'negative_duration',
+  'very_negative_duration'
+]
+
+definitions = [
+    'First Digit = BurstID, Second-Third Digit = Final Day number of interest)',
+    'Day ID assigned by script (labels first day found as 0, second as 1, etc.)',
+    'Total amount of time (hours) where device was on (and actively producing signal readings)',
+    'device_turned_on_duration / 24 (hours in a day)',
+    'Total amount of time (hours) where device was worn (note: this assumes device was also turned on, so therefore this will always be less than device_turned_on_duration)' ,
+    'device_worn_duration / device_turned_on_duration',
+    'device_worn_duration / 24 (hours in a day)',
+    'Total amount of time (hours) where TAC reading was below 0 Celcius',
+    'Total amount of time (hours) where TAC reading was below -10 Celcius'
+]
+
+signal_quality_aggregate_feature_key = pd.DataFrame({
+      'Feature': signal_quality_aggregate_features, 
+      'Definition': definitions
+    })

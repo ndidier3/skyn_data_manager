@@ -15,6 +15,7 @@ from ..Visualization.plotting import *
 from ..Feature_Engineering.tac_features import *
 from ..Feature_Engineering.row_features import generate_row_features
 from ..Documenting.dataset_workbook import export_skyn_workbook
+from ..Documenting.variable_keys import *
 from ..Signal_Processing.revise_incomplete_features import revise_fall_features, revise_rise_features
 import pandas as pd
 import numpy as np
@@ -164,9 +165,15 @@ class skynDataset:
 
       self.day_level_data = create_day_level_dataframe(self.days, self.subid, self.dataset_identifier)
       
-      self.dataset.to_excel(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx')
-      self.day_level_data.to_excel(f'{self.data_out_folder}/dayLevel_{self.subid}.xlsx')
+    with pd.ExcelWriter(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
+      self.dataset.to_excel(writer, sheet_name='processed_data', index=False)
+      signal_quality_feature_key.to_excel(writer, sheet_name='key', index=False)
 
+    # Write `self.day_level_data` and `signal_quality_aggregate_feature_key` to a different file
+    with pd.ExcelWriter(f'{self.data_out_folder}/dayLevel_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
+      self.day_level_data.set_index('DayNo').to_excel(writer, sheet_name='day-level-results')
+      signal_quality_aggregate_feature_key.to_excel(writer, sheet_name='key', index=False)
+  
   def process_as_single_episode(self, make_plots=False, export=True):
     create_output_folders(self)
 

@@ -53,8 +53,8 @@ class ProcessSkynApp(Tk):
     if self.filename and self.subid and self.outputFolder.get():
       entries_confirmed = YesNoMessage(self,'Confirmation', 
         f'Would you like to process the file {self.filename}\n'
-        f'in the directory {self.directory}'
-        f'and save the output in Results/{self.outputFolder.get()}?'
+        f'in the directory {self.directory} and save the output\n'
+        f'in Results/{self.outputFolder.get()}?'
       )
       if entries_confirmed.result:
         try:

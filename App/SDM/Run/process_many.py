@@ -33,8 +33,6 @@ def process_many(project_root, data_input_folder, output_folder_name = 'cohort',
 
   processed_datasets = [] #populated in loop below
 
-  
-
   for file in files:
     print(file)
     try:
@@ -60,7 +58,7 @@ def process_many(project_root, data_input_folder, output_folder_name = 'cohort',
             data_out,
             graphs_out,
             subid,
-            1,
+            dataset_identifier,
             'e' + str(1),
             False,
             False,

@@ -17,6 +17,8 @@ sdm.spec
 SDM.exe
 App/run.py
 archive/
+sdm_single_file.exe
+sdm_single_file.spec
 
 /Inputs/Metadata/*
 !/Inputs/Metadata/Cohort Metadata TEST.xlsx
