@@ -38,10 +38,10 @@ class skynDataset:
           columns=['SubID', 'Condition', 'Dataset_Identifier', 'Episode_Identifier', 'Use_Data', 'Notes', 'Crop Begin Date', 'Crop Begin Time', 'Crop End Date', 'Crop End Time', 'Time Zone'],
           data=[[self.subid, 'Unk', self.dataset_identifier, int(self.episode_identifier[1:]), 'Y', '', '', '', '', '', '']]
         )
-      self.metadata = configure_timestamps(self.metadata)
+      self.metadata = configure_metadata_timestamps(self.metadata)
       self.metadata_index = 0
     else:
-      self.metadata = configure_timestamps(pd.read_excel(metadata_path))
+      self.metadata = configure_metadata_timestamps(pd.read_excel(metadata_path))
       self.metadata_index = get_metadata_index(self)
     
     self.event_timestamps = get_event_timestamps(self, metadata_path) #will return {} if no path

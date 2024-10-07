@@ -7,6 +7,9 @@ class skynDay:
     self.begin_day = self.day_dataset['datetime'].iloc[0] if not self.day_dataset.empty else None
     self.end_day = self.day_dataset['datetime'].iloc[-1] if not self.day_dataset.empty else None
 
+    self.device_id_begin = self.day_dataset['device_id'].iloc[0] if not self.day_dataset.empty else None
+    self.device_id_end = self.day_dataset['device_id'].iloc[-1] if not self.day_dataset.empty else None
+
     self.device_turned_on_duration = self.day_dataset['device_turned_on'].sum() / 60
     self.device_turned_on_percentage_of_day = self.device_turned_on_duration / 24
 

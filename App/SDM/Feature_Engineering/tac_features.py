@@ -142,7 +142,7 @@ def get_rise_completion(df, tac_variable, curve_start_index, relative_peak, curv
   else:
     return 1
 
-def get_rise_rate(rise_duration, relative_peak, rise_duration_minumum = 0.0005, relative_peak_minumum = 0.05):
+def get_rise_rate(rise_duration, relative_peak):
   # if (rise_duration < rise_duration_minumum) or (relative_peak < relative_peak_minumum):
   #   return 0.001
   if rise_duration and (relative_peak != None):
@@ -152,7 +152,7 @@ def get_rise_rate(rise_duration, relative_peak, rise_duration_minumum = 0.0005, 
   else:
     return None
 
-def get_fall_rate(fall_duration, relative_peak, fall_duration_minumum = 0.0005, relative_peak_minumum = 0.05):
+def get_fall_rate(fall_duration, relative_peak):
   # if (fall_duration < fall_duration_minumum) or (relative_peak < relative_peak_minumum):
   #   return 0.001
   if fall_duration and (relative_peak != None):

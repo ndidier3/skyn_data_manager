@@ -185,7 +185,20 @@ def standardize_date_column_YMD(timestamps, column_name='Crop Begin Date', new_c
   
     return timestamps
 
-def configure_timestamps(metadata):
+def configure_dataset_timestamps(dataset):
+  try:
+    dataset["datetime"] = pd.to_datetime(dataset["datetime"], unit='s')
+  except:
+    dataset["datetime"] = pd.to_datetime(dataset["datetime"])
+
+  # Drop timezone information
+  dataset["datetime"] = dataset["datetime"].dt.tz_localize(None)
+
+  dataset = dataset.sort_values(by="datetime", ignore_index=True)
+  dataset.reset_index(inplace=True, drop=True)
+  return dataset
+    
+def configure_metadata_timestamps(metadata):
     # metadata = metadata[metadata['Use_Data']=="Y"]
     metadata.reset_index(inplace=True, drop=True)
     # try:
@@ -234,16 +247,8 @@ def configure_raw_data(self):
     df_raw = update_column_names(self.unprocessed_dataset)
     df_raw = rename_TAC_column(df_raw)
 
-    try:
-        df_raw["datetime"] = pd.to_datetime(df_raw["datetime"], unit='s')
-    except:
-        df_raw["datetime"] = pd.to_datetime(df_raw["datetime"])
-
-    # Drop timezone information
-    df_raw["datetime"] = df_raw["datetime"].dt.tz_localize(None)
-
-    df_raw = df_raw.sort_values(by="datetime", ignore_index=True)
-    df_raw.reset_index(inplace=True, drop=True)
+    df_raw = configure_dataset_timestamps(df_raw)
+    
     df_raw['Row_ID'] = df_raw['Full_Identifier'].astype(str) + '_' + df_raw.index.astype(str)
 
     df_raw = df_raw[['SubID', 'Dataset_Identifier', 'Episode_Identifier', 'Full_Identifier', 'Row_ID'] + [col for col in df_raw.columns.tolist() if col not in ['SubID', 'Dataset_Identifier', 'Episode_Identifier', 'Full_Identifier', 'Row_ID']]]
