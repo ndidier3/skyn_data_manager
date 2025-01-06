@@ -1,5 +1,5 @@
 import sys
-from SDM.Skyn_Processors.skyn_cohort import skynCohort
+from App.SDM.Skyn_Processors.retired_skyn_cohort import skynCohort
 from datetime import date
 import os
 
@@ -13,7 +13,7 @@ analyses_out = f'{SDM_path}/Results/{cohort_name}/{date.today().strftime("%m.%d.
 
 
 sdm_processor = skynCohort(
-  os.path.abspath(f'{SDM_path}/Inputs/Skyn_Data/TestData/') + '/',
+  os.path.abspath(f'{SDM_path}/Inputs/Skyn_Data_RAW/TestData/') + '/',
   metadata_path = f'{SDM_path}/Inputs/Metadata/Cohort Metadata TEST.xlsx',
   cohort_name = 'Test',
   merge_variables = {},

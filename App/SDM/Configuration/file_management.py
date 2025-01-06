@@ -2,6 +2,7 @@ import pandas as pd
 import pickle
 from datetime import date
 import xlsxwriter
+import os
 
 def save_to_computer(object, filename, folder, extension='sdm'):
 
@@ -72,3 +73,32 @@ def merge_using_subid(sdm_results, merge_variables):
     data_to_add = df[[info['subid_column']] + info['variables']]
     sdm_results = sdm_results.merge(data_to_add, on=info['subid_column'], how='left')
   return sdm_results
+
+def create_save_directories(project_root, processed_data_out, output_folder_name, data_out, graphs_out, analyses_out):
+  if not os.path.exists(processed_data_out):
+    os.mkdir(processed_data_out)
+  if not os.path.exists(f'{project_root}/Results/{output_folder_name}'):
+    os.mkdir(f'{project_root}/Results/{output_folder_name}')
+    print('results path exists: ', os.path.exists(f'{project_root}/Results/{output_folder_name}'))
+  if not os.path.exists(f'{project_root}/Results/{output_folder_name}/{date.today().strftime("%m.%d.%Y")}'):
+    os.mkdir(f'{project_root}/Results/{output_folder_name}/{date.today().strftime("%m.%d.%Y")}')
+  if not os.path.exists(data_out):
+    os.mkdir(data_out)
+  if not os.path.exists(graphs_out):
+    os.mkdir(graphs_out)
+  if not os.path.exists(analyses_out):
+    os.mkdir(analyses_out)
+
+def create_individual_plot_folder(graphs_out, subid):
+  # Create subid plot folder within the plot folder
+  subid_plot_folder = f'{graphs_out}/{subid}/'
+  if not os.path.exists(subid_plot_folder):
+      os.makedirs(subid_plot_folder, exist_ok=True)
+  
+  return subid_plot_folder
+
+def create_feature_plot_folder(cohort_name):
+  path = f'Results/{cohort_name}/FeaturePlots/'
+  if not os.path.exists(path):
+    os.mkdir(path)
+  return path

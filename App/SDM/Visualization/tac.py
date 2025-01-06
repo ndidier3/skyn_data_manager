@@ -1,6 +1,7 @@
 from tokenize import group
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import matplotlib
 matplotlib.use("Agg")
 import os
@@ -10,6 +11,128 @@ from SDM.Visualization.plotting_utils import *
 import numpy as np
 from sklearn.tree import plot_tree
 
+def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, peak, curve_threshold, curve_begins, curve_ends, title = "TAC Curve", event_timestamps = {}, df_version = 'SEARCH', drink_total = None):
+  peak_time = df.loc[df[f'TAC']==peak, 'datetime']
+  # graph_cutoff = curve_ends + ((len(df) - curve_ends)*0.25)
+  # df = df.loc[:graph_cutoff]
+  
+  fig, ax = plt.subplots(figsize = (16, 7))
+  ax.plot(df['datetime'], df[f'TAC'], c='black')
+
+  #annotate with lines for curve threshold, peak, curve_begin, curve_end
+  ax.vlines(peak_time, ymin=curve_threshold, ymax=peak, color='black', linestyle='--')
+  ax.hlines(curve_threshold, xmin=df['datetime'].min(), xmax=df['datetime'].max(), colors='black', linestyle='--')
+  # ax.vlines(
+  #   [df.loc[curve_begins, 'datetime'], df.loc[curve_ends, 'datetime']], 
+  #   ymin=0, ymax=df['TAC'].max(), color='red', linestyle='--'
+  # )
+
+  ax.set_xlabel('Time (hrs)', fontsize = 24)
+  ax.set_ylabel('TAC', fontsize = 24)
+  ax.tick_params(axis='x', labelsize = 18)
+  ax.tick_params(axis='y', labelsize = 20)
+
+  ax.set_title(title, fontsize=32, fontweight="semibold", pad=25 if drink_total is not None else 15)
+  if drink_total is not None:
+    ax.text(0.5, 1.05, f"Drink Total: {drink_total}", fontsize=14, ha='center', va='top', transform=ax.transAxes)
+
+  ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+  ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+
+  if ax.get_ylim()[1] < 10:
+    ax.set_ylim(0, 10)
+
+  if (curve_begins is not None) and (curve_ends is not None):
+    curve_timepoints = df.loc[[i for i in range(curve_begins, curve_ends)], 'datetime']
+    curve_tac_values = df.loc[[i for i in range(curve_begins, curve_ends)], 'TAC']
+    plt.fill_between(curve_timepoints, curve_tac_values, [curve_threshold for i in range(curve_begins, curve_ends)], color='lightgray')
+    plot_event_lines(df, ax, event_timestamps, 'datetime', 'datetime')
+
+  path = f'{plot_path}{subid}_{dataset_identifier}_{event_number}_TAC_curve_{df_version}.png'
+  plt.tight_layout()
+  plt.savefig(path, bbox_inches='tight')
+  plt.close('all')
+  return path
+
+def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifier, df_version, curve_threshold, curve_begins, curve_ends, peak, time_variable='datetime', title='Signal Processing', drink_total = 'nan', event_timestamps = {}):
+  # Subset the data
+  # passed = df.loc[(df['imputed'] == 0) & (df['device_worn_model'] == 1)]
+  # imputed = df.loc[df['imputed'] == 1]
+  # non_wear = df.loc[(df['imputed'] == 0) & (df['device_worn_model'] == 0)]
+
+  passed = df.loc[(df['device_worn_model'] == 1)]
+  # imputed = df.loc[df['imputed'] == 1]
+  non_wear = df.loc[(df['device_worn_model'] == 0)]
+
+  # Create a figure and axis
+  fig, ax = plt.subplots(figsize=(12, 6))
+  
+  # Plot each subset with different markers and colors
+  ax.scatter(passed[time_variable], passed['TAC'], label='Passed (Device Worn)', 
+              color='green', marker='o', alpha=0.7)
+  # ax.scatter(imputed[time_variable], imputed['TAC'], label='Imputed', 
+  #             color='blue', marker='x', alpha=0.7)
+  ax.scatter(non_wear[time_variable], non_wear['TAC'], label='Non-Wear', 
+              color='red', marker='s', alpha=0.7)
+  
+  peak_time = df.loc[df[f'TAC']==peak, 'datetime']
+  ax.vlines(peak_time, ymin=curve_threshold, ymax=peak, color='black', linestyle='--')
+  ax.hlines(curve_threshold, xmin=df['datetime'].min(), xmax=df['datetime'].max(), colors='black', linestyle='--')
+  
+  if (curve_begins is not None) and (curve_ends is not None) and event_timestamps and all(value is not None for value in event_timestamps.values()):
+    plot_event_lines(df, ax, event_timestamps, 'datetime', 'datetime')
+
+  # Format the x-axis for time
+  ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+  ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+
+  # Add labels, title, and legend
+  ax.set_xlabel('Time')
+  ax.set_ylabel('TAC')
+  ax.set_title(title, fontsize=32, fontweight="semibold", pad=25 if drink_total is not None else 15)
+  plt.xticks(rotation=45)
+  ax.legend()
+
+  if drink_total is not None:
+    ax.text(0.5, 1.05, f"Drink Total: {drink_total}", fontsize=14, ha='center', va='top', transform=ax.transAxes)
+  
+  path = f'{plot_path}{subid}_{dataset_identifier}_{event_number}_TAC_processing_{df_version}.png'
+  plt.tight_layout()
+  plt.savefig(path, bbox_inches='tight')
+  plt.close('all')
+
+def plot_tac_and_temp(df, plot_folder, subid, dataset_identifier, event_number, tac_variable, temp_variable, time_variable, plot_title = "TAC and Temperature", event_timestamps = {}, df_version = 'SEARCH', drink_total = None):
+  fig, ax1 = plt.subplots(figsize=(16, 7))
+  ax1.plot(df[time_variable], df[tac_variable], color="darkblue", label=tac_variable)
+  ax2 = ax1.twinx()
+  ax2.plot(df[time_variable], df[temp_variable], color="maroon", label=temp_variable)
+  
+  ax1.set_title(plot_title, fontsize=26, fontweight="semibold", pad=25 if drink_total is not None else 15)
+  if drink_total is not None:
+    ax1.text(0.5, 1.05, f"Drink Total: {drink_total}", fontsize=14, ha='center', va='top', transform=ax1.transAxes)
+  
+  ax1.set_ylabel(tac_variable, color='darkblue')
+  ax2.set_ylabel(temp_variable, color='maroon')
+  
+  ax1.legend(loc='upper left')
+  ax2.legend(loc='upper right')
+  
+  if df[tac_variable].max() < 10:
+    ax1.set_ylim(0, 10)
+  if df[temp_variable].min() > 15:
+    ax2.set_ylim(15, 40) 
+    
+  if event_timestamps and all(value is not None for value in event_timestamps.values()):
+    plot_event_lines(df, ax1, event_timestamps, time_variable, 'datetime')
+  
+  ax1.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+  ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+
+  path = f'{plot_folder}tac_and_temp_plot_{subid}_{dataset_identifier}_{event_number}_{df_version}.png'
+  fig.savefig(path)
+  plt.close('all')
+
+  return path
 
 def plot_column(df, plot_folder, subid, condition, dataset_identifier, y_variable, time_variable, xlabel="Time (hours)", event_timestamps = {}):
       ylabel = y_variable    
@@ -26,114 +149,37 @@ def plot_column(df, plot_folder, subid, condition, dataset_identifier, y_variabl
       return full_path
 
 def plot_TAC_curve(df, plot_folder, subid, condition, dataset_identifier, tac_variable, time_variable, ylabel="TAC ug/L", xlabel="Time (hours)", event_timestamps = {}):
-      title = f'TAC Curve - {tac_variable}'
-      fig, ax = plt.subplots(figsize=(16, 7)) 
-      ax.scatter(df[time_variable], df[tac_variable])
-      ax.set_title(title, fontsize=26, fontweight="semibold", pad=15)
-      ax.set_ylabel(ylabel)
-      ax.set_xlabel(xlabel)
-      if df[tac_variable].max() < 15:
-            ax.set_ylim(df[tac_variable].min() - 1, 15)
-      plot_event_lines(df, ax, event_timestamps, time_variable, 'datetime')
+  title = f'TAC Curve - {tac_variable}'
+  fig, ax = plt.subplots(figsize=(16, 7)) 
+  ax.scatter(df[time_variable], df[tac_variable])
+  ax.set_title(title, fontsize=26, fontweight="semibold", pad=15)
+  ax.set_ylabel(ylabel)
+  ax.set_xlabel(xlabel)
+  if df[tac_variable].max() < 15:
+        ax.set_ylim(df[tac_variable].min() - 1, 15)
+  plot_event_lines(df, ax, event_timestamps, time_variable, 'datetime')
 
-
-      full_path = f'{plot_folder}/{tac_variable} - {subid} - {condition}{dataset_identifier}.png'
-      fig.savefig(full_path)
-      plt.close('all')
-      return full_path
+  full_path = f'{plot_folder}/{tac_variable} - {subid} - {condition}{dataset_identifier}.png'
+  fig.savefig(full_path)
+  plt.close('all')
+  return full_path
 
 def plot_overlaid_TAC_curves(df, plot_folder, subid, condition, dataset_identifier, tac_variables, time_variable, plot_name, ylabel="TAC ug/L", xlabel="Time (hours)", event_timestamps = {}):
-      title = f'TAC Curve - {plot_name}'
-      fig, ax = plt.subplots(figsize=(16, 7))
-      for variable in tac_variables:
-            ax.plot(df[time_variable], df[variable])
-      ax.set_title(title, fontsize=26, fontweight="semibold", pad=15)
-      ax.set_ylabel(ylabel)
-      ax.set_xlabel(xlabel)
-      plot_event_lines(df, ax, event_timestamps, time_variable, 'datetime')
-      if ax.get_ylim()[1] < 10:
-            ax.set_ylim(0, 10)
+  title = f'TAC Curve - {plot_name}'
+  fig, ax = plt.subplots(figsize=(16, 7))
+  for variable in tac_variables:
+    ax.plot(df[time_variable], df[variable])
+  ax.set_title(title, fontsize=26, fontweight="semibold", pad=15)
+  ax.set_ylabel(ylabel)
+  ax.set_xlabel(xlabel)
+  plot_event_lines(df, ax, event_timestamps, time_variable, 'datetime')
+  if ax.get_ylim()[1] < 10:
+    ax.set_ylim(0, 10)
 
-      full_path = f'{plot_folder}/{plot_name} - {subid} - {condition}{dataset_identifier}.png'
-      fig.savefig(full_path)
-      plt.close('all')
-      return full_path
-
-def plot_tac_and_temp(df, plot_folder, subid, condition, dataset_identifier, tac_variable, temp_variable, time_variable, plot_title = "TAC and Temperature", event_timestamps = {}):
-      fig, ax1 = plt.subplots(figsize=(16, 7))
-      ax1.plot(df[time_variable], df[tac_variable], color="darkblue", label=tac_variable)
-      ax2 = ax1.twinx()
-      ax2.plot(df[time_variable], df[temp_variable], color="maroon", label=temp_variable)
-      ax1.set_title(plot_title, fontsize=26, fontweight="semibold", pad=15)
-      
-      ax1.set_ylabel(tac_variable, color='darkblue')
-      ax2.set_ylabel(temp_variable, color='maroon')
-      
-      ax1.legend(loc='upper left')
-      ax2.legend(loc='upper right')
-      
-      if df[tac_variable].max() < 10:
-            ax1.set_ylim(0, 10)
-      if df[temp_variable].min() > 15:
-            ax2.set_ylim(15, 40) 
-
-      plot_event_lines(df, ax1, event_timestamps, time_variable, 'datetime')
-
-      path = f'{plot_folder}tac_and_temp_plot_{subid}_{condition}{dataset_identifier}.png'
-      fig.savefig(path)
-      plt.close('all')
-
-      return path
-
-def plot_device_removal(df, plot_folder, subid, condition, dataset_identifier, temp_variable, time_variable, add_color=False, plot_title = "Device Removal Detection", method='Temp Cutoff', motion_variable=None, prediction_column=None, event_timestamps = {}, temp_cutoff=27):
-      
-      if add_color:
-            marker_colors = {
-                  'correct': ['darkblue', 'gray'],
-                  'incorrect': ['red', 'orange']
-            }
-      else:
-            marker_colors = {
-                  'correct': ['black', 'black'],
-                  'incorrect': ['gray', 'gray']
-            }
-
-      fig, ax = plt.subplots(figsize=(16, 7))
- 
-      device_on_time, device_on_temp, device_off_time, device_off_temp = split_x_y_from_predictions(df, prediction_column, temp_variable, time_variable) if (method == 'Model Predictions') or (method == 'Ground Truth') else split_x_y_from_temp_cutoff(df, temp_variable, temp_variable, time_variable, cutoff=temp_cutoff)
-
-      ax.scatter(device_on_time, device_on_temp, marker='o', c=marker_colors['correct'][0])
-      ax.scatter(device_off_time, device_off_temp, marker='x', c=marker_colors['incorrect'][0])
-      ax.set_xlabel('Time (hrs)', fontsize = 20)
-      ax.set_ylabel('Temperature (C)', fontsize = 20)
-      ax.set_title(plot_title, fontsize=24, fontweight="semibold", pad=25)
-      ax.text(0.5, 1.02, f'Method: {method}', fontsize=12, style='italic',
-        ha='center', va='center', transform=ax.transAxes)
-      ax.legend(("Passed Temp", "Flagged Temp"), loc='upper left', fontsize=14)
-      ax.tick_params(axis='x', labelsize = 16)
-      ax.tick_params(axis='y', labelsize = 16)
-      if df[temp_variable].min() > 15:
-            ax.set_ylim(15, 40)
-
-      ax.hlines(y=27, xmin = 0, xmax = df[time_variable].max(), color='black', linestyle='--')
-      if (len(device_off_time) > 0) and (method=='cutoff'):
-            plt.text(df[time_variable].max() * 0.45, 27.0, "Device Not Worn", fontsize = 18, fontstyle = 'italic')
-      plot_event_lines(df, ax, event_timestamps, time_variable, 'datetime')
-
-      if motion_variable:
-            ax2 = ax.twinx()
-            device_on_time, device_on_motion, device_off_time, device_off_motion = split_x_y_from_predictions(df, prediction_column, motion_variable, time_variable) if (method == 'Model Predictions') or (method == 'Ground Truth') else split_x_y_from_temp_cutoff(df, temp_variable, motion_variable, time_variable, cutoff=27)
-            ax2.scatter(device_on_time, device_on_motion, marker='.', c=marker_colors['correct'][1])
-            ax2.scatter(device_off_time, device_off_motion, marker='^', c=marker_colors['incorrect'][1])
-            ax2.set_ylabel('Motion (G)', fontsize=20, rotation=-90, labelpad=25)
-            ax2.legend(("Passed Motion", 'Flagged Motion'), loc='upper right', fontsize=14)
-            ax2.tick_params(axis='y', labelsize=16)
-
-      path=f'{plot_folder}{subid}_{condition}{dataset_identifier}_temp_cleaning_{method}.png'
-      plt.tight_layout()
-      plt.savefig(path, bbox_inches='tight')
-      plt.close('all')
-      return path
+  full_path = f'{plot_folder}/{plot_name} - {subid} - {condition}{dataset_identifier}.png'
+  fig.savefig(full_path)
+  plt.close('all')
+  return full_path
 
 def plot_cropping(data, beginning_timestamp, end_timestamp, self, add_color = False, title="Raw Data Cropping"):
       if add_color:
@@ -184,7 +230,7 @@ def plot_cropping(data, beginning_timestamp, end_timestamp, self, add_color = Fa
       return path
 
 def plot_cleaning_comparison(occasion, df, time_variable, add_color = False, title = "TAC Signal Cleaning", size = (16, 7), legend = True, snip = None, event_timestamps = {}):
-      
+
       if snip:
             df = df.iloc[snip[0]:snip[1]]
 
@@ -288,49 +334,42 @@ def plot_cleaning_comparison(occasion, df, time_variable, add_color = False, tit
       plt.close('all')
       return filename
 
-def plot_smoothed_curve(occasion, df, peak, curve_threshold, curve_begins, curve_ends, title = "TAC Curve", event_timestamps = {}):
-      peak_time = df.loc[df[f'TAC_processed_smooth_{occasion.smoothing_window}']==peak, occasion.time_elapsed_column]
-      # graph_cutoff = curve_ends + ((len(df) - curve_ends)*0.25)
-      # df = df.loc[:graph_cutoff]
-         
-      fig, ax = plt.subplots(figsize = (16, 7))
-      ax.plot(df[occasion.time_elapsed_column].tolist(), df[f'TAC_processed_smooth_{occasion.smoothing_window}'].tolist(), c='black')
-      ax.vlines(peak_time, ymin=curve_threshold, ymax=peak, color='black', linestyle='--')
-      ax.hlines(curve_threshold, xmin=0, xmax=df[occasion.time_elapsed_column].max(), colors='black', linestyle='--')
-      ax.set_xlabel('Time (hrs)', fontsize = 24)
-      ax.set_ylabel('TAC', fontsize = 24)
-      ax.tick_params(axis='x', labelsize = 22)
-      ax.tick_params(axis='y', labelsize = 22)
-      ax.set_title(title, fontsize=36, fontweight="semibold", pad=15)
-      if ax.get_ylim()[1] < 10:
-            ax.set_ylim(0, 10)
-      curve_timepoints = df.loc[[i for i in range(curve_begins, curve_ends)], occasion.time_elapsed_column].tolist()
-      curve_tac_values = df.loc[[i for i in range(curve_begins, curve_ends)], f'TAC_processed_smooth_{occasion.smoothing_window}'].tolist()
-      plt.fill_between(curve_timepoints, curve_tac_values, [curve_threshold for i in range(curve_begins, curve_ends)], color='lightgray')
-      plot_event_lines(df, ax, event_timestamps, occasion.time_elapsed_column, 'datetime')
-
-      path = f'{occasion.plot_folder}{occasion.condition}{occasion.dataset_identifier}_smoothed_curve.png'
-      plt.tight_layout()
-      plt.savefig(path, bbox_inches='tight')
-      plt.close('all')
-      return path
-
 def create_temp_histogram(self):
-    temperatures = []
-    for occasion in self.occasions:
-      data = occasion.dataset['Temperature_C'].tolist()
-      temperatures.extend(data)
-    temperatures_below_threshold = [temp for temp in temperatures if temp < 27]
+  temperatures = []
+  for occasion in self.occasions:
+    data = occasion.dataset['Temperature_C'].tolist()
+    temperatures.extend(data)
+  temperatures_below_threshold = [temp for temp in temperatures if temp < 27]
 
-    import matplotlib.pyplot as plt
-    plt.hist(temperatures, bins = [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40])
-    plt.ylabel("Counts (1000's)")
-    plt.xlabel('Temperature (Celsius)')
-    plt.title('Temperature Distribution')
-    plt.xticks([20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40])
-    plt.yticks(ticks = [2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000, 18000], labels=[2, 4, 6, 8, 10, 12, 14, 16, 18])
-    plt.savefig(f'{self.analyses_out_folder}/temperature_histogram.png')
-    plt.close('all')
+  plt.hist(temperatures, bins = [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40])
+  plt.ylabel("Counts (1000's)")
+  plt.xlabel('Temperature (Celsius)')
+  plt.title('Temperature Distribution')
+  plt.xticks([20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40])
+  plt.yticks(ticks = [2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000, 18000], labels=[2, 4, 6, 8, 10, 12, 14, 16, 18])
+  plt.savefig(f'{self.analyses_out_folder}/temperature_histogram.png')
+  plt.close('all')
+
+
+def create_simple_histogram_of_feature(feature, save_folder, feature_name):
+  # feature_names = [
+  #         'ending_non_wear_perc_CURVE', 'consecutive_extreme_values_SEARCH', 'consecutive_extreme_values_CURVE',
+  #         'device_turned_on_percent_CURVE', 'device_turned_on_duration_CURVE', 'device_turned_on_percent_CURVE', 
+  #         'device_worn_duration_CURVE', 'device_worn_percent_CURVE', 'device_worn_percent_of_device_on_CURVE',
+  #         'negative_duration_CURVE', 'very_negative_duration_CURVE', 'duration_CURVE', 'first_tac_CURVE', 'last_tac_CURVE',
+  #         'mean_tac_CURVE', 'peak_CURVE', 'auc_total_CURVE', 'rise_duration_CURVE', 'fall_duration_CURVE', 'rise_rate_CURVE', 
+  #         'fall_rate_CURVE', 'fall_complete_perc_CURVE', ''
+  #       ]
+  #       for feature in feature_names:
+  #         save_feature
+  #         if not os.path.exists(processed_data_out):
+  #         create_simple_histogram_of_feature(self.event_level_data[feature], f'{self.data_out_folder}/)
+
+  plt.hist(feature, bins = [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40])
+  plt.xlabel(feature_name)
+  plt.title(f'{feature_name} Distribution')
+  plt.savefig(f'{save_folder}/{feature_name}_histogram.png')
+  plt.close('all')
 
 def plot_box_whisker(features, variables, ground_truth_variable, plot_folder, cohort_name, filter = {}):
       features = features[features['valid_occasion']==1].reset_index(drop=True)

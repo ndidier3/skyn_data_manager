@@ -3,7 +3,7 @@ import pandas as pd
 def label_signal_stability(df):
 
   # Identify indices where the device is worn
-  device_worn_indices = df[df['device_worn'] == 1].index
+  device_worn_indices = df[df['device_worn_model'] == 1].index
 
   # Setting new column tac_mean_deviance
   df['tac_mean_dev'] = pd.NA
@@ -14,7 +14,7 @@ def label_signal_stability(df):
 
     # Capture recent values when the device is worn
     recent_values = df.loc[max(0, idx - 10):idx - 1]
-    recent_values = recent_values[recent_values['device_worn'] == 1]['TAC']
+    recent_values = recent_values[recent_values['device_worn_model'] == 1]['TAC']
 
     if len(recent_values) >= 5:
       mean_value = recent_values.mean()
@@ -35,10 +35,10 @@ def label_signal_stability(df):
 
   # Update signal_stable only for indices where device is worn
   # Set unstable (0) for worn devices that are unstable and have valid metrics
-  df.loc[(df['device_worn'] == 1) & (~na_mask) & (unstable), 'signal_stable'] = 0
+  df.loc[(df['device_worn_model'] == 1) & (~na_mask) & (unstable), 'signal_stable'] = 0
 
   # Set stable (1) for worn devices that are stable and have valid metrics
-  df.loc[(df['device_worn'] == 1) & (~na_mask) & (~unstable), 'signal_stable'] = 1
+  df.loc[(df['device_worn_model'] == 1) & (~na_mask) & (~unstable), 'signal_stable'] = 1
   
   return df
 
@@ -47,7 +47,7 @@ def label_signal_stability_when_device_equipped(df):
 
   # Identify indices where the device was re-equipped (0 to 1)
   device_reactivated = df[
-      ((df['device_worn'].shift(1) == 0) & (df['device_worn'] == 1)) |
+      ((df['device_worn_model'].shift(1) == 0) & (df['device_worn_model'] == 1)) |
       ((df['device_turned_on'].shift(1) == 0) & (df['device_turned_on'] == 1))
   ].index
 
@@ -60,7 +60,7 @@ def label_signal_stability_when_device_equipped(df):
           # Check the signal stability value
           signal_stable = df.at[current_idx, 'signal_stable']
           
-          if df.at[current_idx, 'device_worn'] == 0 or df.at[current_idx, 'device_turned_on'] == 0:
+          if df.at[current_idx, 'device_worn_model'] == 0 or df.at[current_idx, 'device_turned_on'] == 0:
             break
           elif pd.isna(signal_stable):
             # If it's null, move to the next index

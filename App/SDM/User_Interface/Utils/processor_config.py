@@ -1,4 +1,4 @@
-from SDM.Skyn_Processors.skyn_cohort import skynCohort
+from App.SDM.Skyn_Processors.retired_skyn_cohort import skynCohort
 from App.SDM.Skyn_Processors.skyn_dataset import skynDataset
 from SDM.User_Interface.Utils.filename_tools import *
 from SDM.User_Interface.Utils.filename_tools import extract_subid
@@ -186,7 +186,7 @@ def create_processor(settings_window, sdm_interface):
 
     if data_format == 'Test':
       sdm_processor = skynCohort(
-        os.path.abspath('Inputs/Skyn_Data/TestData/') + '/',
+        os.path.abspath('Inputs/Skyn_Data_RAW/TestData/') + '/',
         metadata_path = 'Inputs/Metadata/Cohort Metadata TEST.xlsx',
         cohort_name = 'Test',
         merge_variables = {},

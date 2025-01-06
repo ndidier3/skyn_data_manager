@@ -5,7 +5,7 @@ def fill_device_off_gaps(df):
   
   # Calculate the time difference (between each row)
   df['time_diff'] = df['datetime'].diff().dt.total_seconds()
-
+  
   df['device_turned_on'] = 1
 
   df['gap'] = pd.cut(

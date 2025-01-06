@@ -5,8 +5,90 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
 import scipy.interpolate
 from sklearn.gaussian_process.kernels import DotProduct, Matern, ConstantKernel
-import math
+import math  
 
+def impute_device_off_gaps(df: pd.DataFrame, null_duration_minutes_max = 60):
+  """
+  if device off found, take an hour portion (60 min before and after)
+  to make quality determination (i.e., can we use data to compute), get 
+  counts of: 
+    > before: 
+      > device_worn == 1 
+      > pass > 80%  
+    > 
+   
+  """
+  df['TAC_pre_imputation'] = df['TAC'].copy()
+  # df['Temp_pre_imputation'] = df['Temp'].copy()
+  # df['Motion_pre_imputation'] = df['Motion'].copy()
+  
+
+  null_regions = []
+  null_indices = df[df['TAC'].isnull()].index
+  if not null_indices.empty:
+    diff = null_indices.to_series().diff().ne(1)  # Identify breaks in sequence
+    groups = diff.cumsum()  # Group consecutive nulls together
+    null_regions = []
+    for group, group_indices in null_indices.to_series().groupby(groups):
+      null_regions.append([group_indices.iloc[0], group_indices.iloc[-1]])
+  
+  print(null_regions)
+  
+  # Combine null regions if the end of one region is within 5 indices of the next region's start
+  merged_null_regions = []
+  for region in null_regions:
+    if not merged_null_regions or region[0] > merged_null_regions[-1][1] + 5:
+      merged_null_regions.append(region)
+    else:
+      merged_null_regions[-1][1] = region[1]
+
+  print(merged_null_regions)
+
+  for null_start, null_end in merged_null_regions:
+    print('FOUND NULLS')
+    null_start = max(0, null_start - 1)
+    null_end = min(null_end + 1, len(df))
+    null_data = df.iloc[null_start:null_end+1]
+
+    train_data_before_idx = max(0, null_start - 20)
+    train_data_after_idx = min(len(df), null_end + 20)
+    train_data_before = df.iloc[train_data_before_idx:null_start]
+    train_data_after = df.iloc[null_end+1:train_data_after_idx]
+
+    #Quality Checks
+    null_data_too_long = len(null_data) > null_duration_minutes_max
+    minimum_values_before = max(len(null_data), 10) 
+    minimum_values_after = max(round(len(null_data)*0.8), 8) 
+
+    worn_minutes_before = train_data_before['device_worn_model'].sum()
+    worn_percent_before = (worn_minutes_before / len(train_data_before)) if not train_data_before.empty else 0
+    training_data_before_valid = (worn_minutes_before > minimum_values_before) and (worn_percent_before > 0.8)
+
+    worn_minutes_after = train_data_after['device_worn_model'].sum()
+    worn_percent_after = (worn_minutes_after / len(train_data_after)) if not train_data_after.empty else 0
+    training_data_after_valid = (worn_minutes_after > minimum_values_after) and (worn_percent_after > 0.7)
+
+    if (not null_data_too_long) and training_data_before_valid and training_data_after_valid:
+      print('REACHED TRAINING & IMPUTING')
+      t_before = train_data_before[(~train_data_before['TAC'].isnull()) & (train_data_before['device_worn_model']==1)]
+      t_after = train_data_after[~train_data_after['TAC'].isnull() & (train_data_after['device_worn_model']==1)]
+      t_all = pd.concat([t_before, t_after])
+      
+      #maybe add temp and motion later
+      for column in ['TAC']:
+        x = t_all['Duration_Hrs']
+        y = t_all[column]
+        x_null = null_data['Duration_Hrs']      
+
+        kernel = Matern(length_scale=0.4, nu=0.3, length_scale_bounds=(1e-3, 1e3)) * ConstantKernel(constant_value=5)
+        model = GaussianProcessRegressor(kernel = kernel, random_state=0).fit(x.to_numpy().reshape(-1, 1), y)
+        predictions = model.predict(x_null.to_numpy().reshape(-1, 1))
+        df.iloc[null_start:null_end+1, df.columns.get_loc(column)] = predictions
+      
+      df.iloc[null_start:null_end+1, df.columns.get_loc('imputed')] = 1
+
+  return df
+      
 def impute_tac_in_gaps(df, tac_variable, time_elapsed_variable, sampling_rate, hours_elapsed_threshold):
   gaps_filled_df = df.copy()
   gap_rows_filled = 0

@@ -23,14 +23,18 @@ def update_column_names(df):
             'firmware version': 'Firmware Version',
             'Firmware version': 'Firmware Version',
             'tac (ug/L)': 'TAC ug/L(air)',
+            'tac': 'TAC',
+            'tac_ugl': 'TAC',
             'temperature (C)': 'Temperature_C',
             'Temperature (C)': 'Temperature_C',
             'Temperature C': 'Temperature_C',
             'Temperature LSB': 'Temperature_C',
+            'temperature_c': 'Temperature_C',
             'motion (g)': 'Motion',
             'Motion LSB': 'Motion',
+            'motion': 'Motion',
             'device id': 'device_id',
-            'device.id': 'device_id'
+            'device.id': 'device_id',
         }, 
             inplace=True,
             errors='ignore'
@@ -208,28 +212,6 @@ def configure_metadata_timestamps(metadata):
     # except:
     #     return metadata
 
-def create_output_folders(self):
-    # Create the main data output folder, including all necessary parent directories
-    if not os.path.exists(self.data_out_folder):
-        os.makedirs(self.data_out_folder, exist_ok=True)
-    
-    # Create the plot folder, including all necessary parent directories
-    if not os.path.exists(self.plot_folder):
-        os.makedirs(self.plot_folder, exist_ok=True)
-
-    # Create subid plot folder within the plot folder
-    subid_plot_folder = f'{self.plot_folder}/{self.subid}/'
-    if not os.path.exists(subid_plot_folder):
-        os.makedirs(subid_plot_folder, exist_ok=True)
-
-    # Create the full plot folder with condition if applicable
-    full_plot_folder = f'{self.plot_folder}/{self.subid}/{self.dataset_identifier}{self.condition if self.condition else ""}/'
-    if not os.path.exists(full_plot_folder):
-        os.makedirs(full_plot_folder, exist_ok=True)
-
-    # Update the plot folder attribute
-    self.plot_folder = full_plot_folder
-
 def load_dataset(self):
     if self.path[-3:] == 'csv':
       return pd.read_csv(self.path, index_col=False)
@@ -283,14 +265,27 @@ def get_event_timestamps(self, metadata_path):
     except:
         return {}
 
+def get_closest_index_with_timestamp(data, timestamp, datetime_column='datetime', time_diff_limit_hours=None):
+  try:
+    # Calculate the absolute time difference
+    time_diff = (data[datetime_column] - timestamp).abs()
+    closest_index = time_diff.idxmin()
+    
+    # Check if the closest time difference exceeds the limit
+    if time_diff_limit_hours is not None and time_diff.loc[closest_index] > pd.Timedelta(hours=time_diff_limit_hours):
+      print(f"No close match found for timestamp: {timestamp}")
+      return None
 
-def get_closest_index_with_timestamp(data, timestamp, datetime_column):
-    try:
-        return (data[datetime_column] - timestamp).abs().idxmin()
-    except:
-        return None
+    return closest_index
+  except Exception as e:
+    print(f"Error in get_closest_index_with_timestamp: {e}")
+    return None
+  
+  except Exception as e:
+    print(f"An error occurred: {e}")
+    return None
 
-def determine_initial_validity(self):
+def determine_initial_validity(self, allow_multiple_devices = False):
 
     if self.valid_occasion:
       self.valid_occasion = 1 if self.metadata_index != None else 0
@@ -300,7 +295,7 @@ def determine_initial_validity(self):
       self.valid_occasion = 1 if load_metadata(self, 'Use_Data') == 'Y' else 0
       self.invalid_reason = f'Excluded within Metadata [Use_Data = N]. Note: {self.metadata_note}' if self.valid_occasion == 0 else None
     
-    if self.valid_occasion:
+    if self.valid_occasion and not allow_multiple_devices:
       self.valid_occasion = 0 if self.disabled_by_multiple_device_ids else 1
       self.invalid_reason = 'multiple devices detected within dataset' if self.valid_occasion == 0 else None
     

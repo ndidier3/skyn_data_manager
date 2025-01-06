@@ -5,7 +5,8 @@ import pandas as pd
 import numpy as np
 from SDM.Configuration.configuration import get_full_identifier
 from joblib import parallel_backend
-from SDM.Machine_Learning.model import Model
+from App.SDM.Machine_Learning.model import Model
+from App.SDM.Machine_Learning.Utils.filter_features import filter_features
 #parallel_backend("threading")
 
 def CV_group_k_fold(model_design, model_name, cohort_processor):
@@ -132,17 +133,6 @@ def save_tac_feauture_predictions_to_SDM(cohort_processor, model_name, ground_tr
       occasion.predictions[model_name] = 'excluded'
       cohort_processor.features.loc[i, f'{model_name}_prediction'] = 'excluded'
 
-def filter_features(features, filter):
-  excluded = pd.DataFrame(columns=features.columns)
-  for column, values_to_exclude in filter.items():
-    excluded_rows = features[features[column].isin(values_to_exclude)]
-    excluded = pd.concat([excluded, excluded_rows])
-  excluded = excluded.drop_duplicates()
-
-  features = features[~features.isin(excluded)].dropna(how='all')
-  features = features.drop_duplicates()
-
-  return features, excluded
 
 def train_and_test_model_with_holdout(features, predictors, model_name='worn_vs_removed_LR', k=3, holdout=0.3):
 

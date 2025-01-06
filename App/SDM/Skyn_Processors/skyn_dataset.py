@@ -1,17 +1,20 @@
 from .skyn_datapoint import skynDatapoint
 from ..Configuration.configuration import *
 from ..Configuration.day_level import get_day_level_indices, create_day_level_dataframe
+from ..Configuration.event_level import get_event_level_indices, create_event_level_dataframe, identify_overlapping_curves
 from ..Configuration.file_management import *
 from ..Crop.crop import *
 from ..Signal_Processing.smooth_signal import *
 from ..Signal_Processing.remove_outliers import *
-from ..Signal_Processing.impute import impute_tac_in_gaps, impute
+from ..Signal_Processing.impute import impute_tac_in_gaps, impute, impute_device_off_gaps
 from ..Signal_Processing.fill_device_off_gaps import fill_device_off_gaps
-from ..Signal_Processing.label_device_nonwear import label_device_nonwear
+from ..Signal_Processing.label_device_nonwear import label_device_nonwear_using_cutoff, label_device_nonwear_using_model, compare_non_wear_methods
 from ..Signal_Processing.label_signal_stability import *
 from ..Signal_Processing.label_negative_values import label_negative_values
 from ..Skyn_Processors.skyn_day import skynDay
-from ..Visualization.plotting import *
+from ..Skyn_Processors.alcohol_event import alcoholEvent
+from ..Visualization.tac import *
+from ..Visualization.device_nonwear import *
 from ..Feature_Engineering.tac_features import *
 from ..Feature_Engineering.row_features import generate_row_features
 from ..Documenting.dataset_workbook import export_skyn_workbook
@@ -22,7 +25,7 @@ import numpy as np
 import traceback
 
 class skynDataset:
-  def __init__(self, path, data_out_folder, graphs_out_folder, subid, dataset_identifier, episode_identifier='e1', disable_crop_start = True, disable_crop_end = True, skyn_upload_timezone = 'CST', max_duration = 100000, metadata_path = '', metadata = pd.DataFrame()):
+  def __init__(self, path, processed_data_out_folder, data_out_folder, graphs_out_folder, subid, dataset_identifier, episode_identifier='e1', disable_crop_start = True, disable_crop_end = True, skyn_upload_timezone = 'CST', max_duration = 100000, metadata_path = '', metadata = pd.DataFrame()):
     self.path = path
 
     #Subid, Dataset ID, Episode ID
@@ -91,8 +94,10 @@ class skynDataset:
     self.data_cropped = False
 
     #EXPORT PATH INFO
+    self.processed_data_out_folder = processed_data_out_folder
+    self.error_logs_folder = data_out_folder.split('Results/')[0] + 'Results/Error_Logs/'
     self.data_out_folder = data_out_folder
-    self.plot_folder = graphs_out_folder
+    self.plot_folder = create_individual_plot_folder(graphs_out_folder, self.subid)
     self.simple_plot_paths = []
     self.complex_plot_paths = []
     self.plot_paths = self.simple_plot_paths + self.complex_plot_paths
@@ -129,6 +134,7 @@ class skynDataset:
     self.max_percentage_imputed = 65
     self.valid_occasion = 1
     self.invalid_reason = None
+    self.error = ''
 
     #MODEL PREDICTIONS
     self.predictions = {}
@@ -136,46 +142,192 @@ class skynDataset:
     #Day Level
     self.days = []
     self.day_level_data = pd.DataFrame()
+
+    #Event Level
+    self.events = []
+    self.event_level_data = pd.DataFrame()
   
-  def process_as_multiple_episodes(self):
-    print(self.subid)
-    print(self.dataset_identifier)
-    create_output_folders(self)
-    
+  def save_as_sdp(self, valid=True):
+    save_to_computer(self, 
+      f'{self.subid}_{self.dataset_identifier}_skyn_data_{"processed" if valid else "invalid"}.sdp',
+      self.processed_data_out_folder
+    )  
+  
+  def log_error(self):
+    error_file = f'{self.error_logs_folder}{self.subid}_{self.dataset_identifier}_process_error_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.txt'
+    with open(error_file, 'w') as file:
+      file.write(self.error)
+
+  def process_skyn_data(self):
+    print(f'Processing Skyn Dataset: {self.subid} - {self.dataset_identifier}')  
     self.dataset['tac_change'] = self.dataset['TAC'].diff()
 
-    #TAW_Raw keeps the original raw, while TAC will be cleaned eventually 
-    self.dataset['TAC_Raw'] = self.dataset['TAC'].tolist()
-
-    self.valid_occasion, self.invalid_reason = determine_initial_validity(self)
+    self.valid_occasion, self.invalid_reason = determine_initial_validity(self, allow_multiple_devices=True)
 
     if self.valid_occasion:
-      self.dataset = fill_device_off_gaps(self.dataset)
-      self.dataset['Duration_Hrs'] = (self.dataset['datetime'] - self.dataset['datetime'].iloc[0]).dt.total_seconds() / 3600
-      self.dataset = generate_row_features(self)
-      self.dataset = label_device_nonwear(self.dataset)
-      self.dataset = label_signal_stability(self.dataset)
-      self.dataset = label_signal_stability_when_device_equipped(self.dataset)
-      self.dataset = label_negative_values(self.dataset)
+      try:
+        if 'device_turned_on' not in self.dataset.columns:
+          self.dataset = fill_device_off_gaps(self.dataset)
+        self.dataset['Duration_Hrs'] = (self.dataset['datetime'] - self.dataset['datetime'].iloc[0]).dt.total_seconds() / 3600
+        # assert (self.dataset['datetime'].diff().dt.total_seconds() == 60).all(), "Rows are not spaced by one minute"
+        self.dataset = generate_row_features(self)
+        self.dataset = label_device_nonwear_using_cutoff(self.dataset)
+        self.dataset = label_device_nonwear_using_model(self.dataset)
+        self.dataset = compare_non_wear_methods(self.dataset, 'device_worn_temp_cutoff', 'device_worn_model', comparison_name = 'cutoff_vs_model')
+        self.dataset = label_signal_stability(self.dataset)
+        self.dataset = label_signal_stability_when_device_equipped(self.dataset)
 
-      day_start_end_pairs = get_day_level_indices(self.dataset, day_start_hour=0)
+        self.dataset['imputed'] = 0
+        self.dataset = impute_device_off_gaps(self.dataset)
+
+        #TAW_Raw keeps the original raw, while TAC will be cleaned eventually 
+        self.dataset['TAC_pre_smoothing'] = self.dataset['TAC'].tolist()
+        #Smooth signal with moving median
+        self.dataset['TAC'] = self.dataset['TAC'].rolling(window=30, min_periods=1, center=True).median()
+        self.dataset.loc[self.dataset['device_turned_on'] == 0, 'TAC'] = np.nan
+
+        self.dataset = label_negative_values(self.dataset)
+        
+        self.save_as_sdp(valid=True)
+        
+      except Exception:
+        self.error = traceback.format_exc()
+        self.log_error()
+        self.save_as_sdp(valid=False)  
+    else:
+      self.save_as_sdp(valid=False)    
+
+  def run_day_level_analysis(self, day_start_hour = 0, non_wear_self_report_column = '', make_graphs=False):
+    print(f'Analyzing Days: {self.subid} - {self.dataset_identifier}')  
+    self.days = [] #reset to empty
+    self.day_level_data = pd.DataFrame() #reset to empty
+    try:
+      day_start_end_pairs = get_day_level_indices(self.dataset, day_start_hour)
+      day_id = 0
       for start, end in day_start_end_pairs:
-        day = skynDay(self.dataset, start, end)
+        day = skynDay(self.dataset, start, end, non_wear_self_report_column = non_wear_self_report_column)
         self.days.append(day)
+        if make_graphs:
+          plot_path = plot_device_removal(
+            day.day_dataset, self.plot_folder, self.subid, day_id, self.dataset_identifier, 
+            'Temperature_C', 'datetime', motion_variable='Motion', add_color=True, 
+            method = 'Model Predictions', prediction_column = 'device_worn_model', df_version = f'DAY{day_id}',
+          )
+        day_id += 1
 
       self.day_level_data = create_day_level_dataframe(self.days, self.subid, self.dataset_identifier)
       
-    with pd.ExcelWriter(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
-      self.dataset.to_excel(writer, sheet_name='processed_data', index=False)
-      signal_quality_feature_key.to_excel(writer, sheet_name='key', index=False)
+      with pd.ExcelWriter(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
+        self.dataset.to_excel(writer, sheet_name='processed_data', index=False)
+        signal_quality_feature_key.to_excel(writer, sheet_name='key', index=False)
 
-    # Write `self.day_level_data` and `signal_quality_aggregate_feature_key` to a different file
-    with pd.ExcelWriter(f'{self.data_out_folder}/dayLevel_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
-      self.day_level_data.set_index('DayNo').to_excel(writer, sheet_name='day-level-results')
-      signal_quality_aggregate_feature_key.to_excel(writer, sheet_name='key', index=False)
-  
+      with pd.ExcelWriter(f'{self.data_out_folder}/dayLevel_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
+        self.day_level_data.set_index('DayNo').to_excel(writer, sheet_name='day-level-results')
+        signal_quality_aggregate_feature_key.to_excel(writer, sheet_name='key', index=False)
+
+      self.save_as_sdp(valid=True)
+
+    except Exception:
+      self.error = traceback.format_exc()
+      self.log_error()
+      self.save_as_sdp(valid=False)
+
+  def run_event_level_analysis(
+      self, event_data, 
+      drink_start_column = 'drkstarttime_m', 
+      drink_total_column = 'totsd_all_m',
+      day_id_column = 'STUDYDAY',
+      extra_columns = [],
+      search_method = 'peak',
+      curve_threshold = 10,
+      curve_search_pad_hours_before = 2,
+      curve_search_pad_hours_after = 22,
+      allow_duplicate_events = False,
+      make_plots = True,
+      save = True
+    ):
+    #TBD: Common formatting for event_files
+    print(f'Analyzing Events: {self.subid} - {self.dataset_identifier}') 
+    # self.dataset.to_excel(f'test_{self.subid}.xlsx')
+    self.events = []  #reset to empty
+    self.event_level_data = pd.DataFrame() #reset to empty
+    try:
+      event_data[drink_start_column] = pd.to_datetime(event_data[drink_start_column])
+      alcohol_event_indices, extra_info = get_event_level_indices(
+        self.subid, self.dataset, event_data,
+        pad_hours_before = curve_search_pad_hours_before,
+        pad_hours_after = curve_search_pad_hours_after, 
+        drink_start_column = drink_start_column, 
+        drink_total_column = drink_total_column,
+        day_id_column = day_id_column,
+        extra_columns = extra_columns,
+        append_duplicates=allow_duplicate_events
+      )
+      self.curve_datasets = []
+      self.search_datasets = []
+      self.no_skyn_data_events = []
+      for i, event_details in enumerate(alcohol_event_indices):
+        start, end, drink_total, day_id = event_details[:4]
+        if start is not None and end is not None:
+          event = alcoholEvent(self.dataset, self.subid, self.dataset_identifier, i, start, end, drink_total = drink_total, day_id = day_id, extra_info = extra_info[i], search_method = search_method, curve_threshold=curve_threshold)
+          event.get_features_of_search_dataset()
+          event.get_features_of_curve_dataset()
+          if event.quality_features_of_search['data_found_SEARCH'] and make_plots:
+            # event.save_plot_of_tac_and_temp(self.plot_folder, 'SEARCH')
+            event.save_plot_smooth_tac(self.plot_folder, 'SEARCH')
+            event.save_plot_of_device_removal(self.plot_folder, 'SEARCH')
+            event.save_plot_of_signal_processing(self.plot_folder, 'SEARCH')
+          if event.quality_features_of_curve['data_found_CURVE'] and make_plots:
+            # event.save_plot_of_tac_and_temp(self.plot_folder, 'CURVE')
+            event.save_plot_smooth_tac(self.plot_folder, 'CURVE')
+            event.save_plot_of_device_removal(self.plot_folder, 'CURVE')
+            event.save_plot_of_signal_processing(self.plot_folder, 'CURVE')
+          self.events.append(event)
+          self.curve_datasets.append(event.curve_dataset)
+        else:
+          info = {
+            'subid': self.subid,
+            'dataset_identifier': self.dataset_identifier,
+            'event_number': i,
+            'drink_total': drink_total,
+            'day_id': day_id,
+          }
+          info.update(extra_info[i])
+          self.no_skyn_data_events.append(
+            pd.DataFrame([info])
+          )
+          #subid dataset_id drink_total day_id extra info as pandas.dataframe
+        # event.curve_dataset.to_excel(f'curve_{self.subid}_{event.day_id}.xlsx')
+      
+      self.event_level_data = create_event_level_dataframe(self.subid, self.dataset_identifier, self.events)
+      self.event_level_data = identify_overlapping_curves(self.event_level_data)
+      self.events_with_no_skyn_data = (
+          pd.concat(self.no_skyn_data_events)
+          if len(self.no_skyn_data_events)
+          else pd.DataFrame(
+              columns=['subid', 'dataset_identifier', 'drink_total', 'day_id'] + list(extra_info[0].keys())
+          )
+      )      
+      all_event_data = pd.concat(self.curve_datasets, ignore_index=True)
+        
+      with pd.ExcelWriter(f'{self.data_out_folder}/eventLevel_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
+        self.event_level_data.to_excel(writer, sheet_name='event-features', index=False)
+        all_event_data.to_excel(writer, sheet_name='event-data')
+        self.events_with_no_skyn_data.to_excel(writer, sheet_name = 'events-no-skyn', index=False)
+      if save:
+        self.save_as_sdp(valid=True)
+
+    except Exception:
+      self.error = traceback.format_exc()
+      self.log_error()
+      if save:
+        self.save_as_sdp(valid=False)
+
+
+
+      
+
   def process_as_single_episode(self, make_plots=False, export=True):
-    create_output_folders(self)
 
     print(self.subid)
     print(self.dataset_identifier)
@@ -588,7 +740,7 @@ class skynDataset:
     labels = []
     prior_timestamp_index = 0
     for timestamp_label, timestamp in self.event_timestamps.items():
-      timestamp_index = get_closest_index_with_timestamp(self.dataset, timestamp, 'datetime')
+      timestamp_index = get_closest_index_with_timestamp(self.dataset, timestamp)
       if timestamp_index:
         if "off" in timestamp_label.lower(): #if timestamp indicates device was taken off, then prior data corresponds to device on
           labels.extend([1 for i in range(prior_timestamp_index, timestamp_index)])

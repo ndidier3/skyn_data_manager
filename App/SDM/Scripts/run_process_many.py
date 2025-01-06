@@ -1,4 +1,5 @@
 from App.SDM.Run.process_many import process_many
+import pandas as pd
 
 # MAC
 # project_root = '/Users/nathandidier/Desktop/Repositories/skyn_data_manager'
@@ -7,22 +8,50 @@ project_root = '/users/ndidier/SDM/skyn_data_manager'
 # Windows
 # project_root = ''
 
+# """ACE """
+# data_input_folder = f'{project_root}/Inputs/Skyn_Data_RAW/ACE'
+# output_folder_name = 'ACE'
 
-data_input_folder = f'{project_root}/Inputs/Skyn_Data/ARC/Burst1'
-output_folder_name = 'ARC'
+# """ ACE META """
+# event_path = f'{project_root}/Inputs/Metadata/ACE_RG_paper_subset_alcsam.csv'
+# event_data = pd.read_csv(event_path)
+# event_data = event_data.dropna(subset=['drinkstart_timestamp'])
+# event_data = event_data.drop_duplicates(subset=['ID', 'sub_episode_id']).reset_index(drop=True)
+# extra_columns = ['sex', 'age', 'weekend', 'skynversion', 'sub_episode_id', 'eventuse', 'usetype_initial', 'drinkstart_timestamp', 'n_sam_days', 'totdrinks_fin', 'totdrinks_fin_mr']
 
+""" ARC TEST """
+# data_input_folder = f'{project_root}/Inputs/Skyn_Data_RAW/ARC/EventTest'
+# output_folder_name = 'ARC_test'
 
-# how to set output folder name? Separate by date?
+""" ARC """
+data_input_folder = f'{project_root}/Inputs/Skyn_Data_RAW/ARC/Burst1'
+output_folder_name = 'ARC_10'
 
-process_many(project_root, data_input_folder = data_input_folder, output_folder_name = output_folder_name)
+""" ARC META """
+event_path = f'{project_root}/Inputs/Metadata/ARC_flagged.xlsx'
+event_data = pd.read_excel(event_path)
+event_data = event_data[event_data['final966']=='Selected'].reset_index(drop=True)
+extra_columns = ['drkyst_m', 'drkhrs', 'bac_r']
 
+# process_many(project_root, data_input_folder, output_folder_name, event_data=event_data, use_prior_save=False, process_raw_data=True, analyze_day_level=True, extra_columns = extra_columns)
+process_many(project_root, data_input_folder, output_folder_name, event_data=event_data, use_prior_save=True, process_raw_data=False, analyze_day_level=False, extra_columns = extra_columns)
 
+#no event processing requested
+# process_many(project_root, data_input_folder, output_folder_name, use_prior_save=False, process_raw_data=True, analyze_day_level=False, extra_columns = extra_columns)
 
-  #153 left out
-  # subids = [101, 102, 106, 112, 113, 114, 115, 117, 118, 120, 121, 122, 123, 127, 130, 
-  #           132, 133, 134, 138, 139, 140, 141, 143, 146, 147, 149, 150, 151, 153, 155, 
-  #           157, 159, 160, 161, 162, 165, 167, 171, 172, 174, 180, 181, 183, 185, 186, 
-  #           189, 190, 194, 198, 199, 202, 204, 206, 207, 208, 209, 210, 211, 212, 213, 
-  #           214, 215, 216, 218, 219, 220, 221, 222, 223, 227, 233, 236, 237, 238, 241, 
-  #           243, 246, 247, 250, 251, 253, 255, 256, 258, 259, 260, 267, 270, 271, 272, 
-  #           273, 274, 276, 277, 280, 281, 282, 286, 291, 292, 295, 296]
+""" MARS """
+# data_input_folder = f'{project_root}/Inputs/Skyn_Data_RAW/MARS/'
+# output_folder_name = 'MARS'
+
+# process_many(project_root, data_input_folder, output_folder_name, use_prior_save=False, process_raw_data=True, analyze_day_level=True)
+
+"""
+event_timestamps = {
+    "bracelet_on": datetime.strptime("Dec 6 2024 1:24 PM", "%b %d %Y %I:%M %p"),
+    "prime_drink": datetime.strptime("Dec 6 2024 2:08 PM", "%b %d %Y %I:%M %p"),
+    "block_1": datetime.strptime("Dec 6 2024 2:51 PM", "%b %d %Y %I:%M %p"),
+    "block_2": datetime.strptime("Dec 6 2024 3:52 PM", "%b %d %Y %I:%M %p"),
+    "bracelet_off": datetime.strptime("Dec 6 2024 7:01 PM", "%b %d %Y %I:%M %p")
+  }
+
+"""

@@ -1,14 +1,14 @@
-
-
 class skynDay:
-  def __init__(self, dataset, starting_index, ending_index):
-    self.day_dataset = dataset.loc[starting_index:ending_index]
+  def __init__(self, dataset, start_index, end_index, non_wear_self_report_column = '', compare_non_wear_methods = True):
+    self.day_dataset = dataset.loc[start_index:end_index]
 
     self.begin_day = self.day_dataset['datetime'].iloc[0] if not self.day_dataset.empty else None
     self.end_day = self.day_dataset['datetime'].iloc[-1] if not self.day_dataset.empty else None
 
-    self.device_id_begin = self.day_dataset['device_id'].iloc[0] if not self.day_dataset.empty else None
-    self.device_id_end = self.day_dataset['device_id'].iloc[-1] if not self.day_dataset.empty else None
+    self.device_ids = self.day_dataset['device_id'].unique().tolist()
+    self.device_one = self.device_ids[0]
+    self.device_two = self.device_ids[1] if len(self.device_ids) > 1 else None
+    self.device_count = len(self.device_ids)
 
     self.device_turned_on_duration = self.day_dataset['device_turned_on'].sum() / 60
     self.device_turned_on_percentage_of_day = self.device_turned_on_duration / 24
@@ -18,17 +18,31 @@ class skynDay:
     This is because values for device_worn is null whenever device is not turned on.
     Therefore, device_worn_duration will be the duration when device is turned on AND worn.
     """
-    self.device_worn_duration = self.day_dataset['device_worn'].sum() / 60
-    self.device_worn_percentage_of_device_on = (self.device_worn_duration / self.device_turned_on_duration) if self.device_turned_on_duration > 0 else 0
-    self.device_worn_percentage_of_day = self.device_worn_duration / 24
+    self.device_worn_duration = self.day_dataset['device_worn_model'].sum() / 60
+    self.device_worn_percent_of_device_on = (self.device_worn_duration / self.device_turned_on_duration) if self.device_turned_on_duration > 0 else 0
+    self.device_worn_percent_of_day = self.device_worn_duration / 24
 
-    self.negative_duration = self.day_dataset['negative_tac'].sum() / 60
-    self.very_negative_duration = self.day_dataset['below_neg10_tac'].sum() / 60
+    self.device_worn_duration_cutoff = self.day_dataset['device_worn_temp_cutoff'].sum() / 60
+    self.device_worn_cutoff_percent_of_device_on = (self.device_worn_duration_cutoff / self.device_turned_on_duration) if self.device_turned_on_duration > 0 else 0
+    self.device_worn_cutoff_percent_of_day = self.device_worn_duration_cutoff / 24
 
+    if compare_non_wear_methods:
+      self.FP_cutoff_vs_model_duration = self.day_dataset['FP_cutoff_vs_model'].sum() / 60
+      self.FN_cutoff_vs_model_duration = self.day_dataset['FN_cutoff_vs_model'].sum() / 60
+      self.DISAGREE_cutoff_vs_model_duration = self.day_dataset['DISAGREE_cutoff_vs_model'].sum() / 60
 
+    if non_wear_self_report_column:
+      self.device_worn_duration_self_report = self.day_dataset[non_wear_self_report_column].sum() / 60
+      self.device_worn_self_report_percent_of_device_on = (self.device_worn_duration_self_report / self.device_turned_on_duration) if self.device_turned_on_duration > 0 else 0
+      self.device_worn_self_report_percent_of_day = self.device_worn_duration_self_report / 24
 
-
+      if compare_non_wear_methods:
+        self.FP_self_report_vs_model_duration = self.day_dataset['FP_self_report_vs_model'].sum() / 60
+        self.FN_self_report_vs_model_duration = self.day_dataset['FN_self_report_vs_model'].sum() / 60
+        self.DISAGREE_self_report_vs_model_duration = self.day_dataset['DISAGREE_self_report_vs_model'].sum() / 60
+        self.FP_self_report_vs_cutoff_duration = self.day_dataset['FP_self_report_vs_cutoff'].sum() / 60
+        self.FN_self_report_vs_cutoff_duration = self.day_dataset['FN_self_report_vs_cutoff'].sum() / 60
+        self.DISAGREE_self_report_vs_cutoff_duration = self.day_dataset['DISAGREE_self_report_vs_cutoff'].sum() / 60
     
-
-  
-               
+    self.negative_duration = self.day_dataset['negative_tac'].sum() / 60
+    self.very_negative_duration = self.day_dataset['below_neg10_tac'].sum() / 60           

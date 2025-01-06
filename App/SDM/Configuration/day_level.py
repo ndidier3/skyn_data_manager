@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import timedelta, datetime
 
-def get_day_level_indices(df, day_start_hour = 7):
+def get_day_level_indices(df, day_start_hour):
 
   # Define the split hour (modifiable), e.g., 7 for a 7:00 AM start of the day
   split_hour = day_start_hour # Use a simple integer to represent the start hour of the day
@@ -48,6 +48,6 @@ def create_day_level_dataframe(skyn_days, subid, dataset_identifier):
   data = pd.DataFrame([{attr: value for attr, value in day.__dict__.items() if attr != 'day_dataset'} for day in skyn_days])
   data['SubID'] = subid
   data['Dataset_ID'] = dataset_identifier
-  data['DayNo'] = [i for i in range(0, len(data))]
+  data['DayNo'] = [i+1 for i in range(0, len(data))]
   data = data[['SubID', 'Dataset_ID', 'DayNo'] + [col for col in data.columns if col not in ['SubID', 'Dataset_ID', 'DayNo']]]
   return data

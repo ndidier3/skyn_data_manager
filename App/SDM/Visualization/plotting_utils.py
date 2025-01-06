@@ -11,14 +11,6 @@ def plot_event_lines(data, ax, event_timestamp, x_variable, timestamp_column='da
       plt.text(data.loc[idx, x_variable], ax.get_ylim()[1] * (0.95 - text_adjustment), event, fontsize = font_size, fontstyle = "italic")
       text_adjustment += 0.08
 
-def split_x_y_from_temp_cutoff(df, temp_variable, y_variable, time_variable, cutoff=27):
-  invalid_x = df[df[temp_variable]<cutoff][time_variable]
-  invalid_y = df.loc[df[temp_variable]<cutoff, y_variable].tolist()
-  valid_x = df[df[temp_variable]>=cutoff][time_variable]
-  valid_y = df.loc[df[temp_variable]>=cutoff, y_variable].tolist()
-
-  return valid_x, valid_y, invalid_x, invalid_y
-
 def split_x_y_from_predictions(df, prediction_column, y_variable, time_variable):
   #must be binary predictions
   positive_idx = df[df[prediction_column]==1].index.tolist()

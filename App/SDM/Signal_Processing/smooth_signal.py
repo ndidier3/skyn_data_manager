@@ -15,4 +15,4 @@ def smooth_signals(df_prior, window_length, polyorder, variables):
     TAC_smoothed = pd.Series(smoothed)
     smoothed_tac_variables[f'{variable}_{window_length}'] = TAC_smoothed
 
-  return smoothed_tac_variables
+  return smoothed_tac_variables  

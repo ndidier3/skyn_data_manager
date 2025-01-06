@@ -1,4 +1,4 @@
-from SDM.Machine_Learning.model_optimization import *
+from App.SDM.Machine_Learning.model_optimization import *
 from sklearn.model_selection import GroupKFold
 import pandas as pd
 
