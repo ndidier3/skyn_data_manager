@@ -1,10 +1,10 @@
-from SDM.User_Interface.Frames.model_selection import ModelSelection
-from SDM.User_Interface.Frames.crop_settings import CropSettings
-from SDM.User_Interface.Frames.process_signal_settings import ProcessSignalSettings
-from SDM.User_Interface.Frames.train_settings import TrainSettings
-from SDM.User_Interface.Frames.quality_control_settings import QualityControlSettings
-from SDM.User_Interface.Utils.processor_config import create_processor, create_results_directories
-from SDM.User_Interface.Frames.header_menu import HeaderMenu
+from App.SDM.User_Interface.Frames.model_selection import ModelSelection
+from App.SDM.User_Interface.Frames.crop_settings import CropSettings
+from App.SDM.User_Interface.Frames.process_signal_settings import ProcessSignalSettings
+from App.SDM.User_Interface.Frames.train_settings import TrainSettings
+from App.SDM.User_Interface.Frames.quality_control_settings import QualityControlSettings
+from App.SDM.User_Interface.Utils.processor_config import create_processor, create_results_directories
+from App.SDM.User_Interface.Frames.header_menu import HeaderMenu
 from tkinter import *
 from tkinter import filedialog, StringVar, IntVar
 from tkinter import ttk

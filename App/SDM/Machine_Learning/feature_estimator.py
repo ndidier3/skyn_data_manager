@@ -3,7 +3,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from App.SDM.Machine_Learning.Utils.filter_features import filter_features
 from App.SDM.Machine_Learning.model import Model
-from SDM.Configuration.file_management import save_to_computer
+from App.SDM.Configuration.file_management import save_to_computer
 
 def train_feature_estimator(features, predictors, outcome, save_folder, training_filter={}):
 

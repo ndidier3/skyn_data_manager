@@ -13,6 +13,6 @@ else:
 print(base_path)
 sys.path.append(base_path)
 
-from SDM.User_Interface.Sub_Apps.process_data_window import ProcessSkynApp
+from App.SDM.User_Interface.Sub_Apps.process_data_window import ProcessSkynApp
 
 ProcessSkynApp()

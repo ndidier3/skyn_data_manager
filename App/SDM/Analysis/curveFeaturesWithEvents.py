@@ -1,8 +1,8 @@
-from SDM.Analysis.statModel import statModel
-from SDM.Analysis.curveFeatures import curveFeatures
-from SDM.Skyn_Processors.ema_region import emaRegion
-from SDM.Configuration.file_management import load, save_to_computer
-from SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
+from App.SDM.Analysis.statModel import statModel
+from App.SDM.Analysis.curveFeatures import curveFeatures
+from App.SDM.Skyn_Processors.ema_region import emaRegion
+from App.SDM.Configuration.file_management import load, save_to_computer
+from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 import pandas as pd
 
 class curveFeaturesWithEvents(curveFeatures):
