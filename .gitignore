@@ -17,9 +17,18 @@ sdm.spec
 SDM.exe
 App/run.py
 archive/
+sdm_single_file.exe
+sdm_single_file.spec
 
 /Inputs/Metadata/*
 !/Inputs/Metadata/Cohort Metadata TEST.xlsx
-/Inputs/Skyn_Data/*
-!/Inputs/Skyn_Data/TestData
-.vscode/settings.json
+/Inputs/Skyn_Data_RAW/*
+!/Inputs/Skyn_Data_RAW/TestData
+.vscode
+batch_out/
+*.sh
+Inputs/Skyn_Data_PROCESSED/*
+App/SDM/Scripts/ACE
+App/SDM/Scripts/ARC
+App/SDM/Scripts/CSDP
+App/SDM/Scripts/MARS_Brown

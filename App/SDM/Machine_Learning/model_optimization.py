@@ -10,15 +10,15 @@ from joblib import parallel_backend
 #parallel_backend("threading")
 
 def create_rf_search_grid(n_splits, group_kfold=True):
-  rf = RandomForestClassifier()
-  max_depth = [int(x) for x in np.linspace(10, 50, num = 11)]
+  rf = RandomForestClassifier(random_state=44)
   distributions = {
-    'n_estimators': [10, 50, 100, 300],
-    'max_features': [3, 5],
-    'max_depth': max_depth,
-    'min_samples_split': [2],
-    'min_samples_leaf': [1],
-    'bootstrap': [True]
+    'n_estimators': [50, 100],  # More trees for better generalization
+    # 'max_features': ['sqrt', 'log2', 5, 7, 10],  # A mix of common values and custom ones
+    'max_features': [5, 7, 10],  # A mix of common values and custom ones
+    'max_depth': [10, 25, 40],  # Test a range of depths with None as an option
+    'min_samples_split': [2, 5],  # Testing slightly higher values to prevent overfitting
+    'min_samples_leaf': [2, 5, 10],  # Smoothing effect with higher values
+    'bootstrap': [True, False]  # Test both bootstrap and non-bootstrap trees
   }
   cv_method = GroupKFold(n_splits=n_splits) if group_kfold else KFold(n_splits=n_splits, shuffle=True, random_state=42)
   rf_grid = GridSearchCV(estimator = rf, scoring='accuracy', param_grid = distributions, cv=cv_method, n_jobs = -1)

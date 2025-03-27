@@ -1,9 +1,9 @@
-from SDM.Skyn_Processors.skyn_cohort import skynCohort
-from SDM.Skyn_Processors.skyn_dataset import skynDataset
-from SDM.User_Interface.Utils.filename_tools import *
-from SDM.User_Interface.Utils.filename_tools import extract_subid
-from SDM.User_Interface.Sub_Windows.rename_files_window import RenameFilesWindow
-from SDM.User_Interface.Sub_Windows.filenames_confirmation_window import FilenamesConfirmationWindow
+from App.Archive.retired_skyn_cohort import skynCohort
+from App.SDM.Skyn_Processors.skyn_dataset import skynDataset
+from App.SDM.User_Interface.Utils.filename_tools import *
+from App.SDM.User_Interface.Utils.filename_tools import extract_subid
+from App.SDM.User_Interface.Sub_Windows.rename_files_window import RenameFilesWindow
+from App.SDM.User_Interface.Sub_Windows.filenames_confirmation_window import FilenamesConfirmationWindow
 from tkinter import filedialog, ttk, simpledialog
 from tkinter import messagebox
 from datetime import date, datetime
@@ -186,7 +186,7 @@ def create_processor(settings_window, sdm_interface):
 
     if data_format == 'Test':
       sdm_processor = skynCohort(
-        os.path.abspath('Inputs/Skyn_Data/TestData/') + '/',
+        os.path.abspath('Inputs/Skyn_Data_RAW/TestData/') + '/',
         metadata_path = 'Inputs/Metadata/Cohort Metadata TEST.xlsx',
         cohort_name = 'Test',
         merge_variables = {},

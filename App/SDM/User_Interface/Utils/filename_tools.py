@@ -150,5 +150,12 @@ def attempt_condition_extraction(filename):
 def processor_data_ready(processor, min_datasets_required):
   return (len(processor.occasions) > min_datasets_required) and (len(processor.features) > min_datasets_required) if hasattr(processor, 'occasions') else False
 
+def get_project_root(path, target='skyn_data_manager'):
+  parts = path.split(os.sep)
+  try:
+    index = parts.index(target)
+    return os.sep.join(parts[:index + 1])
+  except ValueError:
+    return None
 
   

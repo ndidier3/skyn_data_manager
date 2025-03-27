@@ -1,13 +1,13 @@
-from SDM.Configuration.file_management import *
-from SDM.Configuration.configuration import load_metadata
-from SDM.User_Interface.Sub_Windows.settings_window import SettingsWindow
-from SDM.User_Interface.Frames.data_loading_method_frame import DataLoadingMethodSelection
-from SDM.User_Interface.Frames.program_selection_frame import ProgramSelectionFrame
-from SDM.User_Interface.Frames.header_menu import HeaderMenu
-from SDM.User_Interface.Utils.filename_tools import *
-from SDM.User_Interface.Utils.processor_config import *
-from SDM.User_Interface.Utils.get_sdm_run_settings import get_sdm_run_settings
-from SDM.User_Interface.Utils.get_font_size import get_font_size
+from App.SDM.Configuration.file_management import *
+from App.SDM.Configuration.configuration import load_metadata
+from App.SDM.User_Interface.Sub_Windows.settings_window import SettingsWindow
+from App.SDM.User_Interface.Frames.data_loading_method_frame import DataLoadingMethodSelection
+from App.SDM.User_Interface.Frames.program_selection_frame import ProgramSelectionFrame
+from App.SDM.User_Interface.Frames.header_menu import HeaderMenu
+from App.SDM.User_Interface.Utils.filename_tools import *
+from App.SDM.User_Interface.Utils.processor_config import *
+from App.SDM.User_Interface.Utils.get_sdm_run_settings import get_sdm_run_settings
+from App.SDM.User_Interface.Utils.get_font_size import get_font_size
 from tkinter import *
 from tkinter import filedialog, ttk, simpledialog
 from tkinter import messagebox
@@ -133,7 +133,7 @@ class SkynDataManagerApp(Tk):
     self.unload_data()
 
     if self.data_loading_method == 'Test':
-      self.selected_data = os.path.abspath('Inputs/Skyn_Data/TestData/') + '/'
+      self.selected_data = os.path.abspath('Inputs/Skyn_Data_RAW/TestData/') + '/'
       self.filenames = [file for file in os.listdir(self.selected_data)]
       self.metadata = 'Inputs/Metadata/Cohort Metadata TEST.xlsx'
       self.metadata_df = pd.read_excel(self.metadata)

@@ -1,13 +1,13 @@
 import pandas as pd
 from statistics import mean
 import numpy as np
-from SDM.Feature_Engineering.tac_features import *
-from SDM.Signal_Processing.impute import impute
+from App.SDM.Feature_Engineering.tac_features import *
+from App.SDM.Signal_Processing.impute import impute
 np.seterr(divide = 'ignore')
-from SDM.Visualization.plotting import *
-from SDM.Feature_Engineering.get_tac_clusters import get_tac_clusters
-from SDM.Signal_Processing.returns_to_baseline import returns_to_baseline
-from SDM.Signal_Processing.tac_slope import tac_slope
+from App.SDM.Visualization.tac import *
+from App.SDM.Feature_Engineering.get_tac_clusters import get_tac_clusters
+from App.SDM.Signal_Processing.returns_to_baseline import returns_to_baseline
+from App.SDM.Signal_Processing.tac_slope import tac_slope
 
 def replace_extreme_values(df, time_variable, method="cluster"):
   df['TAC_extreme_values_imputed'] = df['TAC'].tolist()
@@ -88,7 +88,7 @@ def impute_artifacts(df, test_range, time_variable, extreme_outliers, major_thre
     'cleaned': { counter: tac_list_cleaned.copy()}
   }
   cannot_impute = []
-  starting_index = {0: 0}
+  start_index = {0: 0}
   index_check_count = {}
   for i, tac in enumerate(tac_list_imputed):
     index_check_count[i] = 0
@@ -99,7 +99,7 @@ def impute_artifacts(df, test_range, time_variable, extreme_outliers, major_thre
   all_data_points_checked = False
   while not all_data_points_checked:
     tac_list_current = tac_lists_repo['imputed'][counter]
-    start = starting_index[counter]
+    start = start_index[counter]
     if start == 0:
       cycle += 1
       outliers_in_cycle[cycle] = False
@@ -207,6 +207,6 @@ def impute_artifacts(df, test_range, time_variable, extreme_outliers, major_thre
           all_data_points_checked = True
           break
         if tac_review_complete and (outliers_in_cycle[cycle]) or (tac_review_complete and (cycle == 1)):
-          starting_index[counter] = 0
+          start_index[counter] = 0
           
   return tac_lists_repo['imputed'][counter], tac_lists_repo['cleaned'][counter], set(outlier_counter['major']), set(outlier_counter['minor'])

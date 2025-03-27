@@ -6,7 +6,7 @@ from statistics import mode
 from sklearn import preprocessing
 import numpy as np
 import os
-from SDM.User_Interface.Utils.filename_tools import stringify_dataset_id
+from App.SDM.User_Interface.Utils.filename_tools import stringify_dataset_id
 
 """
 this file contains utilies for loading the date, standardizing formats, retrieving unique identifiers, etc.
@@ -17,19 +17,24 @@ starting_standard_columns = ['datetime', 'device_id', 'Firmware Version', 'TAC u
 def update_column_names(df):
     df.rename(columns = {
             'device timestamp': 'datetime',
+            'device_timestamp': 'datetime',
             'Timestamp': 'datetime',
             'Device Serial Number': 'device_id',
             'firmware version': 'Firmware Version',
             'Firmware version': 'Firmware Version',
             'tac (ug/L)': 'TAC ug/L(air)',
+            'tac': 'TAC',
+            'tac_ugl': 'TAC',
             'temperature (C)': 'Temperature_C',
             'Temperature (C)': 'Temperature_C',
             'Temperature C': 'Temperature_C',
             'Temperature LSB': 'Temperature_C',
+            'temperature_c': 'Temperature_C',
             'motion (g)': 'Motion',
             'Motion LSB': 'Motion',
+            'motion': 'Motion',
             'device id': 'device_id',
-            'device.id': 'device_id'
+            'device.id': 'device_id',
         }, 
             inplace=True,
             errors='ignore'
@@ -184,7 +189,20 @@ def standardize_date_column_YMD(timestamps, column_name='Crop Begin Date', new_c
   
     return timestamps
 
-def configure_timestamps(metadata):
+def configure_dataset_timestamps(dataset):
+  try:
+    dataset["datetime"] = pd.to_datetime(dataset["datetime"], unit='s')
+  except:
+    dataset["datetime"] = pd.to_datetime(dataset["datetime"])
+
+  # Drop timezone information
+  dataset["datetime"] = dataset["datetime"].dt.tz_localize(None)
+
+  dataset = dataset.sort_values(by="datetime", ignore_index=True)
+  dataset.reset_index(inplace=True, drop=True)
+  return dataset
+    
+def configure_metadata_timestamps(metadata):
     # metadata = metadata[metadata['Use_Data']=="Y"]
     metadata.reset_index(inplace=True, drop=True)
     # try:
@@ -193,19 +211,6 @@ def configure_timestamps(metadata):
     return metadata
     # except:
     #     return metadata
-
-def create_output_folders(self):
-    if not os.path.exists(self.data_out_folder):
-      os.mkdir(self.data_out_folder)
-    if not os.path.exists(self.plot_folder):
-      os.mkdir(self.plot_folder)
-    subid_plot_folder = f'{self.plot_folder}/{self.subid}/'
-    if not os.path.exists(subid_plot_folder):
-      os.mkdir(subid_plot_folder)
-    full_plot_folder = f'{self.plot_folder}/{self.subid}/{self.dataset_identifier}{self.condition if self.condition else ""}/'
-    if not os.path.exists(full_plot_folder):
-      os.mkdir(full_plot_folder)
-    self.plot_folder = full_plot_folder
 
 def load_dataset(self):
     if self.path[-3:] == 'csv':
@@ -224,20 +229,14 @@ def configure_raw_data(self):
     df_raw = update_column_names(self.unprocessed_dataset)
     df_raw = rename_TAC_column(df_raw)
 
-    try:
-        df_raw["datetime"] = pd.to_datetime(df_raw["datetime"], unit='s')
-    except:
-        df_raw["datetime"] = pd.to_datetime(df_raw["datetime"])
-
-    df_raw = df_raw.sort_values(by="datetime", ignore_index=True)
-    df_raw.reset_index(inplace=True, drop=True)
+    df_raw = configure_dataset_timestamps(df_raw)
+    
     df_raw['Row_ID'] = df_raw['Full_Identifier'].astype(str) + '_' + df_raw.index.astype(str)
 
     df_raw = df_raw[['SubID', 'Dataset_Identifier', 'Episode_Identifier', 'Full_Identifier', 'Row_ID'] + [col for col in df_raw.columns.tolist() if col not in ['SubID', 'Dataset_Identifier', 'Episode_Identifier', 'Full_Identifier', 'Row_ID']]]
 
     sampling_rate = get_sampling_rate(df_raw, 'datetime')
     if sampling_rate > 1:
-        print('reached123')
         df_raw = reduce_sampling_rate(df_raw, 'datetime')
 
     df_raw = get_time_elapsed(df_raw, 'datetime')
@@ -266,29 +265,53 @@ def get_event_timestamps(self, metadata_path):
     except:
         return {}
 
-
-def get_closest_index_with_timestamp(data, timestamp, datetime_column):
-    try:
-        return (data[datetime_column] - timestamp).abs().idxmin()
-    except:
-        return None
-
-def determine_initial_validity(self):
-
-    if self.valid_occasion:
-      self.valid_occasion = 1 if self.metadata_index != None else 0
-      self.invalid_reason = 'Not in metadata' if self.valid_occasion == 0 else None
-
-    if self.valid_occasion:
-        self.valid_occasion = 1 if load_metadata(self, 'Use_Data') == 'Y' else 0
-        self.invalid_reason = f'Excluded within Metadata [Use_Data = N]. Note: {self.metadata_note}' if self.valid_occasion == 0 else None
+def get_closest_index_with_timestamp(data, timestamp, datetime_column='datetime', time_diff_limit_hours=None):
+  try:
+    # Calculate the absolute time difference
+    time_diff = (data[datetime_column] - timestamp).abs()
+    closest_index = time_diff.idxmin()
     
-    if self.valid_occasion:
-      self.valid_occasion = 0 if self.disabled_by_multiple_device_ids else 1
-      self.invalid_reason = 'multiple devices detected within dataset' if self.valid_occasion == 0 else None
-    
-    return self.valid_occasion, self.invalid_reason
+    # Check if the closest time difference exceeds the limit
+    if time_diff_limit_hours is not None and time_diff.loc[closest_index] > pd.Timedelta(hours=time_diff_limit_hours):
+      print(f"No close match found for timestamp: {timestamp}")
+      return None
 
+    return closest_index
+  except Exception as e:
+    print(f"Error in get_closest_index_with_timestamp: {e}")
+    return None
+  
+  except Exception as e:
+    print(f"An error occurred: {e}")
+    return None
+
+
+def get_closest_index_after_timestamp(data, timestamp, datetime_column='datetime', time_diff_limit_hours=None):
+  try:
+    # Filter rows where the datetime is after or equal to the given timestamp
+    filtered_data = data[data[datetime_column] >= timestamp]
+
+    # If no rows match, return None
+    if filtered_data.empty:
+      print(f"No rows found after or at timestamp: {timestamp}")
+      return data.index[-1]
+
+    # Calculate the absolute time difference
+    time_diff = (filtered_data[datetime_column] - timestamp).abs()
+    closest_index = time_diff.idxmin()
+
+    # Check if the closest time difference exceeds the limit
+    if time_diff_limit_hours is not None and time_diff.loc[closest_index] > pd.Timedelta(hours=time_diff_limit_hours):
+      print(f"No close match found for timestamp: {timestamp} within the time limit")
+      return None
+
+    return closest_index
+  
+  except Exception as e:
+    print(f"Error in get_closest_index_after_timestamp: {e}")
+    return 
+
+#RETIRED
 def determine_post_cleaning_validity(self):
 
     device_off_or_removed = (self.dataset['gap_imputed'] == 1) | (self.dataset['TAC_device_off_imputed'] == 1)

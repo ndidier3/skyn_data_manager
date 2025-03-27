@@ -3,15 +3,19 @@ import pandas as pd
 import statistics as stats_package
 from sklearn.metrics import r2_score
 
-def get_auc(df, variable, time_variable):
-  if len(df):
-    tac = df[variable]
-    tac = tac.astype(float)
-    total_auc = np.trapz(tac, dx = 0.1)
-    auc_per_hour = total_auc / df[time_variable].max()
-    return total_auc, auc_per_hour
-  else:
-    return None, None
+def get_auc(df, variable):
+  if len(df) == 0:
+    return None
+
+  try:
+    tac = df[variable].dropna().astype(float)
+    if len(tac) == 0:
+      return None
+    total_auc = np.trapz(tac, dx=0.1)
+    return total_auc
+  except Exception as e:
+    print(f"Error calculating AUC: {e}")
+    return None
   
 def get_mean_stdev_sem(df, variable):
   if len(df):
@@ -27,10 +31,11 @@ def get_peak(df, variable, window = {}):
       index = window['index']
       previous_window = window_length if (index - window_length) > 0 else (index - 1)
       post_window = window_length if (index + window_length) < len(df) else ((len(df) - window_length) - 1)
-      return df.loc[index-previous_window:index+post_window, variable].max()
+      peak = df.loc[index-previous_window:index+post_window, variable].max()
     else:
       tac = df[variable]
-      return tac.max()
+      peak = tac.max()
+    return peak if peak > 0.5 else 0.5 # prevent extremely low peaks for division purposes in getting relative peak changes
   else:
     return None
 
@@ -141,7 +146,7 @@ def get_rise_completion(df, tac_variable, curve_start_index, relative_peak, curv
   else:
     return 1
 
-def get_rise_rate(rise_duration, relative_peak, rise_duration_minumum = 0.0005, relative_peak_minumum = 0.05):
+def get_rise_rate(rise_duration, relative_peak):
   # if (rise_duration < rise_duration_minumum) or (relative_peak < relative_peak_minumum):
   #   return 0.001
   if rise_duration and (relative_peak != None):
@@ -151,7 +156,7 @@ def get_rise_rate(rise_duration, relative_peak, rise_duration_minumum = 0.0005, 
   else:
     return None
 
-def get_fall_rate(fall_duration, relative_peak, fall_duration_minumum = 0.0005, relative_peak_minumum = 0.05):
+def get_fall_rate(fall_duration, relative_peak):
   # if (fall_duration < fall_duration_minumum) or (relative_peak < relative_peak_minumum):
   #   return 0.001
   if fall_duration and (relative_peak != None):
@@ -164,18 +169,22 @@ def get_fall_rate(fall_duration, relative_peak, fall_duration_minumum = 0.0005, 
 def get_curve_duration(rise_duration, fall_duration):
   return rise_duration + fall_duration
 
-def get_curve_auc(df, variable, curve_begins_index, curve_ends_index, curve_threshold):
-  if curve_begins_index == curve_ends_index:
-    curve_ends_index += 1
-  if len(df):
-    df_curve_only = df.loc[curve_begins_index:curve_ends_index]
-    tac_cropped = df_curve_only[variable]
-    tac_cropped = tac_cropped.astype(float)
-    tac_cropped = np.clip(tac_cropped, curve_threshold, None)
-    curve_auc = np.trapz(tac_cropped, dx = 0.1)
-    return curve_auc
-  else:
-    return None
+def get_curve_auc(df, variable, curve_threshold):
+    """ computes area between curve and curve threshold, and does not include negative values """
+    if len(df) == 0:
+      return None
+
+    try:
+      tac = df[variable].dropna().astype(float)
+      if len(tac) == 0:
+          return None
+      relative_tac = np.maximum(tac - curve_threshold, 0)  # Ensure values below threshold become 0
+      relative_tac = np.clip(relative_tac, 0, None)
+      relative_auc = np.trapz(relative_tac, dx=0.1)
+      return relative_auc
+    except Exception as e:
+      print(f"Error calculating relative AUC: {e}")
+      return None
   
 def get_curve_auc_per_hour(curve_auc, curve_duration):
   if curve_auc and curve_duration:
@@ -271,3 +280,74 @@ def get_r2(df, truth, test):
   else:
     return None
   
+def count_complete_curves(df, tac_variable, threshold=10, min_length=5):
+  """
+  Counts occurrences where the values in a DataFrame column exceed a threshold
+  for a minimum number of consecutive rows and then drop back below that threshold.
+
+  Parameters:
+  - df (pd.DataFrame): The DataFrame containing the data.
+  - tac_variable (str): The column name in which to detect threshold crossings.
+  - threshold (float): The threshold value to detect crossings. Default is 10.
+  - min_duration (int): The minimum number of consecutive rows required to count a curve.
+
+  Returns:
+  - int: The number of occurrences where values rise above the threshold for
+          at least `min_duration` rows and then fall below it.
+  """
+  data = df[tac_variable]
+  
+  above_threshold = False
+  crossing_count = 0
+  duration = 0  # Track how many consecutive rows are above the threshold
+  
+  for value in data:
+    if value > threshold:
+      if not above_threshold:
+        above_threshold = True  # Start of a new potential curve
+        duration = 1  # Reset duration counter
+      else:
+        duration += 1  # Continue counting rows above the threshold
+    elif above_threshold:  # value <= threshold and currently above
+      if duration >= min_length:
+        crossing_count += 1  # Only count if the curve lasted long enough
+      above_threshold = False  # Reset for the next potential curve
+      duration = 0  # Reset duration counter
+
+  return crossing_count
+
+def count_started_curves(df, tac_variable, threshold=10, min_length=5):
+  """
+  Counts occurrences where the values in a DataFrame column exceed a threshold
+  for a minimum number of consecutive rows, then drop back below that threshold.
+
+  Parameters:
+  - df (pd.DataFrame): The DataFrame containing the data.
+  - tac_variable (str): The column name in which to detect threshold crossings.
+  - threshold (float): The threshold value to detect crossings. Default is 10.
+  - min_duration (int): The minimum number of consecutive rows required to count a curve.
+
+  Returns:
+  - int: The number of occurrences where values rise above the threshold for
+          at least `min_duration` rows and then fall below it.
+  """
+  data = df[tac_variable]
+  
+  above_threshold = False
+  crossing_count = 0
+  duration = 0  # Track how many consecutive rows are above the threshold
+  
+  for value in data:
+    if value > threshold:
+      if not above_threshold:
+        above_threshold = True  # Start of a new potential curve
+        duration = 1  # Reset duration counter
+      else:
+        duration += 1  # Continue counting rows above the threshold
+    elif above_threshold:  # value <= threshold and currently above
+      if duration >= min_length:
+        crossing_count += 1  # Only count if the curve lasted long enough
+      above_threshold = False  # Reset for the next potential curve
+      duration = 0  # Reset duration counter
+
+  return crossing_count

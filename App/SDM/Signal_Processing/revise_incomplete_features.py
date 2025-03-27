@@ -1,5 +1,5 @@
 import numpy as np
-from SDM.Configuration.file_management import *
+from App.SDM.Configuration.file_management import *
 
 def revise_fall_features(occasion, fall_revision_threshold=0.5):
   if occasion.stats['fall_completion'] < fall_revision_threshold:

@@ -1,23 +1,26 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from SDM.Configuration.configuration import get_closest_index_with_timestamp
+from App.SDM.Configuration.configuration import get_closest_index_after_timestamp, get_closest_index_with_timestamp
 
-def plot_event_lines(data, ax, event_timestamp, x_variable, timestamp_column='datetime', font_size=18):
-  text_adjustment = 0
+def plot_event_lines(data, ax, event_timestamp, x_variable, timestamp_column='datetime', font_size=14, text_adjustment=0.08, y_start = 0.95):
+  text_start = 0
   for event, timestamp in event_timestamp.items():
-    if pd.notna(timestamp):
-      idx = get_closest_index_with_timestamp(data, timestamp, timestamp_column)
-      ax.vlines(data.loc[idx, x_variable], 0, ax.get_ylim()[1], linestyles="dashed")
-      plt.text(data.loc[idx, x_variable], ax.get_ylim()[1] * (0.95 - text_adjustment), event, fontsize = font_size, fontstyle = "italic")
-      text_adjustment += 0.08
+    if pd.notna(timestamp) and timestamp != None:
+      idx = get_closest_index_after_timestamp(data, timestamp, timestamp_column)
+      # idx = get_closest_index_with_timestamp(data, timestamp, timestamp_column)
+      ax.vlines(data.loc[idx, x_variable], 0, ax.get_ylim()[1] * (y_start), linestyles="dashed")
+      plt.text(data.loc[idx, x_variable], ax.get_ylim()[1] * (y_start) * (0.95 - text_start), event, fontsize = font_size, fontstyle = "italic")
+      text_start += text_adjustment
 
-def split_x_y_from_temp_cutoff(df, temp_variable, y_variable, time_variable, cutoff=27):
-  invalid_x = df[df[temp_variable]<cutoff][time_variable]
-  invalid_y = df.loc[df[temp_variable]<cutoff, y_variable].tolist()
-  valid_x = df[df[temp_variable]>=cutoff][time_variable]
-  valid_y = df.loc[df[temp_variable]>=cutoff, y_variable].tolist()
-
-  return valid_x, valid_y, invalid_x, invalid_y
+def plot_event_lines_with_fixed_text_height(data, ax, event_timestamp, x_variable, timestamp_column='datetime', font_size=18, y_starts = []):
+  start_y_index = 0
+  for event, timestamp in event_timestamp.items():
+    if pd.notna(timestamp) and timestamp != None:
+      idx = get_closest_index_after_timestamp(data, timestamp, timestamp_column)
+      # idx = get_closest_index_with_timestamp(data, timestamp, timestamp_column)
+      ax.vlines(data.loc[idx, x_variable], 0, ax.get_ylim()[1] * y_starts[start_y_index], linestyles="dashed")
+      plt.text(data.loc[idx, x_variable], ax.get_ylim()[1] * y_starts[start_y_index] * (0.95), event, fontsize = font_size, fontstyle = "italic")
+      start_y_index += 1
 
 def split_x_y_from_predictions(df, prediction_column, y_variable, time_variable):
   #must be binary predictions
