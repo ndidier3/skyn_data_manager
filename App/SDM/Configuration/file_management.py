@@ -96,7 +96,6 @@ def create_save_directories(project_root, processed_data_out, output_folder_name
     os.makedirs(processed_data_out, exist_ok=True)
   if not os.path.exists(f'{project_root}/Results/{output_folder_name}'):
     os.mkdir(f'{project_root}/Results/{output_folder_name}')
-    print('results path exists: ', os.path.exists(f'{project_root}/Results/{output_folder_name}'))
   if not os.path.exists(f'{project_root}/Results/{output_folder_name}/{date.today().strftime("%m.%d.%Y")}'):
     os.mkdir(f'{project_root}/Results/{output_folder_name}/{date.today().strftime("%m.%d.%Y")}')
   if not os.path.exists(data_out):
@@ -105,6 +104,8 @@ def create_save_directories(project_root, processed_data_out, output_folder_name
     os.mkdir(graphs_out)
   if not os.path.exists(analyses_out):
     os.mkdir(analyses_out)
+  if not os.path.exists(f'{project_root}/Results/Error_Logs'):
+    os.mkdir(f'{project_root}/Results/Error_Logs')
 
 def create_individual_plot_folder(graphs_out, subid):
   # Create subid plot folder within the plot folder

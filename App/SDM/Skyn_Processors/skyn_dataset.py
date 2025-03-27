@@ -188,8 +188,9 @@ class skynDataset:
         rows.append(curve.row)
         curve_id += 1
 
-      self.curve_features = pd.DataFrame(rows, columns=curve.features.columns)
-      self.curve_features['unadjusted_threshold'] = unadjusted_curve_threshold
+      if len(self.curves) > 0:
+        self.curve_features = pd.DataFrame(rows, columns=curve.features.columns)
+        self.curve_features['unadjusted_threshold'] = unadjusted_curve_threshold
       # self.curve_features = identify_overlapping_curves(self.curve_features)
       self.curve_features.to_excel(f'{self.data_out_folder}/curve_features_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
       
@@ -289,8 +290,9 @@ class skynDataset:
       curve.create_graphs(self.plot_folder)
       rows.append(curve.row)
     
-    updated_curve_features = pd.DataFrame(rows, columns=curve.features.columns)
-    self.curve_features.update(updated_curve_features[[col for col in updated_curve_features.columns if '_plot' in col]])
+    if len(self.curves) > 0:
+      updated_curve_features = pd.DataFrame(rows, columns=curve.features.columns)
+      self.curve_features.update(updated_curve_features[[col for col in updated_curve_features.columns if '_plot' in col]])
     
     if export_excel:
       self.curve_features.to_excel(f'{self.data_out_folder}/curve_features_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
