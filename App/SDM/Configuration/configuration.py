@@ -285,22 +285,33 @@ def get_closest_index_with_timestamp(data, timestamp, datetime_column='datetime'
     print(f"An error occurred: {e}")
     return None
 
-def determine_initial_validity(self, allow_multiple_devices = False):
 
-    if self.valid_occasion:
-      self.valid_occasion = 1 if self.metadata_index != None else 0
-      self.invalid_reason = 'Not in metadata' if self.valid_occasion == 0 else None
+def get_closest_index_after_timestamp(data, timestamp, datetime_column='datetime', time_diff_limit_hours=None):
+  try:
+    # Filter rows where the datetime is after or equal to the given timestamp
+    filtered_data = data[data[datetime_column] >= timestamp]
 
-    if self.valid_occasion:
-      self.valid_occasion = 1 if load_metadata(self, 'Use_Data') == 'Y' else 0
-      self.invalid_reason = f'Excluded within Metadata [Use_Data = N]. Note: {self.metadata_note}' if self.valid_occasion == 0 else None
-    
-    if self.valid_occasion and not allow_multiple_devices:
-      self.valid_occasion = 0 if self.disabled_by_multiple_device_ids else 1
-      self.invalid_reason = 'multiple devices detected within dataset' if self.valid_occasion == 0 else None
-    
-    return self.valid_occasion, self.invalid_reason
+    # If no rows match, return None
+    if filtered_data.empty:
+      print(f"No rows found after or at timestamp: {timestamp}")
+      return data.index[-1]
 
+    # Calculate the absolute time difference
+    time_diff = (filtered_data[datetime_column] - timestamp).abs()
+    closest_index = time_diff.idxmin()
+
+    # Check if the closest time difference exceeds the limit
+    if time_diff_limit_hours is not None and time_diff.loc[closest_index] > pd.Timedelta(hours=time_diff_limit_hours):
+      print(f"No close match found for timestamp: {timestamp} within the time limit")
+      return None
+
+    return closest_index
+  
+  except Exception as e:
+    print(f"Error in get_closest_index_after_timestamp: {e}")
+    return 
+
+#RETIRED
 def determine_post_cleaning_validity(self):
 
     device_off_or_removed = (self.dataset['gap_imputed'] == 1) | (self.dataset['TAC_device_off_imputed'] == 1)

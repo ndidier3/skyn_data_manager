@@ -26,8 +26,8 @@ def get_event_level_indices(
   for i, row in event_data.iterrows():
     if row[drink_start_column]:
       # Calculate start and end indices
-      start_index = get_closest_index_with_timestamp(dataset, row[drink_start_column] - timedelta(hours=pad_hours_before), time_diff_limit_hours=24)
-      end_index = get_closest_index_with_timestamp(dataset, row[drink_start_column] + timedelta(hours=pad_hours_after), time_diff_limit_hours=24)
+      start_index = get_closest_index_with_timestamp(dataset, row[drink_start_column] - timedelta(hours=pad_hours_before), time_diff_limit_hours=12)
+      end_index = get_closest_index_with_timestamp(dataset, row[drink_start_column] + timedelta(hours=pad_hours_after), time_diff_limit_hours=12)
       
       if start_index is not None and end_index is not None:
         new_entry = [start_index, end_index, row[drink_total_column], row[day_id_column]]
@@ -63,35 +63,3 @@ def create_event_level_dataframe(subid, dataset_identifier, events):
     all_events_features.append(combined_features)
 
   return pd.DataFrame(all_events_features)
-
-def identify_overlapping_curves(event_level_data):
-  event_level_data['begin_matches_prior_CURVE'] = (
-    (event_level_data['begin_CURVE'] == event_level_data['begin_CURVE'].shift()) & 
-    (event_level_data['subid'] == event_level_data['subid'].shift())
-  ).astype(int)
-
-  event_level_data['end_matches_prior_CURVE'] = (
-    (event_level_data['end_CURVE'] == event_level_data['end_CURVE'].shift()) & 
-    (event_level_data['subid'] == event_level_data['subid'].shift())
-  ).astype(int)
-
-  event_level_data['overlaps_with_prior_CURVE'] = 0
-
-  for i in range(1, len(event_level_data)):
-    previous_row = event_level_data.iloc[i - 1]
-    current_row = event_level_data.iloc[i]
-
-    if (
-      current_row["begin_CURVE"] and previous_row["end_CURVE"] 
-      and current_row["end_CURVE"] and previous_row["begin_CURVE"]
-      ):
-
-      if (
-        current_row["subid"] == previous_row["subid"]
-        and current_row["begin_CURVE"] < previous_row["end_CURVE"]
-        and current_row["end_CURVE"] > previous_row["begin_CURVE"]
-      ):
-        
-        event_level_data.loc[i, "overlaps_with_prior_CURVE"] = 1
-  
-  return event_level_data

@@ -4,12 +4,31 @@ from datetime import date
 import xlsxwriter
 import os
 
+def export_to_computer(object, filepath):
+  out = open(filepath, "wb")
+  pickle.dump(object, out)
+  out.close()
+  print('successful export: ', filepath)
+  
+def import_from_computer(filename):
+  pickle_in = open(filename, "rb") 
+  object = pickle.load(pickle_in)
+  pickle_in.close()
+  return object
+
+def import_model(name='RF_non_wear_CSDP'):
+  pickle_in = open(f'App/SDM/Trained_Models/{name}.sdma', "rb")
+  model = pickle.load(pickle_in)
+  pickle_in.close()
+  return model
+
 def save_to_computer(object, filename, folder, extension='sdm'):
 
   out = open(f'{folder}/{filename}.{extension}', "wb")
   pickle.dump(object, out)
   out.close()
   print(f'SAVE SUCCESSFUL: {folder}/{filename}.{extension}')
+
 
 def load(name, folder):
   try:
@@ -33,19 +52,15 @@ def load_default_model(name='Alc_vs_Non', type='RF'):
         pickle_in = open(f'App/SDM/Trained_Models/MARS2C4{type}_Binge.{extension}', "rb")
       if name=='worn_vs_removed':
         pickle_in = open(f'App/SDM/Trained_Models/worn_vs_removed_{type}.{extension}', "rb")
-        type='LinReg'
+        # type='LinReg'
       if name == 'fall_duration':
         pickle_in = open(f'App/SDM/Trained_Models/fall_duration_CLN_LinearReg.{extension}', "rb")
-        type='LinReg'
       if name == 'fall_rate':
         pickle_in = open(f'App/SDM/Trained_Models/fall_rate_CLN_LinearReg.{extension}', "rb")
-        type='LinReg'
       if name == 'rise_duration':
         pickle_in = open(f'App/SDM/Trained_Models/rise_duration_CLN_LinearReg.{extension}', "rb")
-        type='LinReg'
       if name == 'rise_rate':
         pickle_in = open(f'App/SDM/Trained_Models/rise_rate_CLN_LinearReg.{extension}', "rb")
-        type='LinReg'
     except:
       pass
 
@@ -53,6 +68,8 @@ def load_default_model(name='Alc_vs_Non', type='RF'):
   pickle_in.close()
 
   return object
+
+
 
 def get_model_summary_sheet_name(model_name, data_version):
   model_name_new = model_name.split('_')[0][0].upper() + model_name.split('_')[0][1:] + ' ' + model_name.split('_')[1][0].upper() + model_name.split('_')[1][1:]
@@ -76,7 +93,7 @@ def merge_using_subid(sdm_results, merge_variables):
 
 def create_save_directories(project_root, processed_data_out, output_folder_name, data_out, graphs_out, analyses_out):
   if not os.path.exists(processed_data_out):
-    os.mkdir(processed_data_out)
+    os.makedirs(processed_data_out, exist_ok=True)
   if not os.path.exists(f'{project_root}/Results/{output_folder_name}'):
     os.mkdir(f'{project_root}/Results/{output_folder_name}')
     print('results path exists: ', os.path.exists(f'{project_root}/Results/{output_folder_name}'))

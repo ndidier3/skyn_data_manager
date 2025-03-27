@@ -1,4 +1,4 @@
-from App.SDM.Skyn_Processors.retired_skyn_cohort import skynCohort
+from App.Archive.retired_skyn_cohort import skynCohort
 from App.SDM.Skyn_Processors.skyn_dataset import skynDataset
 from SDM.User_Interface.Utils.filename_tools import *
 from SDM.User_Interface.Utils.filename_tools import extract_subid

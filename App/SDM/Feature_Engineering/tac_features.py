@@ -169,18 +169,22 @@ def get_fall_rate(fall_duration, relative_peak):
 def get_curve_duration(rise_duration, fall_duration):
   return rise_duration + fall_duration
 
-def get_curve_auc(df, variable, curve_begins_index, curve_ends_index, curve_threshold):
-  if curve_begins_index == curve_ends_index:
-    curve_ends_index += 1
-  if len(df):
-    df_curve_only = df.loc[curve_begins_index:curve_ends_index]
-    tac_cropped = df_curve_only[variable]
-    tac_cropped = tac_cropped.astype(float)
-    tac_cropped = np.clip(tac_cropped, curve_threshold, None)
-    curve_auc = np.trapz(tac_cropped, dx = 0.1)
-    return curve_auc
-  else:
-    return None
+def get_curve_auc(df, variable, curve_threshold):
+    """ computes area between curve and curve threshold, and does not include negative values """
+    if len(df) == 0:
+      return None
+
+    try:
+      tac = df[variable].dropna().astype(float)
+      if len(tac) == 0:
+          return None
+      relative_tac = np.maximum(tac - curve_threshold, 0)  # Ensure values below threshold become 0
+      relative_tac = np.clip(relative_tac, 0, None)
+      relative_auc = np.trapz(relative_tac, dx=0.1)
+      return relative_auc
+    except Exception as e:
+      print(f"Error calculating relative AUC: {e}")
+      return None
   
 def get_curve_auc_per_hour(curve_auc, curve_duration):
   if curve_auc and curve_duration:
@@ -276,13 +280,6 @@ def get_r2(df, truth, test):
   else:
     return None
   
-def get_consecutive_extreme_values(df, tac_variable='TAC'):
-  return df[
-    (df[tac_variable].shift()==df[tac_variable]) &
-    (df[tac_variable] == df[tac_variable].max()) &
-    (df[tac_variable].max() > 300)
-  ].shape[0]
-
 def count_complete_curves(df, tac_variable, threshold=10, min_length=5):
   """
   Counts occurrences where the values in a DataFrame column exceed a threshold

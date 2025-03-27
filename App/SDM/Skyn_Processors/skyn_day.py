@@ -9,6 +9,7 @@ class skynDay:
     self.device_one = self.device_ids[0]
     self.device_two = self.device_ids[1] if len(self.device_ids) > 1 else None
     self.device_count = len(self.device_ids)
+    self.firmware = self.day_dataset['Firmware Version'].iloc[0]
 
     self.device_turned_on_duration = self.day_dataset['device_turned_on'].sum() / 60
     self.device_turned_on_percentage_of_day = self.device_turned_on_duration / 24
@@ -45,4 +46,14 @@ class skynDay:
         self.DISAGREE_self_report_vs_cutoff_duration = self.day_dataset['DISAGREE_self_report_vs_cutoff'].sum() / 60
     
     self.negative_duration = self.day_dataset['negative_tac'].sum() / 60
-    self.very_negative_duration = self.day_dataset['below_neg10_tac'].sum() / 60           
+    self.sub_negative_10_duration = self.day_dataset['below_neg10_tac'].sum() / 60
+
+    self.temp_mean = self.day_dataset['Temperature_C'].mean()
+    self.temp_sd = self.day_dataset['Temperature_C'].std()
+    self.temp_min = self.day_dataset['Temperature_C'].min()
+    self.temp_max = self.day_dataset['Temperature_C'].max()
+
+    self.motion_mean = self.day_dataset['Motion'].mean()
+    self.motion_sd = self.day_dataset['Motion'].std()
+    self.motion_min = self.day_dataset['Motion'].min()
+    self.motion_max = self.day_dataset['Motion'].max()

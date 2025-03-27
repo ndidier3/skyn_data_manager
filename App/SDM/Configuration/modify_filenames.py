@@ -8,7 +8,9 @@ def standardize_filename(filename, dataset_id, text='', ext=''):
   """ rewrites filename with standard format of <subid>_<dataset-ID>_<optional-text>.<ext>
   uses original extension if not specified"""
   subid = extract_subid(filename)
+  print(dataset_id, '  before')
   dataset_id = stringify_dataset_id(dataset_id)
+  print(dataset_id, '  after stringify')
   if ext == '':
     _, ext = os.path.splitext(filename)
 
@@ -31,6 +33,7 @@ def standardize_filenames_within_folder(folder_path, dataset_id = 1, text=''):
       print(new_filepath)
       os.rename(old_filepath, new_filepath)
 
+# Perhaps Retired
 def modify_filenames(directory_path, insert_index, insert_character):
 
   directory = os.fsencode(directory_path)

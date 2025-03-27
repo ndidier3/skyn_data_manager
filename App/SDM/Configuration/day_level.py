@@ -44,10 +44,19 @@ def get_day_level_indices(df, day_start_hour):
   
   return day_start_end_indices
 
-def create_day_level_dataframe(skyn_days, subid, dataset_identifier):
+def create_day_level_dataframe(skyn_days, subid, dataset_identifier, morning_report = pd.DataFrame()):
   data = pd.DataFrame([{attr: value for attr, value in day.__dict__.items() if attr != 'day_dataset'} for day in skyn_days])
   data['SubID'] = subid
   data['Dataset_ID'] = dataset_identifier
   data['DayNo'] = [i+1 for i in range(0, len(data))]
   data = data[['SubID', 'Dataset_ID', 'DayNo'] + [col for col in data.columns if col not in ['SubID', 'Dataset_ID', 'DayNo']]]
+  data['date'] = data['begin_day'].dt.date
+  if len(morning_report):
+    morning_report = morning_report[morning_report['ID']==subid]
+    morning_report['date'] = morning_report['SURVEYDATE'].dt.date
+    data = data.merge(
+      morning_report[[col for col in morning_report.columns if col not in ['ID', 'NotificationStatus', 'Survey', 'User']]],
+      on='date', how='left'
+    )
+
   return data

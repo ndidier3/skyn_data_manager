@@ -1,12 +1,14 @@
 from matplotlib import ticker
 from scipy.signal import savgol_filter
 import pandas as pd
-import numpy as np
-from scipy import interpolate
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
 
+def smooth_savgol(df, window_length = 71, polyorder = 3, tac_variable = 'TAC'):
+    non_null_mask = df[tac_variable].notnull()
+    smoothed = savgol_filter(df.loc[non_null_mask, tac_variable], window_length=window_length, polyorder=polyorder, mode='mirror')
+    df.loc[non_null_mask, tac_variable] = smoothed
+    return df
 
+#RETIRED
 def smooth_signals(df_prior, window_length, polyorder, variables):
   df = df_prior.copy()
   smoothed_tac_variables = {}

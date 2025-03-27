@@ -28,3 +28,7 @@ sdm_single_file.spec
 batch_out/
 *.sh
 Inputs/Skyn_Data_PROCESSED/*
+App/SDM/Scripts/ACE
+App/SDM/Scripts/ARC
+App/SDM/Scripts/CSDP
+App/SDM/Scripts/MARS_Brown

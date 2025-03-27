@@ -6,7 +6,7 @@ signal_quality_features = [
   'device_worn_model', 
   'pred_method', 
   'negative_value', 
-  'very_negative_value'
+  'sub_negative_10_value'
 ]
 
 definitions = [
@@ -32,7 +32,7 @@ signal_quality_aggregate_features = [
   'device_worn_percent_of_device_on',
   'device_worn_percent_of_day',
   'negative_duration',
-  'very_negative_duration'
+  'sub_negative_10_duration'
 ]
 
 definitions = [

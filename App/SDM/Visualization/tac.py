@@ -6,12 +6,12 @@ import matplotlib
 matplotlib.use("Agg")
 import os
 from SDM.Configuration.configuration import normalize_column
-from SDM.Feature_Engineering.get_feature_importances import get_feature_importances
+from App.SDM.Machine_Learning.get_feature_importances import get_feature_importances
 from SDM.Visualization.plotting_utils import *
 import numpy as np
 from sklearn.tree import plot_tree
 
-def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, peak, curve_threshold, curve_begins, curve_ends, title = "TAC Curve", event_timestamps = {}, df_version = 'SEARCH', drink_total = None):
+def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, peak, curve_threshold, title = "TAC Curve", event_timestamps = {}, df_version = 'SEARCH', subtitle_text = ''):
   peak_time = df.loc[df[f'TAC']==peak, 'datetime']
   # graph_cutoff = curve_ends + ((len(df) - curve_ends)*0.25)
   # df = df.loc[:graph_cutoff]
@@ -32,20 +32,19 @@ def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, 
   ax.tick_params(axis='x', labelsize = 18)
   ax.tick_params(axis='y', labelsize = 20)
 
-  ax.set_title(title, fontsize=32, fontweight="semibold", pad=25 if drink_total is not None else 15)
-  if drink_total is not None:
-    ax.text(0.5, 1.05, f"Drink Total: {drink_total}", fontsize=14, ha='center', va='top', transform=ax.transAxes)
+  ax.set_title(title, fontsize=32, fontweight="semibold", pad=25)
+  ax.text(0.5, 1.025, subtitle_text, fontsize=12, style='italic',
+    ha='center', va='center', transform=ax.transAxes)
+  # if drink_total is not None:
+  #   ax.text(0.5, 1.05, f"Drink Total: {drink_total}", fontsize=14, ha='center', va='top', transform=ax.transAxes)
 
   ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
   ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
   if ax.get_ylim()[1] < 10:
-    ax.set_ylim(0, 10)
+    ax.set_ylim(-10, 20)
 
-  if (curve_begins is not None) and (curve_ends is not None):
-    curve_timepoints = df.loc[[i for i in range(curve_begins, curve_ends)], 'datetime']
-    curve_tac_values = df.loc[[i for i in range(curve_begins, curve_ends)], 'TAC']
-    plt.fill_between(curve_timepoints, curve_tac_values, [curve_threshold for i in range(curve_begins, curve_ends)], color='lightgray')
+  if event_timestamps and all(value is not None for value in event_timestamps.values()):
     plot_event_lines(df, ax, event_timestamps, 'datetime', 'datetime')
 
   path = f'{plot_path}{subid}_{dataset_identifier}_{event_number}_TAC_curve_{df_version}.png'
@@ -54,33 +53,70 @@ def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, 
   plt.close('all')
   return path
 
-def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifier, df_version, curve_threshold, curve_begins, curve_ends, peak, time_variable='datetime', title='Signal Processing', drink_total = 'nan', event_timestamps = {}):
-  # Subset the data
-  # passed = df.loc[(df['imputed'] == 0) & (df['device_worn_model'] == 1)]
-  # imputed = df.loc[df['imputed'] == 1]
-  # non_wear = df.loc[(df['imputed'] == 0) & (df['device_worn_model'] == 0)]
-
-  passed = df.loc[(df['device_worn_model'] == 1)]
-  # imputed = df.loc[df['imputed'] == 1]
-  non_wear = df.loc[(df['device_worn_model'] == 0)]
+def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifier, df_version, 
+                           curve_threshold, time_variable='datetime', title='Signal Processing', 
+                           event_timestamps={}, subtitle_text=''):
+  
+  passed = df.loc[
+    (df['device_worn_model'] == 1) & 
+    (df['gap_buffered']==0) & 
+    (df['non_wear_buffered']==0) & 
+    (df['jump']==0) & 
+    (df['plummet']==0) &
+    (df['imputed']==0)
+  ]
+  gap = df.loc[df['gap_buffered'] == 1]
+  gap_imputed = df.loc[df['gap_imputed'] == 1]
+  non_wear = df.loc[(df['non_wear_buffered'] == 1)]
+  non_wear_imputed = df.loc[(df['non_wear_imputed'] == 1)]
+  jumps = df.loc[(df['jump'] == 1) & (df['non_wear_buffered'] == 0)]
+  jump_imputed= df.loc[df['jump_imputed'] == 1]
+  plummet = df.loc[(df['plummet'] == 1) & (df['jump'] == 0) & (df['non_wear_buffered'] == 0)]
+  plummet_imputed = df.loc[df['plummet_imputed'] == 1]
 
   # Create a figure and axis
-  fig, ax = plt.subplots(figsize=(12, 6))
+  fig, ax = plt.subplots(figsize=(16, 7))
   
-  # Plot each subset with different markers and colors
-  ax.scatter(passed[time_variable], passed['TAC'], label='Passed (Device Worn)', 
-              color='green', marker='o', alpha=0.7)
-  # ax.scatter(imputed[time_variable], imputed['TAC'], label='Imputed', 
-  #             color='blue', marker='x', alpha=0.7)
-  ax.scatter(non_wear[time_variable], non_wear['TAC'], label='Non-Wear', 
-              color='red', marker='s', alpha=0.7)
+  #Smoothed Final TAC
+  ax.plot(df[time_variable], df['TAC'], label="TAC (Processed)", alpha=0.5, color="black", linewidth = 2.5)
   
-  peak_time = df.loc[df[f'TAC']==peak, 'datetime']
-  ax.vlines(peak_time, ymin=curve_threshold, ymax=peak, color='black', linestyle='--')
-  ax.hlines(curve_threshold, xmin=df['datetime'].min(), xmax=df['datetime'].max(), colors='black', linestyle='--')
+  #Passed (high quality values)
+  ax.scatter(passed[time_variable], passed['TAC_pre_imputation'], label='Passed', 
+             color='darkblue', marker='.', alpha=1.0)
+  #Non Wear
+  if not non_wear.empty:
+    ax.scatter(non_wear[time_variable], non_wear['TAC_pre_imputation'], label='Non-Wear', 
+             color='lightpink', marker='x', alpha=0.7, s=12)
+  #Jumps
+  if not jumps.empty:
+    ax.scatter(jumps[time_variable], jumps['TAC_pre_imputation'], label='Jump', 
+              color='lightblue', marker='^', alpha=0.7, s=12)
+  #Plummet
+  if not plummet.empty:
+    ax.scatter(plummet[time_variable], plummet['TAC_pre_imputation'], label='Plummet', 
+              color='thistle', marker='v', alpha=0.7, s=12)
+    
+  #Imputations (for gaps, non wear, jumps, plumments)
+  if not gap_imputed.empty:
+    ax.scatter(gap_imputed[time_variable], gap_imputed['TAC_pre_smoothed'], label='Imputed Gap', 
+              marker='o', alpha=1.0, facecolor='gray', edgecolors="black")
+  if not non_wear_imputed.empty:
+    ax.scatter(non_wear_imputed[time_variable], non_wear_imputed['TAC_pre_smoothed'], 
+               label='Imputed Non-Wear', facecolor='lightpink', edgecolors= "darkred", marker='o', alpha=1.0)
+  if not jump_imputed.empty:
+    ax.scatter(jump_imputed[time_variable], jump_imputed['TAC_pre_smoothed'], 
+              label='Imputed Jump', facecolor='lightblue', edgecolors= "darkblue", marker='o', alpha=1.0)
+  if not plummet_imputed.empty:
+    ax.scatter(plummet_imputed[time_variable], plummet_imputed['TAC_pre_smoothed'], 
+               label='Imputed Plummet', facecolor='thistle', edgecolors= "purple", marker='o', alpha=1.0)
   
-  if (curve_begins is not None) and (curve_ends is not None) and event_timestamps and all(value is not None for value in event_timestamps.values()):
-    plot_event_lines(df, ax, event_timestamps, 'datetime', 'datetime')
+  # Plot threshold line
+  ax.hlines(curve_threshold, xmin=df['datetime'].min(), xmax=df['datetime'].max(), 
+            colors='black', linestyle='--', label="Curve Threshold")
+
+  # Plot event timestamps if available
+  if event_timestamps and all(value is not None for value in event_timestamps.values()):
+    plot_event_lines(df, ax, event_timestamps, 'datetime', 'datetime', font_size=10)
 
   # Format the x-axis for time
   ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
@@ -89,17 +125,22 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
   # Add labels, title, and legend
   ax.set_xlabel('Time')
   ax.set_ylabel('TAC')
-  ax.set_title(title, fontsize=32, fontweight="semibold", pad=25 if drink_total is not None else 15)
+  ax.set_title(title, fontsize=18, fontweight="semibold", pad=25)
   plt.xticks(rotation=45)
-  ax.legend()
+  ax.legend(loc='upper right', bbox_to_anchor=(1.1, 1.1), ncol=2, 
+           frameon=True, framealpha=1, edgecolor='black', facecolor='white')
 
-  if drink_total is not None:
-    ax.text(0.5, 1.05, f"Drink Total: {drink_total}", fontsize=14, ha='center', va='top', transform=ax.transAxes)
+  # Add subtitle
+  ax.text(0.5, 1.025, subtitle_text, fontsize=10, style='italic',
+          ha='center', va='center', transform=ax.transAxes)
   
+  # Save the figure
   path = f'{plot_path}{subid}_{dataset_identifier}_{event_number}_TAC_processing_{df_version}.png'
   plt.tight_layout()
   plt.savefig(path, bbox_inches='tight')
   plt.close('all')
+  
+  return path
 
 def plot_tac_and_temp(df, plot_folder, subid, dataset_identifier, event_number, tac_variable, temp_variable, time_variable, plot_title = "TAC and Temperature", event_timestamps = {}, df_version = 'SEARCH', drink_total = None):
   fig, ax1 = plt.subplots(figsize=(16, 7))
@@ -353,10 +394,10 @@ def create_temp_histogram(self):
 
 def create_simple_histogram_of_feature(feature, save_folder, feature_name):
   # feature_names = [
-  #         'ending_non_wear_perc_CURVE', 'consecutive_extreme_values_SEARCH', 'consecutive_extreme_values_CURVE',
+  #         'ending_non_wear_perc_CURVE', 'flatline_max_SEARCH', 'flatline_max_CURVE',
   #         'device_turned_on_percent_CURVE', 'device_turned_on_duration_CURVE', 'device_turned_on_percent_CURVE', 
   #         'device_worn_duration_CURVE', 'device_worn_percent_CURVE', 'device_worn_percent_of_device_on_CURVE',
-  #         'negative_duration_CURVE', 'very_negative_duration_CURVE', 'duration_CURVE', 'first_tac_CURVE', 'last_tac_CURVE',
+  #         'negative_duration_CURVE', 'sub_negative_10_duration_CURVE', 'duration_CURVE', 'first_tac_CURVE', 'last_tac_CURVE',
   #         'mean_tac_CURVE', 'peak_CURVE', 'auc_total_CURVE', 'rise_duration_CURVE', 'fall_duration_CURVE', 'rise_rate_CURVE', 
   #         'fall_rate_CURVE', 'fall_complete_perc_CURVE', ''
   #       ]

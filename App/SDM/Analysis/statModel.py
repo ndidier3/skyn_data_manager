@@ -1,4 +1,5 @@
 import pandas as pd
+import scipy.stats as stats
 
 class statModel:
   def __init__(self, event_features):
@@ -60,7 +61,7 @@ class statModel:
     return result
 
   def groupby_continuous_stats(self, categorical_column, continuous_column):
-    result = self.temp_data.groupby(categorical_column)[continuous_column].agg(['mean', 'std', 'sem'])
+    result = self.temp_data.groupby(categorical_column)[continuous_column].agg(['mean', 'std', 'sem', 'sum', 'min', 'max', 'median'])
     result.columns.name = categorical_column
     return result
   
@@ -68,3 +69,72 @@ class statModel:
     unique_counts = self.temp_data.groupby(column)[subid_column].nunique().to_frame(name=f'N_subjects_by_{column}')
     unique_counts.columns.name = column
     return unique_counts
+  
+  def multi_groupby_counts(self, column, groubpy_columns=['SubID','Dataset_Identifier']):
+    counts = self.temp_data.groupby(groubpy_columns)[column].value_counts()
+    counts = counts.reset_index(name=f'{column}_counts')
+    return counts
+
+  def multi_groubpy_row_counts(self, groubpy_columns=['SubID','Dataset_Identifier']):
+    row_counts = self.temp_data.groupby(groubpy_columns).size()
+    row_counts = row_counts.reset_index(name='row_count')
+    return row_counts
+
+  def multi_groupby_continuous_stats(self, continuous_column, groubpy_columns=['SubID','Dataset_Identifier']):
+    result = self.temp_data.groupby(groubpy_columns)[continuous_column].agg(['mean', 'std', 'sem', 'sum', 'min', 'max', 'median'])
+    result.columns.name = '_'.join(groubpy_columns)
+    return result
+
+  def continuous_stats(self, continuous_column):
+    stats = self.temp_data[continuous_column].agg(['mean', 'std', 'sem', 'min', 'max', 'sum', 'count', 'median'])
+    stats_df = stats.reset_index(name=continuous_column)
+    stats_df.columns = ['Statistic', continuous_column]
+    return stats_df
+
+  def continuous_stats_for_columns(self, column_list):
+    all_stats = []
+    for column in column_list:
+      stats_df = self.continuous_stats(column)
+      stats_df = stats_df.set_index('Statistic')  # Set Statistic as the index
+      stats_df.columns = [column]  # Rename the column with the specific column name
+      all_stats.append(stats_df)
+    
+    combined_stats_df = pd.concat(all_stats, axis=1)
+    return combined_stats_df
+
+  def get_pearson_correlation(self, col1, col2):
+
+    self.temp_data[col1] = pd.to_numeric(self.temp_data[col1], errors='coerce')
+    self.temp_data[col2] = pd.to_numeric(self.temp_data[col2], errors='coerce')
+
+    nan_count_col1 = self.temp_data[col1].isna().sum()
+    nan_count_col2 = self.temp_data[col2].isna().sum()
+
+    filtered_data = self.temp_data.dropna(subset=[col1, col2])
+
+    col1_data = filtered_data[col1].tolist()
+    col2_data = filtered_data[col2].tolist()
+    count = len(col2_data)
+
+    correlation, p_value = stats.pearsonr(col1_data, col2_data)
+    self.reset_data()
+
+    return correlation, p_value, count, nan_count_col1, nan_count_col2
+
+  def get_pearson_correlations(self, repeated_col, column_list):
+    r_results = []
+    for col in column_list:
+      correlation, p_value, count, nan_count1, nan_count2 = self.get_pearson_correlation(repeated_col, col)
+      r_results.append({
+        "Column": col,
+        "Repeated_Column": repeated_col,
+        "Correlation": correlation,
+        "P_Value": p_value,
+        "Count": count,
+        f"Null Count in {repeated_col}": nan_count1,
+        f"Null Count in Assessed Column": nan_count2,
+      })
+    
+    result_df = pd.DataFrame(r_results)
+    result_df.set_index('Column', inplace=True)
+    return result_df

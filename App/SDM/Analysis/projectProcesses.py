@@ -11,7 +11,7 @@ def run_ace_processes():
   event_features = pd.read_excel('Results/ACE/11.20.2024/event_level_quality_metrics.xlsx')
   event_features = event_features[event_features['data_found_CURVE'] == True]
   print(len(event_features))
-  event_features = event_features[event_features['consecutive_extreme_values_CURVE'] <= 50]
+  event_features = event_features[event_features['flatline_max_CURVE'] <= 50]
   print(len(event_features))
   event_features = event_features[event_features['device_worn_percent_CURVE'] >= 0.8]
   print(len(event_features))
