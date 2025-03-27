@@ -2,7 +2,7 @@ from App.SDM.Machine_Learning.model_optimization import *
 from App.SDM.Machine_Learning.cv_folds import * 
 from App.SDM.Machine_Learning.get_feature_importances import get_feature_importances
 from App.SDM.Machine_Learning.metrics import *
-from statsmodels.formula.api import mixedlm  # Add this import for mixed-effects model
+# from statsmodels.formula.api import mixedlm  # Add this import for mixed-effects model
 from sklearn.model_selection import GroupKFold
 import pandas as pd
 import numpy as np
@@ -55,16 +55,17 @@ class Model:
       # Fit model (handling for mixed-effects model)
       if "MixedLM" in self.model_name:
         """ Used when grouping variable is included as predictor to enhance within-person understanding """
-        X_train_with_y = X_train.copy()
-        X_train_with_y[self.outcome] = y_train 
-        formula = f"{self.outcome} ~ {' + '.join(self.predictors)}"
-        self.model = mixedlm(formula, X_train_with_y, groups=X_train_with_y[self.grouping_column])
-        self.current_model = self.model.fit()  # Fit the mixed-effects model
+        print('Not Available')
+        # X_train_with_y = X_train.copy()
+        # X_train_with_y[self.outcome] = y_train 
+        # formula = f"{self.outcome} ~ {' + '.join(self.predictors)}"
+        # self.model = mixedlm(formula, X_train_with_y, groups=X_train_with_y[self.grouping_column])
+        # self.current_model = self.model.fit()  # Fit the mixed-effects model
 
-        X_holdout_with_y = X_holdout.copy()
-        X_holdout_with_y[self.outcome] = y_holdout  # Ensure outcome variable is included for prediction
-        y_pred = self.current_model.predict(X_holdout_with_y)
-        y_prob = []
+        # X_holdout_with_y = X_holdout.copy()
+        # X_holdout_with_y[self.outcome] = y_holdout  # Ensure outcome variable is included for prediction
+        # y_pred = self.current_model.predict(X_holdout_with_y)
+        # y_prob = []
 
       else:
         #currently assumes RF -- may need adjustment later
