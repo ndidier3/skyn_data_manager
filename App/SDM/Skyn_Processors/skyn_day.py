@@ -1,5 +1,5 @@
 class skynDay:
-  def __init__(self, dataset, start_index, end_index, non_wear_self_report_column = '', compare_non_wear_methods = True):
+  def __init__(self, dataset, start_index, end_index, non_wear_self_report_column = '', compare_non_wear_methods = False):
     self.day_dataset = dataset.loc[start_index:end_index]
 
     self.begin_day = self.day_dataset['datetime'].iloc[0] if not self.day_dataset.empty else None
