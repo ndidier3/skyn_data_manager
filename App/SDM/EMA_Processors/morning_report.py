@@ -1,6 +1,6 @@
 import pandas as pd
 import traceback
-from SDM.Visualization.device_non_wear import create_histogram_self_reported_non_wear
+from App.SDM.Visualization.device_non_wear import create_histogram_self_reported_non_wear
 
 def time_difference_in_minutes(t1, t2):
   delta1 = pd.Timestamp.combine(pd.Timestamp(0).date(), t1) - pd.Timestamp(0)

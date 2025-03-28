@@ -1,4 +1,4 @@
-from SDM.Configuration.file_management import load_default_model
+from App.SDM.Configuration.file_management import load_default_model
 from tkinter import *
 from tkinter import filedialog, StringVar, IntVar
 from tkinter.filedialog import askopenfile

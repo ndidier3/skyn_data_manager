@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from SDM.Visualization.plotting_utils import *
+from App.SDM.Visualization.plotting_utils import *
 
 def create_histogram_self_reported_non_wear(day_id_list, non_wear_duration_list, out_path, version):
   plt.bar(day_id_list, non_wear_duration_list)

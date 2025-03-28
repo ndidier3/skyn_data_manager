@@ -1,6 +1,6 @@
 import pandas as pd
-from SDM.Run.process_many import *
-from SDM.Analysis.curveFeatures import curveFeatures
+from App.SDM.Run.process_many import *
+from App.SDM.Analysis.curveFeatures import curveFeatures
 
 user_root = '/users/ndidier'
 project_root = f'{user_root}/SDM/skyn_data_manager' 
