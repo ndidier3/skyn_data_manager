@@ -1,4 +1,4 @@
-from App.SDM.User_Interface.Utils.filename_tools import processor_data_ready
+from SDM.User_Interface.Utils.filename_tools import processor_data_ready
 from tkinter import *
 from tkinter import filedialog, StringVar, IntVar
 from tkinter.filedialog import askopenfile

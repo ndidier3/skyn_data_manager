@@ -1,8 +1,8 @@
-from App.SDM.Feature_Engineering.tac_features import *
-from App.SDM.Feature_Engineering.quality_features import *
-from App.SDM.Visualization.tac import *
-from App.SDM.Visualization.device_non_wear import plot_device_removal
-from App.SDM.Analysis.featureFlagger import featureFlagger
+from SDM.Feature_Engineering.tac_features import *
+from SDM.Feature_Engineering.quality_features import *
+from SDM.Visualization.tac import *
+from SDM.Visualization.device_non_wear import plot_device_removal
+from SDM.Analysis.featureFlagger import featureFlagger
 import pandas as pd
 
 class Curve:

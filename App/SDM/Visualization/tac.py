@@ -5,9 +5,9 @@ import matplotlib.dates as mdates
 import matplotlib
 matplotlib.use("Agg")
 import os
-from App.SDM.Configuration.configuration import normalize_column
-from App.SDM.Machine_Learning.get_feature_importances import get_feature_importances
-from App.SDM.Visualization.plotting_utils import *
+from SDM.Configuration.configuration import normalize_column
+from SDM.Machine_Learning.get_feature_importances import get_feature_importances
+from SDM.Visualization.plotting_utils import *
 import numpy as np
 from sklearn.tree import plot_tree
 

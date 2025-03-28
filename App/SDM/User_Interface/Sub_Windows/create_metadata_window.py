@@ -1,5 +1,5 @@
-from App.SDM.User_Interface.Utils.filename_tools import *
-from App.SDM.User_Interface.Sub_Windows.rename_files_window import RenameFilesWindow
+from SDM.User_Interface.Utils.filename_tools import *
+from SDM.User_Interface.Sub_Windows.rename_files_window import RenameFilesWindow
 from tkinter import *
 from tkinter import filedialog, StringVar, IntVar, Toplevel
 from tkinter.filedialog import askopenfile

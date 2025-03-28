@@ -1,7 +1,7 @@
-from App.SDM.Analysis.statModel import statModel
-from App.SDM.Skyn_Processors.ema_region import emaRegion
-from App.SDM.Configuration.file_management import load, save_to_computer
-from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
+from SDM.Analysis.statModel import statModel
+from SDM.Skyn_Processors.ema_region import emaRegion
+from SDM.Configuration.file_management import load, save_to_computer
+from SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 import os
 import pandas as pd
 

@@ -1,4 +1,4 @@
-from App.SDM.User_Interface.Sub_Windows.select_tab_window import SelectTabWindow
+from SDM.User_Interface.Sub_Windows.select_tab_window import SelectTabWindow
 from tkinter import *
 from tkinter import filedialog, StringVar, IntVar
 from tkinter.filedialog import askopenfile

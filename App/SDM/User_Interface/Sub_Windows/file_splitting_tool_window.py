@@ -6,10 +6,10 @@ from tkinter import ttk
 import pandas as pd
 import os
 import traceback
-from App.SDM.Configuration.configuration import update_column_names
-from App.SDM.Configuration.modify_filenames import generate_random_id
-from App.SDM.Configuration.split_skyn_dataset import *
-from App.SDM.User_Interface.Frames.subid_entries_per_email import SubidEntriesPerEmail
+from SDM.Configuration.configuration import update_column_names
+from SDM.Configuration.modify_filenames import generate_random_id
+from SDM.Configuration.split_skyn_dataset import *
+from SDM.User_Interface.Frames.subid_entries_per_email import SubidEntriesPerEmail
 
 class FileSplittingToolWindow(Toplevel):
   def __init__(self, parent, main_window):

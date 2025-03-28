@@ -1,4 +1,4 @@
-from App.SDM.Machine_Learning.model import Model
+from SDM.Machine_Learning.model import Model
 from sklearn.metrics import mean_absolute_error
 import pandas as pd
 

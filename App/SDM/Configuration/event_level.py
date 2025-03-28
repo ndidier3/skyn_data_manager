@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import timedelta
-from App.SDM.Configuration.configuration import get_closest_index_with_timestamp
+from SDM.Configuration.configuration import get_closest_index_with_timestamp
 
 def get_event_level_indices(
   subid, 

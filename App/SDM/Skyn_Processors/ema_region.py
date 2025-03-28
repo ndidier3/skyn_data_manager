@@ -1,8 +1,8 @@
 import pandas as pd
-from App.SDM.Feature_Engineering.tac_features import *
-from App.SDM.Feature_Engineering.quality_features import *
-from App.SDM.Visualization.tac import *
-from App.SDM.Visualization.device_non_wear import plot_device_removal
+from SDM.Feature_Engineering.tac_features import *
+from SDM.Feature_Engineering.quality_features import *
+from SDM.Visualization.tac import *
+from SDM.Visualization.device_non_wear import plot_device_removal
 
 class emaRegion():
   def __init__(self, df: pd.DataFrame, subid, dataset_identifier, ema_id, self_report_start_time, event_labels, extend_before_hours = 2, extend_after_hours = 4):

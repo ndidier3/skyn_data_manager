@@ -1,5 +1,5 @@
-from App.SDM.User_Interface.Frames.rename_file_row import RenameFileRow
-from App.SDM.User_Interface.Utils.filename_tools import get_used_dataset_identifiers, extract_subid
+from SDM.User_Interface.Frames.rename_file_row import RenameFileRow
+from SDM.User_Interface.Utils.filename_tools import get_used_dataset_identifiers, extract_subid
 from tkinter import *
 from tkinter import StringVar, IntVar
 from tkinter.filedialog import askopenfile
