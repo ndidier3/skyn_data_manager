@@ -1,13 +1,13 @@
 import pandas as pd
 from statistics import mean
 import numpy as np
-from App.SDM.Feature_Engineering.tac_features import *
-from App.SDM.Signal_Processing.impute import impute
+from SDM.Feature_Engineering.tac_features import *
+from SDM.Signal_Processing.impute import impute
 np.seterr(divide = 'ignore')
-from App.SDM.Visualization.tac import *
-from App.SDM.Feature_Engineering.get_tac_clusters import get_tac_clusters
-from App.SDM.Signal_Processing.returns_to_baseline import returns_to_baseline
-from App.SDM.Signal_Processing.tac_slope import tac_slope
+from SDM.Visualization.tac import *
+from SDM.Feature_Engineering.get_tac_clusters import get_tac_clusters
+from SDM.Signal_Processing.returns_to_baseline import returns_to_baseline
+from SDM.Signal_Processing.tac_slope import tac_slope
 
 def replace_extreme_values(df, time_variable, method="cluster"):
   df['TAC_extreme_values_imputed'] = df['TAC'].tolist()

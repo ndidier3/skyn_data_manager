@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from App.SDM.Feature_Engineering.tac_features import *
+from SDM.Feature_Engineering.tac_features import *
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
 import scipy.interpolate

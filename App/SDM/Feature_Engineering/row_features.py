@@ -1,4 +1,4 @@
-from App.SDM.Skyn_Processors.skyn_datapoint import skynDatapoint
+from SDM.Skyn_Processors.skyn_datapoint import skynDatapoint
 import numpy as np
 
 def generate_row_features(skyn_dataset, include_tac = False):

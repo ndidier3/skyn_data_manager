@@ -1,6 +1,6 @@
 from tkinter import *
 from tkinter import StringVar, IntVar
-from App.SDM.User_Interface.Utils.filename_tools import *
+from SDM.User_Interface.Utils.filename_tools import *
 from tkinter import messagebox
 import traceback
 class RenameFileRow(Frame):

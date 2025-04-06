@@ -1,4 +1,4 @@
-from App.SDM.Stats.statModel import statModel
+from SDM.Stats.statModel import statModel
 import pandas as pd
 
 class dayQualityStats():

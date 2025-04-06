@@ -1,7 +1,7 @@
-from App.SDM.Feature_Engineering.tac_features import *
-from App.SDM.Visualization.tac import *
-from App.SDM.Visualization.device_non_wear import plot_device_removal
-from App.SDM.Configuration.configuration import get_closest_index_with_timestamp
+from SDM.Feature_Engineering.tac_features import *
+from SDM.Visualization.tac import *
+from SDM.Visualization.device_non_wear import plot_device_removal
+from SDM.Configuration.configuration import get_closest_index_with_timestamp
 import traceback
 import pandas as pd
 

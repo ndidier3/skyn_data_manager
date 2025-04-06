@@ -1,7 +1,7 @@
-from App.SDM.Skyn_Processors.skyn_dataset import skynDataset
-from App.SDM.User_Interface.Utils.filename_tools import extract_dataset_identifier, extract_subid
-from App.SDM.Configuration.file_management import save_to_computer, create_save_directories, load, create_individual_plot_folder
-from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
+from SDM.Skyn_Processors.skyn_dataset import skynDataset
+from SDM.User_Interface.Utils.filename_tools import extract_dataset_identifier, extract_subid
+from SDM.Configuration.file_management import save_to_computer, create_save_directories, load, create_individual_plot_folder
+from SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 from tkinter import messagebox
 import traceback
 from datetime import date

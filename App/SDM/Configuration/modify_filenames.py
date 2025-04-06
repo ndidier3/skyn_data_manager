@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import string
 import random
-from App.SDM.User_Interface.Utils.filename_tools import extract_subid, stringify_dataset_id
+from SDM.User_Interface.Utils.filename_tools import extract_subid, stringify_dataset_id
 
 def standardize_filename(filename, dataset_id, text='', ext=''):
   """ rewrites filename with standard format of <subid>_<dataset-ID>_<optional-text>.<ext>
