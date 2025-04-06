@@ -1,4 +1,4 @@
-from SDM.User_Interface.Utils.filename_tools import create_metadata_from_cohort_folder
+from App.SDM.User_Interface.Utils.filename_tools import create_metadata_from_cohort_folder
 from tkinter import *
 from tkinter import filedialog, StringVar, IntVar
 from tkinter.filedialog import askopenfile

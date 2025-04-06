@@ -1,9 +1,9 @@
 from App.Archive.retired_skyn_cohort import skynCohort
-from SDM.Skyn_Processors.skyn_dataset import skynDataset
-from SDM.User_Interface.Utils.filename_tools import *
-from SDM.User_Interface.Utils.filename_tools import extract_subid
-from SDM.User_Interface.Sub_Windows.rename_files_window import RenameFilesWindow
-from SDM.User_Interface.Sub_Windows.filenames_confirmation_window import FilenamesConfirmationWindow
+from App.SDM.Skyn_Processors.skyn_dataset import skynDataset
+from App.SDM.User_Interface.Utils.filename_tools import *
+from App.SDM.User_Interface.Utils.filename_tools import extract_subid
+from App.SDM.User_Interface.Sub_Windows.rename_files_window import RenameFilesWindow
+from App.SDM.User_Interface.Sub_Windows.filenames_confirmation_window import FilenamesConfirmationWindow
 from tkinter import filedialog, ttk, simpledialog
 from tkinter import messagebox
 from datetime import date, datetime
