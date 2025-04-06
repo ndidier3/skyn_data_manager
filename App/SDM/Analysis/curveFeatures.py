@@ -10,6 +10,8 @@ class curveFeatures():
     self.processors = [load(file[:-4], processed_data_folder) for file in os.listdir(processed_data_folder) if 'processed' in file]
     self.processors = [processor for processor in self.processors if hasattr(processor, 'curve_features')]
     self.curve_features = pd.concat([processor.curve_features for processor in self.processors], ignore_index=True)
+    self.curve_features[['subid', 'curve_id']] = self.curve_features[['subid', 'curve_id']].astype(int)
+    self.curve_features.drop_duplicates(subset=['subid', 'curve_id'], inplace=True)
     self.curve_stat_frames = []
 
     self.default_tac_features = [

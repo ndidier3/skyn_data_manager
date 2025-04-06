@@ -87,6 +87,89 @@ class skynDataset:
     #Curve Level
     self.curves = []
     self.curve_features = pd.DataFrame()
+    self.curve_columns = [
+        'device_one_REGION',
+        'device_two_REGION',
+        'device_count_REGION',
+        'total_duration_PERIPHERY',
+        'device_turned_on_duration_PERIPHERY',
+        'device_turned_on_percent_PERIPHERY',
+        'device_worn_duration_PERIPHERY',
+        'device_worn_percent_PERIPHERY',
+        'imputed_duration_PERIPHERY',
+        'imputed_percent_PERIPHERY',
+        'low_quality_duration_PERIPHERY',
+        'low_quality_percent_PERIPHERY',
+        'unimputed_low_quality_duration_PERIPHERY',
+        'unimputed_low_quality_percent_PERIPHERY',
+        'negative_duration_PERIPHERY',
+        'sub_negative_10_duration_PERIPHERY',
+        'sub_negative_10_percent_PERIPHERY',
+        'consecutive_sub_negative_10_duration_PERIPHERY',
+        'sub_negative_20_duration_PERIPHERY',
+        'sub_negative_20_percent_PERIPHERY',
+        'consecutive_sub_negative_20_duration_PERIPHERY',
+        'sub_negative_40_duration_PERIPHERY',
+        'sub_negative_40_percent_PERIPHERY',
+        'consecutive_sub_negative_40_duration_PERIPHERY',
+        'started_curve_count_CURVE',
+        'complete_curve_count_CURVE',
+        'total_duration_CURVE',
+        'device_turned_on_duration_CURVE',
+        'device_turned_on_percent_CURVE',
+        'device_worn_duration_CURVE',
+        'device_worn_percent_CURVE',
+        'consecutive_non_wear_duration_CURVE',
+        'consecutive_non_wear_percent_CURVE',
+        'flatline_max_CURVE',
+        'flatlined_percent_CURVE',
+        'jump_duration_CURVE',
+        'jump_percent_CURVE',
+        'plummet_duration_CURVE',
+        'plummet_percent_CURVE',
+        'imputed_duration_CURVE',
+        'imputed_percent_CURVE',
+        'low_quality_duration_CURVE',
+        'low_quality_percent_CURVE',
+        'unimputed_low_quality_duration_CURVE',
+        'unimputed_low_quality_percent_CURVE',
+        'negative_duration_CURVE',
+        'sub_negative_10_duration_CURVE',
+        'sub_negative_10_percent_CURVE',
+        'consecutive_sub_negative_10_duration_CURVE',
+        'sub_negative_20_duration_CURVE',
+        'sub_negative_20_percent_CURVE',
+        'consecutive_sub_negative_20_duration_CURVE',
+        'sub_negative_40_duration_CURVE',
+        'sub_negative_40_percent_CURVE',
+        'consecutive_sub_negative_40_duration_CURVE',
+        'begin_CURVE',
+        'end_CURVE',
+        'duration_CURVE',
+        'first_tac_CURVE',
+        'last_tac_CURVE',
+        'mean_tac_CURVE',
+        'sd_tac_CURVE',
+        'sem_tac_CURVE',
+        'peak_CURVE',
+        'auc_total_CURVE',
+        'auc_relative_CURVE',
+        'rise_duration_CURVE',
+        'fall_duration_CURVE',
+        'relative_peak_CURVE',
+        'rise_rate_CURVE',
+        'fall_rate_CURVE',
+        'rise_complete_perc_CURVE',
+        'fall_complete_perc_CURVE',
+        'smoothed_curve_plot',
+        'signal_processing_plot',
+        'device_removal_plot',
+        'signal_processing_plot_wide',
+        'subid',
+        'dataset_id',
+        'curve_id',
+        'curve_threshold'
+    ]
   
   def save_as_sdp(self, valid=True):
     save_to_computer(self, 
@@ -190,7 +273,93 @@ class skynDataset:
 
       if len(self.curves) > 0:
         self.curve_features = pd.DataFrame(rows, columns=curve.features.columns)
-        self.curve_features['unadjusted_threshold'] = unadjusted_curve_threshold
+      else:
+        self.curve_columns = [
+            'device_one_REGION',
+            'device_two_REGION',
+            'device_count_REGION',
+            'total_duration_PERIPHERY',
+            'device_turned_on_duration_PERIPHERY',
+            'device_turned_on_percent_PERIPHERY',
+            'device_worn_duration_PERIPHERY',
+            'device_worn_percent_PERIPHERY',
+            'imputed_duration_PERIPHERY',
+            'imputed_percent_PERIPHERY',
+            'low_quality_duration_PERIPHERY',
+            'low_quality_percent_PERIPHERY',
+            'unimputed_low_quality_duration_PERIPHERY',
+            'unimputed_low_quality_percent_PERIPHERY',
+            'negative_duration_PERIPHERY',
+            'sub_negative_10_duration_PERIPHERY',
+            'sub_negative_10_percent_PERIPHERY',
+            'consecutive_sub_negative_10_duration_PERIPHERY',
+            'sub_negative_20_duration_PERIPHERY',
+            'sub_negative_20_percent_PERIPHERY',
+            'consecutive_sub_negative_20_duration_PERIPHERY',
+            'sub_negative_40_duration_PERIPHERY',
+            'sub_negative_40_percent_PERIPHERY',
+            'consecutive_sub_negative_40_duration_PERIPHERY',
+            'started_curve_count_CURVE',
+            'complete_curve_count_CURVE',
+            'total_duration_CURVE',
+            'device_turned_on_duration_CURVE',
+            'device_turned_on_percent_CURVE',
+            'device_worn_duration_CURVE',
+            'device_worn_percent_CURVE',
+            'consecutive_non_wear_duration_CURVE',
+            'consecutive_non_wear_percent_CURVE',
+            'flatline_max_CURVE',
+            'flatlined_percent_CURVE',
+            'jump_duration_CURVE',
+            'jump_percent_CURVE',
+            'plummet_duration_CURVE',
+            'plummet_percent_CURVE',
+            'imputed_duration_CURVE',
+            'imputed_percent_CURVE',
+            'low_quality_duration_CURVE',
+            'low_quality_percent_CURVE',
+            'unimputed_low_quality_duration_CURVE',
+            'unimputed_low_quality_percent_CURVE',
+            'negative_duration_CURVE',
+            'sub_negative_10_duration_CURVE',
+            'sub_negative_10_percent_CURVE',
+            'consecutive_sub_negative_10_duration_CURVE',
+            'sub_negative_20_duration_CURVE',
+            'sub_negative_20_percent_CURVE',
+            'consecutive_sub_negative_20_duration_CURVE',
+            'sub_negative_40_duration_CURVE',
+            'sub_negative_40_percent_CURVE',
+            'consecutive_sub_negative_40_duration_CURVE',
+            'begin_CURVE',
+            'end_CURVE',
+            'duration_CURVE',
+            'first_tac_CURVE',
+            'last_tac_CURVE',
+            'mean_tac_CURVE',
+            'sd_tac_CURVE',
+            'sem_tac_CURVE',
+            'peak_CURVE',
+            'auc_total_CURVE',
+            'auc_relative_CURVE',
+            'rise_duration_CURVE',
+            'fall_duration_CURVE',
+            'relative_peak_CURVE',
+            'rise_rate_CURVE',
+            'fall_rate_CURVE',
+            'rise_complete_perc_CURVE',
+            'fall_complete_perc_CURVE',
+            'smoothed_curve_plot',
+            'signal_processing_plot',
+            'device_removal_plot',
+            'signal_processing_plot_wide',
+            'subid',
+            'dataset_id',
+            'curve_id',
+            'curve_threshold'
+        ]
+        self.curve_features = pd.DataFrame(columns=self.curve_columns)
+
+      self.curve_features['unadjusted_threshold'] = unadjusted_curve_threshold
       # self.curve_features = identify_overlapping_curves(self.curve_features)
       self.curve_features.to_excel(f'{self.data_out_folder}/curve_features_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
       
@@ -201,7 +370,7 @@ class skynDataset:
       self.log_error()
       self.save_as_sdp(valid=False)
   
-  def configure_event_data(self, data: pd.DataFrame, subid_column, ema_id_column, drink_total_column, event_timestamp_columns, buffer_before=1, buffer_after=0, export_excel=False):
+  def configure_event_data(self, data: pd.DataFrame, subid_column, ema_id_column, drink_total_column, event_timestamp_columns, buffer_before=2, buffer_after=0, export_excel=False):
     self.events = data[(data[subid_column] == str(self.subid)) | (data[subid_column] == int(self.subid))]
     event_timestamps = []
     timestamp_labels = []
@@ -318,7 +487,9 @@ class skynDataset:
           ema_region.make_signal_processing_plot(self.plot_folder, self.curve_threshold, one_alcohol_event.loc[idx, 'drink_total'])
           ema_region_feature_dictionaries.append(ema_region.self_report_region_quality_features)
     self.ema_region_features = pd.DataFrame(ema_region_feature_dictionaries)
-    self.event_labels = self.event_labels.merge(self.ema_region_features, on='ema_id', how='left')
+
+    if len(self.ema_region_features) > 0:
+      self.event_labels = self.event_labels.merge(self.ema_region_features, on='ema_id', how='left')
     if export_excel:
       self.event_labels.to_excel(f'{self.data_out_folder}/event_labels_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
     self.save_as_sdp(valid=True)
@@ -380,7 +551,7 @@ class skynDataset:
 
   def run_event_level_analysis(
       self, event_data, 
-      drink_start_column = 'drkstarttime_m', 
+      drink_start_column = 'drinkstarttime_m', 
       drink_total_column = 'totsd_all_m',
       day_id_column = 'STUDYDAY',
       extra_columns = [],

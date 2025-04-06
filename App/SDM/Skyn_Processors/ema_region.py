@@ -21,16 +21,17 @@ class emaRegion():
       self_report_region_end = self.self_report_start_time + pd.Timedelta(hours=extend_after_hours)
       self.self_report_region = self.df[(self.df['datetime'] >= self_report_region_start) & (self.df['datetime'] <= self_report_region_end)]
       self.self_report_region.reset_index(inplace=True, drop=True)
+    else:
+      self.self_report_region = pd.DataFrame()
+    
+    if len(self.self_report_region) > 0:
       region_event_labels = self.event_labels[
         (self.event_labels['timestamp'] >= self.self_report_region.iloc[0]['datetime']) & 
         (self.event_labels['timestamp'] <= self.self_report_region.iloc[-1]['datetime'])
       ]
       for i, row in region_event_labels.iterrows():
         self.plot_annotations[row['label']] = row['timestamp']
-    else:
-      self.self_report_region = pd.DataFrame()
 
-    if len(self.self_report_region) > 0:
       self.self_report_region_quality_features = {
         'subid': self.subid,
         'dataset_identifier': self.dataset_identifier,

@@ -88,6 +88,7 @@ def process_and_analyze_data(
             sdm_processor.run_day_level_analysis(**day_attrs)
             day_datasets.append(sdm_processor.day_level_data)
           if identify_curves:
+            print('IDENTIFYING CURVES')
             sdm_processor.identify_curves(curve_threshold, curve_attrs=curve_attrs)
             if not match_events_to_curves:
               sdm_processor.make_curve_graphs()

@@ -6,7 +6,7 @@ def get_event_level_indices(
   subid, 
   dataset, 
   event_data, 
-  drink_start_column='drkstarttime_m', 
+  drink_start_column='drinkstarttime_m', 
   drink_total_column='totsd_all_m', 
   day_id_column='STUDYDAY', 
   extra_columns=[], 

@@ -63,10 +63,12 @@ def plot_device_removal(df, plot_folder, subid, event_number, dataset_identifier
   ax.set_title(plot_title, fontsize=24, fontweight="semibold", pad=25)
   ax.text(0.5, 1.025, subtitle_text, fontsize=12, style='italic',
     ha='center', va='center', transform=ax.transAxes)
-  ax.legend(("Passed Temp", "Flagged Temp"), loc='upper left', fontsize=14)
+  ax.legend(("Temp (Wear)", "Temp (Non-Wear)"), loc='upper left', fontsize=14)
   ax.tick_params(axis='x', labelsize = 16)
   ax.tick_params(axis='y', labelsize = 16)
-  ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+
+  x_tick_interval = 2 if (len(df) / 60) > 12 else 1
+  ax.xaxis.set_major_locator(mdates.HourLocator(interval=x_tick_interval))
   ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
   if df[temp_variable].min() > 15:
@@ -75,7 +77,7 @@ def plot_device_removal(df, plot_folder, subid, event_number, dataset_identifier
     ax.hlines(y=28, xmin = df[time_variable].min(), xmax = df[time_variable].max(), color='black', linestyle='--')
   
   if event_timestamps and all(value is not None for value in event_timestamps.values()):
-    plot_event_lines(df, ax, event_timestamps, time_variable, 'datetime')
+    plot_event_lines(df, ax, event_timestamps, time_variable, 'datetime', font_size=22)
 
   if motion_variable:
         ax2 = ax.twinx()
@@ -83,13 +85,13 @@ def plot_device_removal(df, plot_folder, subid, event_number, dataset_identifier
         ax2.scatter(device_on_time, device_on_motion, marker='.', c=marker_colors['correct'][1])
         ax2.scatter(device_off_time, device_off_motion, marker='^', c=marker_colors['incorrect'][1])
         ax2.set_ylabel('Motion (G)', fontsize=20, rotation=-90, labelpad=25)
-        ax2.legend(("Passed Motion", 'Flagged Motion'), loc='upper right', fontsize=14)
+        ax2.legend(("Motion (Wear)", 'Motion (Non-Wear)'), loc='upper right', fontsize=14)
         ax2.tick_params(axis='y', labelsize=16)
 
   path=f'{plot_folder}{subid}_{dataset_identifier}_{event_number}_device_removal_{method}_{df_version}.png'
 
   plt.tight_layout()
-  plt.savefig(path, bbox_inches='tight')
+  plt.savefig(path, bbox_inches='tight', dpi=150)
   plt.close('all')
   return path
 
