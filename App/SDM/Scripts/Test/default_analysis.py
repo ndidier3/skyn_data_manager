@@ -2,8 +2,8 @@ import pandas as pd
 from SDM.Run.process_many import *
 from SDM.Analysis.curveFeatures import curveFeatures
 
-user_root = '/users/ndidier'
-project_root = f'{user_root}/SDM/skyn_data_manager' 
+user_root = '/Users/nathandidier/Desktop/Repositories/'
+project_root = f'{user_root}/skyn_data_manager' 
 data_input_folder = f'{project_root}/Inputs/Skyn_Data_RAW/TestData'
 processed_data_folder = f'{project_root}/Inputs/Skyn_Data_PROCESSED/TestData'
 cohort_name = 'Test'
