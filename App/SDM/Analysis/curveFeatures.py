@@ -1,7 +1,7 @@
-from SDM.Analysis.statModel import statModel
-from SDM.Skyn_Processors.ema_region import emaRegion
-from SDM.Configuration.file_management import load, save_to_computer
-from SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
+from App.SDM.Analysis.statModel import statModel
+from App.SDM.Skyn_Processors.ema_region import emaRegion
+from App.SDM.Configuration.file_management import load, save_to_computer
+from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 import os
 import pandas as pd
 
@@ -10,6 +10,8 @@ class curveFeatures():
     self.processors = [load(file[:-4], processed_data_folder) for file in os.listdir(processed_data_folder) if 'processed' in file]
     self.processors = [processor for processor in self.processors if hasattr(processor, 'curve_features')]
     self.curve_features = pd.concat([processor.curve_features for processor in self.processors], ignore_index=True)
+    self.curve_features[['subid', 'curve_id']] = self.curve_features[['subid', 'curve_id']].astype(int)
+    self.curve_features.drop_duplicates(subset=['subid', 'curve_id'], inplace=True)
     self.curve_stat_frames = []
 
     self.default_tac_features = [

@@ -1,6 +1,6 @@
-from SDM.Analysis.statModel import statModel
-from SDM.Analysis.featureFlagger import featureFlagger
-from SDM.Configuration.file_management import load, save_to_computer, create_feature_plot_folder
+from App.SDM.Analysis.statModel import statModel
+from App.SDM.Analysis.featureFlagger import featureFlagger
+from App.SDM.Configuration.file_management import load, save_to_computer, create_feature_plot_folder
 import os
 import pandas as pd
 import numpy as np

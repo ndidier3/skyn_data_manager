@@ -1,8 +1,8 @@
 import pandas as pd
-from SDM.Feature_Engineering.tac_features import *
-from SDM.Feature_Engineering.quality_features import *
-from SDM.Visualization.tac import *
-from SDM.Visualization.device_non_wear import plot_device_removal
+from App.SDM.Feature_Engineering.tac_features import *
+from App.SDM.Feature_Engineering.quality_features import *
+from App.SDM.Visualization.tac import *
+from App.SDM.Visualization.device_non_wear import plot_device_removal
 
 class emaRegion():
   def __init__(self, df: pd.DataFrame, subid, dataset_identifier, ema_id, self_report_start_time, event_labels, extend_before_hours = 2, extend_after_hours = 4):
@@ -21,16 +21,17 @@ class emaRegion():
       self_report_region_end = self.self_report_start_time + pd.Timedelta(hours=extend_after_hours)
       self.self_report_region = self.df[(self.df['datetime'] >= self_report_region_start) & (self.df['datetime'] <= self_report_region_end)]
       self.self_report_region.reset_index(inplace=True, drop=True)
+    else:
+      self.self_report_region = pd.DataFrame()
+    
+    if len(self.self_report_region) > 0:
       region_event_labels = self.event_labels[
         (self.event_labels['timestamp'] >= self.self_report_region.iloc[0]['datetime']) & 
         (self.event_labels['timestamp'] <= self.self_report_region.iloc[-1]['datetime'])
       ]
       for i, row in region_event_labels.iterrows():
         self.plot_annotations[row['label']] = row['timestamp']
-    else:
-      self.self_report_region = pd.DataFrame()
 
-    if len(self.self_report_region) > 0:
       self.self_report_region_quality_features = {
         'subid': self.subid,
         'dataset_identifier': self.dataset_identifier,

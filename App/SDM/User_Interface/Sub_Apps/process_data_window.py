@@ -1,6 +1,6 @@
 from App.Archive.process_many_retired import process_many
-from SDM.User_Interface.Utils.filename_tools import extract_subid, get_project_root
-from SDM.User_Interface.Messages.yesno import YesNoMessage
+from App.SDM.User_Interface.Utils.filename_tools import extract_subid, get_project_root
+from App.SDM.User_Interface.Messages.yesno import YesNoMessage
 from tkinter import *
 from tkinter import filedialog, ttk, simpledialog
 from tkinter import messagebox

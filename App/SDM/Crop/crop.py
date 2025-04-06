@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import datetime, timedelta
 import numpy as np
-from SDM.Visualization.tac import plot_cropping
+from App.SDM.Visualization.tac import plot_cropping
 import pytz
 
 """

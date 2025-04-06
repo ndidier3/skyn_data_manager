@@ -1,8 +1,8 @@
 from tkinter import *
 import pandas as pd
-from SDM.User_Interface.Sub_Windows.file_splitting_tool_window import FileSplittingToolWindow
-from SDM.User_Interface.Sub_Windows.create_metadata_window import CreateMetadataWindow
-from SDM.User_Interface.Utils.dataframe_dialog import DataFrameDialog
+from App.SDM.User_Interface.Sub_Windows.file_splitting_tool_window import FileSplittingToolWindow
+from App.SDM.User_Interface.Sub_Windows.create_metadata_window import CreateMetadataWindow
+from App.SDM.User_Interface.Utils.dataframe_dialog import DataFrameDialog
 import webbrowser
 
 class HeaderMenu(Menu):

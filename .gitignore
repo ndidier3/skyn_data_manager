@@ -33,3 +33,4 @@ App/SDM/Scripts/ARC
 App/SDM/Scripts/CSDP
 App/SDM/Scripts/MARS_Brown
 Inputs/Skyn_Data/
+App/SDM/Scripts/LINC/run_curve_analysis.py

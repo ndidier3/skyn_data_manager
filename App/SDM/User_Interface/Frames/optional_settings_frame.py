@@ -2,9 +2,9 @@ from tkinter import *
 from tkinter import filedialog, StringVar, IntVar
 from tkinter.filedialog import askopenfile
 from tkinter import messagebox
-from SDM.User_Interface.Frames.crop_settings import CropSettings
-from SDM.User_Interface.Frames.merge_files import MergeFiles
-from SDM.User_Interface.Sub_Windows.model_name_window import ModelNameWindow
+from App.SDM.User_Interface.Frames.crop_settings import CropSettings
+from App.SDM.User_Interface.Frames.merge_files import MergeFiles
+from App.SDM.User_Interface.Sub_Windows.model_name_window import ModelNameWindow
 import pickle
 
 class OptionalSettingsFrame(Frame):

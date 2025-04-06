@@ -1,7 +1,7 @@
-from SDM.Machine_Learning.model_optimization import *
-from SDM.Machine_Learning.cv_folds import * 
-from SDM.Machine_Learning.get_feature_importances import get_feature_importances
-from SDM.Machine_Learning.metrics import *
+from App.SDM.Machine_Learning.model_optimization import *
+from App.SDM.Machine_Learning.cv_folds import * 
+from App.SDM.Machine_Learning.get_feature_importances import get_feature_importances
+from App.SDM.Machine_Learning.metrics import *
 # from statsmodels.formula.api import mixedlm  # Add this import for mixed-effects model
 from sklearn.model_selection import GroupKFold
 import pandas as pd

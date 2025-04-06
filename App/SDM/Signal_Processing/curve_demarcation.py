@@ -30,63 +30,70 @@ def label_clusters(data, features, optimal_k, scaler):
 
 def get_tac_clusters(data, features):
   distortions, k_values_to_test, scaler = get_distortions(data, features, 10)
-  optimal_k = get_knee(distortions, k_values_to_test)
+  # optimal_k = get_knee(distortions, k_values_to_test)
+  optimal_k = 2
   return label_clusters(data, features, optimal_k, scaler), optimal_k
 
 def determine_curve_threshold(df: pd.DataFrame, default_threshold = 10):
-  data = df.copy()
-  #if less than 12 hours of data, not enough data to use k means
-  if (data['TAC'].count() / 60) < 12:
-    return default_threshold, default_threshold
-  else:
-    data.dropna(subset=['TAC'], inplace=True)
-    data['TAC'] = data['TAC'].clip(lower=0)
-
-    data['TAC_Change'] = data['TAC'].diff()
-    data['TAC_RollingStd'] = data['TAC'].rolling(window=5, min_periods=1).std()
-    data.fillna(0, inplace=True)
-
-    features = ['TAC', 'TAC_Change', 'TAC_RollingStd']
-
-    data, optimal_k = get_tac_clusters(data, features)
-
-    baseline_cluster = data.groupby('Cluster')['TAC'].mean().idxmin()
-
-    baseline_mean = data[data['Cluster'] == baseline_cluster]['TAC'].mean()
-    baseline_std = data[data['Cluster'] == baseline_cluster]['TAC'].std()
-
-    # If optimal_k is < 4, use the 3SD approach
-    if optimal_k < 4:
-      threshold = baseline_mean + (3 * baseline_std)
-
-      print(f"Optimal K: {optimal_k}")
-      print(f"Baseline Mean TAC: {baseline_mean:.2f}")
-      print(f"Baseline Standard Deviation: {baseline_std:.2f}")
-      print(f"Curve Threshold (Mean + 3SD): {threshold:.2f}")
-
-    # If optimal_k >= 4, use the mean+1SD of the TAC cluster just above baseline
-    elif optimal_k >= 4:
-      cluster_means = data.groupby('Cluster')['TAC'].mean()
-      sorted_clusters = cluster_means.sort_values()
-      baseline_idx = sorted_clusters.index.get_loc(baseline_cluster)
-      second_cluster = sorted_clusters.index[baseline_idx + 1]
-      second_cluster_mean = data[data['Cluster'] == second_cluster]['TAC'].mean()
-      second_cluster_std = data[data['Cluster'] == second_cluster]['TAC'].std()
-      threshold = second_cluster_mean + second_cluster_std
-
-      print(f"Optimal K: {optimal_k}")
-      print(f"Baseline Mean TAC: {baseline_mean:.2f}")
-      print(f"Threshold set to the mean TAC of the next cluster: {threshold:.2f}")
-
-    # Return the threshold based on the logic
-    if threshold > 30:
-      return 15, threshold  
-    elif threshold > 10:
-      return 10, threshold
-    elif threshold < 1:
-      return threshold + 1, threshold
+  try:
+    data = df.copy()
+    #if less than 12 hours of data, not enough data to use k means
+    if (data['TAC'].count() / 60) < 4:
+      return default_threshold, default_threshold
     else:
-      return threshold, threshold
+      data.dropna(subset=['TAC'], inplace=True)
+      data['TAC'] = data['TAC'].clip(lower=0)
+
+      data['TAC_Change'] = data['TAC'].diff()
+      data['TAC_RollingStd'] = data['TAC'].rolling(window=5, min_periods=1).std()
+      data.fillna(0, inplace=True)
+
+      features = ['TAC', 'TAC_Change', 'TAC_RollingStd']
+
+      data, optimal_k = get_tac_clusters(data, features)
+
+      baseline_cluster = data.groupby('Cluster')['TAC'].mean().idxmin()
+
+      baseline_mean = data[data['Cluster'] == baseline_cluster]['TAC'].mean()
+      baseline_std = data[data['Cluster'] == baseline_cluster]['TAC'].std()
+
+      # If optimal_k is < 4, use the 2SD approach
+      if optimal_k < 4:
+        if baseline_mean == 0:
+          threshold = default_threshold
+        else:
+          threshold = baseline_mean + (2 * baseline_std)
+
+        print(f"Optimal K: {optimal_k}")
+        print(f"Baseline Mean TAC: {baseline_mean:.2f}")
+        print(f"Baseline Standard Deviation: {baseline_std:.2f}")
+        print(f"Curve Threshold (Mean + 3SD): {threshold:.2f}")
+
+      # If optimal_k >= 4, use the mean+1SD of the TAC cluster just above baseline
+      elif optimal_k >= 4:
+        cluster_means = data.groupby('Cluster')['TAC'].mean()
+        sorted_clusters = cluster_means.sort_values()
+        baseline_idx = sorted_clusters.index.get_loc(baseline_cluster)
+        second_cluster = sorted_clusters.index[baseline_idx + 1]
+        second_cluster_mean = data[data['Cluster'] == second_cluster]['TAC'].mean()
+        second_cluster_std = data[data['Cluster'] == second_cluster]['TAC'].std()
+        threshold = second_cluster_mean + second_cluster_std
+
+        print(f"Optimal K: {optimal_k}")
+        print(f"Baseline Mean TAC: {baseline_mean:.2f}")
+        print(f"Threshold set to the mean TAC of the next cluster: {threshold:.2f}")
+
+      # Return the threshold based on the logic
+      # if threshold > 30:
+      #   return 15, threshold  
+      if threshold > 10:
+        return 10, threshold
+      # elif threshold < 1:
+      #   return threshold + 1, threshold
+      else:
+        return threshold, threshold
+  except:
+    return default_threshold, default_threshold
   
 def get_start_and_end_of_discrete_curves(df, curve_threshold):
   above_threshold = np.sort(df[df['TAC'] > curve_threshold].index)

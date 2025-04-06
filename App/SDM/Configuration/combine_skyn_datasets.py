@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-from SDM.Configuration.configuration import update_column_names, rename_TAC_column, configure_dataset_timestamps
+from App.SDM.Configuration.configuration import update_column_names, rename_TAC_column, configure_dataset_timestamps
 
 def combine_skyn_datasets(filepaths, out_filepath):
   datasets = []
