@@ -7,13 +7,12 @@ from App.SDM.User_Interface.Utils.filename_tools import extract_additional_filen
 from ..Crop.crop import *
 from ..Signal_Processing.identify_overlapping_curves import identify_overlapping_curves
 from ..Signal_Processing.smooth_signal import smooth_savgol
-from ..Signal_Processing.remove_outliers import *
 from ..Signal_Processing.impute import impute_low_quality_data
 from ..Signal_Processing.fill_device_off_gaps import fill_device_off_gaps
 from ..Signal_Processing.label_device_non_wear import label_device_non_wear_using_cutoff, label_device_non_wear_using_model, compare_non_wear_methods
 from ..Signal_Processing.label_signal_stability import *
 from ..Signal_Processing.label_negative_values import label_negative_values
-from ..Signal_Processing.curve_demarcation import *
+from ..Signal_Processing.curve_demarcation import get_curve_threshold_from_method, get_start_and_end_of_discrete_curves, merge_nearby_curves
 from ..Skyn_Processors.skyn_day import skynDay
 from ..Skyn_Processors.alcohol_event import alcoholEvent
 from ..Skyn_Processors.curve import Curve
@@ -22,12 +21,14 @@ from ..Visualization.tac import *
 from ..Visualization.device_non_wear import *
 from ..Feature_Engineering.tac_features import *
 from ..Feature_Engineering.row_features import generate_row_features
+from ..Feature_Engineering.temperature_clusters import get_temperature_clusters
 from ..Documenting.variable_keys import *
 # from ..Signal_Processing.revise_incomplete_features import revise_fall_features, revise_rise_features
 
 import pandas as pd
 import numpy as np
 import traceback
+from typing import Union, Dict
 
 class skynDataset:
   def __init__(self, path, processed_data_out_folder, data_out_folder, graphs_out_folder, subid, dataset_identifier, episode_identifier='e1'):
@@ -79,7 +80,7 @@ class skynDataset:
     self.day_level_data = pd.DataFrame()
 
     #Event Level
-    self.events = []
+    self.events = pd.DataFrame()
     self.event_level_data = pd.DataFrame()
     self.events_with_no_skyn_data = pd.DataFrame()
     self.event_labels = pd.DataFrame()
@@ -87,6 +88,7 @@ class skynDataset:
     #Curve Level
     self.curves = []
     self.curve_features = pd.DataFrame()
+    self.curve_threshold = 10.0  # Default curve threshold
     self.curve_columns = [
         'device_one_REGION',
         'device_two_REGION',
@@ -168,6 +170,7 @@ class skynDataset:
         'subid',
         'dataset_id',
         'curve_id',
+        'curve_count',
         'curve_threshold'
     ]
   
@@ -191,9 +194,10 @@ class skynDataset:
       self.dataset['Duration_Hrs'] = (self.dataset['datetime'] - self.dataset['datetime'].iloc[0]).dt.total_seconds() / 3600
       # assert (self.dataset['datetime'].diff().dt.total_seconds() == 60).all(), "Rows are not spaced by one minute"
       self.dataset = generate_row_features(self)
+      
       self.dataset = label_device_non_wear_using_cutoff(self.dataset)
       self.dataset = label_device_non_wear_using_model(self.dataset)
-      self.dataset = compare_non_wear_methods(self.dataset, 'device_worn_temp_cutoff', 'device_worn_model', comparison_name = 'cutoff_vs_model')
+      # self.dataset = compare_non_wear_methods(self.dataset, 'device_worn_temp_cutoff', 'device_worn_model', comparison_name = 'cutoff_vs_model')
       # self.dataset = label_signal_stability(self.dataset)
       # self.dataset = label_signal_stability_when_device_equipped(self.dataset)
 
@@ -224,7 +228,7 @@ class skynDataset:
         self.dataset.loc[self.dataset['device_turned_on'] == 0, 'TAC'] = np.nan
 
       if any([impute_gaps, impute_non_wear, impute_jumps, impute_plummets]):
-        self.dataset = impute_low_quality_data(self.dataset, impute_gaps=impute_gaps, impute_non_wear=impute_non_wear, impute_jumps=impute_jumps, impute_plummets=impute_plummets)
+        self.dataset, self.imputation_info = impute_low_quality_data(self.dataset, impute_gaps=impute_gaps, impute_non_wear=impute_non_wear, impute_jumps=impute_jumps, impute_plummets=impute_plummets)
       
       self.dataset['TAC_pre_smoothed'] = self.dataset['TAC'].copy()  # Save original TAC values
       if savgol_smooth:
@@ -234,6 +238,8 @@ class skynDataset:
       
       if export_excel:
         self.dataset.to_excel(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
+        if hasattr(self, 'imputation_info'):
+          self.imputation_info.to_excel(f'{self.data_out_folder}/imputation_info_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
 
       self.save_as_sdp(valid=True)
         
@@ -242,209 +248,193 @@ class skynDataset:
       self.log_error()
       self.save_as_sdp(valid=False)  
   
-  def identify_curves(self, curve_threshold = 'auto', curve_attrs = {}):
+  def identify_curves(self, curve_attrs: Dict = {}):
+    """
+    Identify curves in the dataset using either an automatic or manual threshold.
+    
+    Args:
+      curve_attrs (dict): Additional curve attributes for processing
+        - curve_threshold (float | str): Either a numeric threshold or 'auto' to determine automatically
+        - merge_curves_within_duration (int): Duration in hours to merge nearby curves
+        - curve_flags (dict): Flags for curve processing
+        - periphery_flags (dict): Flags for periphery processing
+        - periphery_buffer_before (int): Buffer before curve in hours
+        - periphery_buffer_after (int): Buffer after curve in hours
+      
+    Returns:
+      None
+      
+    Raises:
+      ValueError: If curve_threshold is invalid or automatic threshold determination fails
+    """
     self.curve_features = pd.DataFrame()
+    self.curve_threshold_method = curve_attrs.get('curve_threshold', 'auto')
+    
     try:
-      if curve_threshold == 'auto':
-        self.curve_threshold, unadjusted_curve_threshold = determine_curve_threshold(self.dataset)
-      else:
-        self.curve_threshold = curve_threshold
-        unadjusted_curve_threshold = curve_threshold
+      # Get curve threshold using the new function
+      result = get_curve_threshold_from_method(self.dataset, self.curve_threshold_method)
+      self.curve_threshold, unadjusted_curve_threshold, baseline_mean, baseline_sd = result
+
+      # Get curve start and end indices
       curve_start_and_end_indices = get_start_and_end_of_discrete_curves(self.dataset, self.curve_threshold)
 
-      if curve_attrs['merge_curves_within_duration'] > 0:
-        curve_start_and_end_indices = merge_nearby_curves(curve_start_and_end_indices, max_curve_separation_minutes=curve_attrs['merge_curves_within_duration']*60)
+      # Merge nearby curves if specified
+      if curve_attrs.get('merge_curves_within_duration', 0) > 0:
+        curve_start_and_end_indices_with_curve_count = merge_nearby_curves(
+          curve_start_and_end_indices, 
+          max_curve_separation_minutes=curve_attrs['merge_curves_within_duration']*60
+        )
       
+      # Process each curve
       curve_id = 0
       rows = []
       self.curves = []
-      # if all(key in event_attrs for key in ['data', 'subid_column', 'start_column', 'drink_total', 'ema_id']):
-      for curve_start, curve_end in curve_start_and_end_indices:
-        curve = Curve(self.dataset, self.subid, self.dataset_identifier, curve_id, curve_start, curve_end, self.curve_threshold, curve_attrs['curve_flags'], curve_attrs['periphery_flags'], curve_attrs['periphery_buffer_before'], curve_attrs['periphery_buffer_after'])
-          # curve.match_curve_to_event(event_attrs['subid_column'], event_attrs['start_column'], event_attrs['ema_id'])
-          # curve.create_graphs(self.plot_folder, drink_total_column=event_attrs['drink_total'], self_report_start_time=event_attrs['start_column'])
-        # else:
-        #   curve = Curve(self.dataset, self.subid, self.dataset_identifier, curve_id, curve_start, curve_end, self.curve_threshold, curve_attrs['curve_flags'], curve_attrs['periphery_flags'], curve_attrs['periphery_buffer_before'], curve_attrs['periphery_buffer_after'])
-        #   curve.create_graphs(self.plot_folder)
-        # curve.evaluate_self_report_region(self.plot_folder, event_attrs['drink_total'])
+      
+      for curve_start, curve_end, curve_count in curve_start_and_end_indices_with_curve_count:
+        curve = Curve(
+          self.dataset, 
+          self.subid, 
+          self.dataset_identifier, 
+          curve_id, 
+          curve_start, 
+          curve_end,
+          curve_count, 
+          self.curve_threshold, 
+          curve_attrs.get('curve_flags', {}),
+          curve_attrs.get('periphery_flags', {}),
+          curve_attrs.get('periphery_buffer_before', 0),
+          curve_attrs.get('periphery_buffer_after', 0)
+        )
         self.curves.append(curve)
         rows.append(curve.row)
         curve_id += 1
 
+      # Create curve features DataFrame
       if len(self.curves) > 0:
         self.curve_features = pd.DataFrame(rows, columns=curve.features.columns)
       else:
-        self.curve_columns = [
-            'device_one_REGION',
-            'device_two_REGION',
-            'device_count_REGION',
-            'total_duration_PERIPHERY',
-            'device_turned_on_duration_PERIPHERY',
-            'device_turned_on_percent_PERIPHERY',
-            'device_worn_duration_PERIPHERY',
-            'device_worn_percent_PERIPHERY',
-            'imputed_duration_PERIPHERY',
-            'imputed_percent_PERIPHERY',
-            'low_quality_duration_PERIPHERY',
-            'low_quality_percent_PERIPHERY',
-            'unimputed_low_quality_duration_PERIPHERY',
-            'unimputed_low_quality_percent_PERIPHERY',
-            'negative_duration_PERIPHERY',
-            'sub_negative_10_duration_PERIPHERY',
-            'sub_negative_10_percent_PERIPHERY',
-            'consecutive_sub_negative_10_duration_PERIPHERY',
-            'sub_negative_20_duration_PERIPHERY',
-            'sub_negative_20_percent_PERIPHERY',
-            'consecutive_sub_negative_20_duration_PERIPHERY',
-            'sub_negative_40_duration_PERIPHERY',
-            'sub_negative_40_percent_PERIPHERY',
-            'consecutive_sub_negative_40_duration_PERIPHERY',
-            'started_curve_count_CURVE',
-            'complete_curve_count_CURVE',
-            'total_duration_CURVE',
-            'device_turned_on_duration_CURVE',
-            'device_turned_on_percent_CURVE',
-            'device_worn_duration_CURVE',
-            'device_worn_percent_CURVE',
-            'consecutive_non_wear_duration_CURVE',
-            'consecutive_non_wear_percent_CURVE',
-            'flatline_max_CURVE',
-            'flatlined_percent_CURVE',
-            'jump_duration_CURVE',
-            'jump_percent_CURVE',
-            'plummet_duration_CURVE',
-            'plummet_percent_CURVE',
-            'imputed_duration_CURVE',
-            'imputed_percent_CURVE',
-            'low_quality_duration_CURVE',
-            'low_quality_percent_CURVE',
-            'unimputed_low_quality_duration_CURVE',
-            'unimputed_low_quality_percent_CURVE',
-            'negative_duration_CURVE',
-            'sub_negative_10_duration_CURVE',
-            'sub_negative_10_percent_CURVE',
-            'consecutive_sub_negative_10_duration_CURVE',
-            'sub_negative_20_duration_CURVE',
-            'sub_negative_20_percent_CURVE',
-            'consecutive_sub_negative_20_duration_CURVE',
-            'sub_negative_40_duration_CURVE',
-            'sub_negative_40_percent_CURVE',
-            'consecutive_sub_negative_40_duration_CURVE',
-            'begin_CURVE',
-            'end_CURVE',
-            'duration_CURVE',
-            'first_tac_CURVE',
-            'last_tac_CURVE',
-            'mean_tac_CURVE',
-            'sd_tac_CURVE',
-            'sem_tac_CURVE',
-            'peak_CURVE',
-            'auc_total_CURVE',
-            'auc_relative_CURVE',
-            'rise_duration_CURVE',
-            'fall_duration_CURVE',
-            'relative_peak_CURVE',
-            'rise_rate_CURVE',
-            'fall_rate_CURVE',
-            'rise_complete_perc_CURVE',
-            'fall_complete_perc_CURVE',
-            'smoothed_curve_plot',
-            'signal_processing_plot',
-            'device_removal_plot',
-            'signal_processing_plot_wide',
-            'subid',
-            'dataset_id',
-            'curve_id',
-            'curve_threshold'
-        ]
         self.curve_features = pd.DataFrame(columns=self.curve_columns)
 
+      # Add threshold information
       self.curve_features['unadjusted_threshold'] = unadjusted_curve_threshold
-      # self.curve_features = identify_overlapping_curves(self.curve_features)
-      self.curve_features.to_excel(f'{self.data_out_folder}/curve_features_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
+      self.curve_features['baseline_mean'] = baseline_mean
+      self.curve_features['baseline_sd'] = baseline_sd
+      
+      # Save results
+      self.curve_features.to_excel(
+        f'{self.data_out_folder}/curve_features_{self.subid}_{self.dataset_identifier}.xlsx', 
+        index=False
+      )
       
       self.save_as_sdp(valid=True)
 
-    except Exception:
+    except Exception as e:
       self.error = traceback.format_exc()
       self.log_error()
       self.save_as_sdp(valid=False)
+      raise ValueError(f"Failed to identify curves: {str(e)}")
   
-  def configure_event_data(self, data: pd.DataFrame, subid_column, ema_id_column, drink_total_column, event_timestamp_columns, buffer_before=2, buffer_after=0, export_excel=False):
+  def configure_event_data(self, data: pd.DataFrame, subid_column, ema_id_column, drink_total_column, event_timestamp_columns, buffer_before=2, buffer_after=0, max_event_duration=12, export_excel=False):
     self.events = data[(data[subid_column] == str(self.subid)) | (data[subid_column] == int(self.subid))]
-    event_timestamps = []
-    timestamp_labels = []
-    ema_ids = []
-    drink_totals = []
-    for i, row, in self.events.iterrows():
-      event_timestamps.extend([row[col] for col in event_timestamp_columns if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp)])
-      if row[drink_total_column]:
-        timestamp_labels.extend([f'{col.replace("timestamp", "")}_{row[drink_total_column]}drks_{row[ema_id_column]}' for col in event_timestamp_columns if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp)])
-      else:
-        timestamp_labels.extend([f'{col.replace("timestamp", "")}_{row[ema_id_column]}' for col in event_timestamp_columns if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp)])
-      ema_ids.extend([row[ema_id_column] for col in event_timestamp_columns if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp)])
-      drink_totals.extend([row[drink_total_column] for col in event_timestamp_columns if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp)])
-    
-    subids = [self.subid for i in range(0, len(event_timestamps))]
-    self.event_labels = pd.DataFrame({
-      'ID': subids,
-      'timestamp': event_timestamps,
-      'label': timestamp_labels,
-      'ema_id': ema_ids,
-      'drink_total': drink_totals
-    })
+    self.events['max_event_duration'] = max_event_duration
+    self.event_labels = pd.DataFrame(columns=['timestamp', 'label'])
+    event_ranges = []
+    for i, row in self.events.iterrows():
+      valid_timestamps = [
+        row[col] for col in event_timestamp_columns 
+        if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp)
+      ]
+      if valid_timestamps:
+        earliest_timestamp = min(valid_timestamps)
+        latest_timestamp = max(valid_timestamps)
+        
+        matching_end_timestamp = min(
+          latest_timestamp,
+          earliest_timestamp + pd.Timedelta(hours=max_event_duration)
+        )
+        
+        # Add timestamps to self.events
+        self.events.loc[i, 'earliest_timestamp'] = earliest_timestamp
+        self.events.loc[i, 'latest_timestamp'] = latest_timestamp
+        self.events.loc[i, 'matching_end_timestamp'] = matching_end_timestamp
+        self.events.loc[i, 'drink_total'] = row[drink_total_column]
+        self.events.loc[i, 'ema_id'] = row[ema_id_column]
+        
+        #Creating labels for curve plots
+        # Add earliest timestamp label
+        # Get drink total suffix if it exists
+        drink_suffix = f'_{row[drink_total_column]}drks' if pd.notna(row[drink_total_column]) else '_NAdrks'
+        earliest_col = event_timestamp_columns[
+            [valid_timestamps.index(earliest_timestamp) for col in event_timestamp_columns 
+             if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp) and row[col] == earliest_timestamp][0]
+        ]
+        latest_col = event_timestamp_columns[
+            [valid_timestamps.index(latest_timestamp) for col in event_timestamp_columns 
+             if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp) and row[col] == latest_timestamp][0]
+        ]
 
-    for curve_type in ['WITHIN_CURVE', 'PRIOR_CURVE', 'NEXT_CURVE']:
-      for curve_relation_column in ['id', 'event_diff_start', 'event_diff_end']:
-        self.event_labels[f'{curve_relation_column}_{curve_type}'] = None
-    
+        earliest_label = f'{earliest_col}_{row[ema_id_column]}{drink_suffix}'
+        self.event_labels = pd.concat([self.event_labels, pd.DataFrame({'timestamp': [earliest_timestamp], 'label': [earliest_label]})], ignore_index=True)
+
+        latest_label = f'{latest_col}_{row[ema_id_column]}{drink_suffix}'
+        self.event_labels = pd.concat([self.event_labels, pd.DataFrame({'timestamp': [latest_timestamp], 'label': [latest_label]})], ignore_index=True)
+
+        # Add max event duration timestamp label
+        # max_duration_label = f'max_duration_{row[ema_id_column]}_{max_event_duration}hrs'
+        # self.event_labels = pd.concat([self.event_labels, pd.DataFrame({'timestamp': [matching_end_timestamp], 'label': [max_duration_label]})], ignore_index=True)
+        event_ranges.append({
+          'ema_id': row[ema_id_column],
+          'drink_total': row[drink_total_column],
+          'earliest_timestamp': earliest_timestamp,
+          'latest_timestamp': latest_timestamp,
+          'matching_end_timestamp': matching_end_timestamp
+        })
+
     self.curve_features['CURVE_event_match_before_buffer'] = buffer_before
     self.curve_features['CURVE_event_match_after_buffer'] = buffer_after
-    self.curve_features['CURVE_MATCH_START'] = self.curve_features['begin_CURVE'] - pd.Timedelta(hours=buffer_before)
-    self.curve_features['CURVE_MATCH_END'] = self.curve_features['end_CURVE'] + pd.Timedelta(hours=buffer_after)
-
-    for i, row in self.event_labels.iterrows():
-      curve_within = self.curve_features[
-        (self.curve_features['CURVE_MATCH_START'] <= row['timestamp']) & 
-        (self.curve_features['CURVE_MATCH_END'] >= row['timestamp'])
-      ].reset_index(drop=True) #curve that started before event and ended after event
-      curves_before = self.curve_features[self.curve_features['CURVE_MATCH_START'] <= row['timestamp']].reset_index(drop=True) #curves that started before event
-      curves_after = self.curve_features[self.curve_features['CURVE_MATCH_START'] >= row['timestamp']].reset_index(drop=True) #curve that started after event
-      if not curve_within.empty:
-        curve_data = curve_within.loc[curve_within['CURVE_MATCH_START'].idxmax()]
-        self.event_labels.loc[i,'id_WITHIN_CURVE'] = curve_data['curve_id']
-        self.event_labels.loc[i,'event_diff_start_WITHIN_CURVE'] = (curve_data['begin_CURVE'] - row['timestamp']).total_seconds() / 3600
-        self.event_labels.loc[i,'event_diff_end_WITHIN_CURVE'] = (curve_data['end_CURVE'] - row['timestamp']).total_seconds() / 3600
-      if not curves_before.empty:
-        curve_data = curves_before.loc[curves_before['CURVE_MATCH_START'].idxmax()]
-        #if curve before matched to curve within, re-assign curve before to one more before
-        if curve_data['curve_id'] == self.event_labels.loc[i,'id_WITHIN_CURVE']:
-          idx = curves_before['CURVE_MATCH_START'].idxmax()
-          if idx in curves_before.index and curves_before.index.get_loc(idx) > 0:
-            prev_idx = curves_before.index[curves_before.index.get_loc(idx) - 1]
-            curve_data = curves_before.loc[prev_idx]
-          else:
-            curve_data = pd.DataFrame()
-        if not curve_data.empty:
-          self.event_labels.loc[i,'id_PRIOR_CURVE'] = curve_data['curve_id']
-          self.event_labels.loc[i,'event_diff_start_PRIOR_CURVE'] = (curve_data['begin_CURVE'] - row['timestamp']).total_seconds() / 3600
-          self.event_labels.loc[i,'event_diff_end_PRIOR_CURVE'] = (curve_data['end_CURVE'] - row['timestamp']).total_seconds() / 3600
-      if not curves_after.empty:
-        curve_data = curves_after.loc[curves_after['CURVE_MATCH_START'].idxmin()]
-        #if curve after matched to curve within, re-assign curve before to one more in the future
-        if curve_data['curve_id'] == self.event_labels.loc[i,'id_WITHIN_CURVE']:
-          idx = curves_after['CURVE_MATCH_START'].idxmin()
-          if idx in curves_after.index and curves_after.index.get_loc(idx) < len(curves_after) - 1:
-            next_idx = curves_after.index[curves_after.index.get_loc(idx) + 1]
-            curve_data = curves_after.loc[next_idx]
-          else:
-            curve_data = pd.DataFrame()
-        if not curve_data.empty:
-          self.event_labels.loc[i,'id_NEXT_CURVE'] = curve_data['curve_id']
-          self.event_labels.loc[i,'event_diff_start_NEXT_CURVE'] = (curve_data['begin_CURVE'] - row['timestamp']).total_seconds() / 3600
-          self.event_labels.loc[i,'event_diff_end_NEXT_CURVE'] = (curve_data['end_CURVE'] - row['timestamp']).total_seconds() / 3600
+    self.curve_features['CURVE_MATCH_START'] = pd.to_datetime(self.curve_features['begin_CURVE']) - pd.Timedelta(hours=buffer_before)
+    self.curve_features['CURVE_MATCH_END'] = pd.to_datetime(self.curve_features['end_CURVE']) + pd.Timedelta(hours=buffer_after)
     
-    self.event_labels['relative_position_WITHIN_CURVE'] = (self.event_labels['event_diff_start_WITHIN_CURVE'] * -1) / (self.event_labels['event_diff_end_WITHIN_CURVE'] + (self.event_labels['event_diff_start_WITHIN_CURVE'] * -1))
+    # Filter curve features to only include current subject
+    subject_curves = self.curve_features[
+        (self.curve_features['subid'] == str(self.subid)) | 
+        (self.curve_features['subid'] == int(self.subid))
+    ].copy()
+
+    # Process event ranges to match curves
+    for event_range in event_ranges:
+        # Find curves that overlap with this event's time range using matching_end_timestamp
+        overlapping_curves = subject_curves[
+          ~(
+            (subject_curves['CURVE_MATCH_END'] < event_range['earliest_timestamp']) |  
+            (subject_curves['CURVE_MATCH_START'] > event_range['matching_end_timestamp'])
+          )
+        ].sort_values('CURVE_MATCH_START')  # Sort by start time to get earliest first
+        
+        matching_curve_ids = overlapping_curves['curve_id'].tolist()
+        self.events.loc[self.events['ema_id'] == event_range['ema_id'], 'num_curves_matched'] = len(matching_curve_ids)
+        
+        # Calculate overlap proportions for each matching curve
+        for j in range(1, 6):
+          match_key = f'curve_match_{j}'
+          overlap_key = f'curve_match_{j}_overlap'
+          
+          if j <= len(matching_curve_ids):
+            curve = overlapping_curves.iloc[j-1]
+            curve_id = matching_curve_ids[j-1]
+            
+            # Calculate overlap
+            overlap_start = max(event_range['earliest_timestamp'], curve['CURVE_MATCH_START'])
+            overlap_end = min(event_range['matching_end_timestamp'], curve['CURVE_MATCH_END'])
+            overlap_duration = (overlap_end - overlap_start).total_seconds()
+            curve_duration = (curve['CURVE_MATCH_END'] - curve['CURVE_MATCH_START']).total_seconds()
+            overlap_proportion = overlap_duration / curve_duration
+            
+            self.events.loc[self.events['ema_id'] == event_range['ema_id'], match_key] = curve_id
+            self.events.loc[self.events['ema_id'] == event_range['ema_id'], overlap_key] = overlap_proportion
+          else:
+            self.events.loc[self.events['ema_id'] == event_range['ema_id'], match_key] = None
+            self.events.loc[self.events['ema_id'] == event_range['ema_id'], overlap_key] = None
 
     if export_excel:
       self.event_labels.to_excel(f'{self.data_out_folder}/event_labels_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
@@ -471,27 +461,22 @@ class skynDataset:
   def set_ema_regions(self, export_excel=True):
     self.ema_regions = []
     ema_region_feature_dictionaries = []
-    for ema_id in self.event_labels['ema_id'].unique():
-      one_alcohol_event = self.event_labels[
-        (self.event_labels['ema_id'] == ema_id) &
-        (self.event_labels['label'].str.contains('drink', na=False))
-      ]
-      if not one_alcohol_event.empty:
-        idx = one_alcohol_event['timestamp'].idxmin()
-
-        if pd.notna(idx):  # Ensure idx is valid
-          drink_start = one_alcohol_event.loc[idx, 'timestamp']
-          ema_region = emaRegion(self.dataset, self.subid, self.dataset_identifier, ema_id, drink_start, self.event_labels)
-          self.ema_regions.append(ema_region)
-          ema_region.make_device_removal_plot(self.plot_folder)
-          ema_region.make_signal_processing_plot(self.plot_folder, self.curve_threshold, one_alcohol_event.loc[idx, 'drink_total'])
-          ema_region_feature_dictionaries.append(ema_region.self_report_region_quality_features)
+    for i, row in self.events.iterrows():
+      if pd.notna(row['ema_id']):
+        drink_start = row['earliest_timestamp']
+        drink_total = row['drink_total']
+        ema_id = row['ema_id']
+        ema_region = emaRegion(self.dataset, self.subid, self.dataset_identifier, ema_id, drink_start, self.event_labels)
+        ema_region.make_device_removal_plot(self.plot_folder)
+        ema_region.make_signal_processing_plot(self.plot_folder, self.curve_threshold, drink_total)
+        ema_region_feature_dictionaries.append(ema_region.self_report_region_quality_features)
+        self.ema_regions.append(ema_region)
     self.ema_region_features = pd.DataFrame(ema_region_feature_dictionaries)
 
     if len(self.ema_region_features) > 0:
-      self.event_labels = self.event_labels.merge(self.ema_region_features, on='ema_id', how='left')
+      self.events = self.events.merge(self.ema_region_features, on='ema_id', how='left')
     if export_excel:
-      self.event_labels.to_excel(f'{self.data_out_folder}/event_labels_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
+      self.events.to_excel(f'{self.data_out_folder}/event_labels_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
     self.save_as_sdp(valid=True)
     
   # def match_events_to_curves(self, ema_id_column, drink_total_column, drink_start_timestamp_column, event_timestamp_columns):
@@ -640,7 +625,6 @@ class skynDataset:
           self.non_wear_curve_plot_paths[event_number] = ''
           self.tac_processing_curve_plot_paths[event_number] = ''
           info = {
-            'subid': self.subid,
             'dataset_identifier': self.dataset_identifier,
             'event': event_number,
             'drink_total': drink_total,

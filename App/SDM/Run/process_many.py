@@ -2,15 +2,10 @@ from App.SDM.Skyn_Processors.skyn_dataset import skynDataset
 from App.SDM.User_Interface.Utils.filename_tools import extract_dataset_identifier, extract_subid
 from App.SDM.Configuration.file_management import save_to_computer, create_save_directories, load, create_individual_plot_folder
 from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
-from tkinter import messagebox
 import traceback
 from datetime import date
 import pandas as pd
 import os
-
-"""
-split into process raw data, analyze_days, analyze_events
-"""
 
 def process_and_analyze_data(
   project_root, 
@@ -18,7 +13,6 @@ def process_and_analyze_data(
   output_folder_name = 'cohort', 
   event_data = pd.DataFrame(), 
   event_subid_column = 'ID',
-  curve_threshold = 'auto',
   use_prior_save = True, 
   smooth_and_impute = False,
   adjust_for_gaps_and_non_wear = False,
@@ -50,7 +44,6 @@ def process_and_analyze_data(
   curve_features = []
   event_datasets = []
   event_curve_matches = []
-
   no_skyn_data_found = []
 
   for file in files:
@@ -84,20 +77,26 @@ def process_and_analyze_data(
             sdm_processor.adjust_for_gaps_and_non_wear(**gaps_and_non_wear_attrs)
           if smooth_and_impute:
             sdm_processor.smooth_and_impute(**smooth_and_impute_attrs)
-          if analyze_days:
-            sdm_processor.run_day_level_analysis(**day_attrs)
-            day_datasets.append(sdm_processor.day_level_data)
           if identify_curves:
             print('IDENTIFYING CURVES')
-            sdm_processor.identify_curves(curve_threshold, curve_attrs=curve_attrs)
+            sdm_processor.identify_curves(curve_attrs=curve_attrs)
             if not match_events_to_curves:
               sdm_processor.make_curve_graphs()
-            curve_features.append(sdm_processor.curve_features)
+              curve_features.append(sdm_processor.curve_features)
+          if analyze_days:
+            print(f'Running day analysis for {subid}_{dataset_identifier}')
+            sdm_processor.run_day_level_analysis(**day_attrs)
+            if not sdm_processor.day_level_data.empty:
+                print(f'  Found day data with shape: {sdm_processor.day_level_data.shape}')
+                day_datasets.append(sdm_processor.day_level_data)
+            else:
+                print(f'  WARNING: No day data found for {subid}_{dataset_identifier}')
           if match_events_to_curves:
             sdm_processor.configure_event_data(**event_attrs)
             sdm_processor.make_curve_graphs()
             sdm_processor.set_ema_regions()
-            event_curve_matches.append(sdm_processor.event_labels)
+            curve_features.append(sdm_processor.curve_features)
+            event_datasets.append(sdm_processor.events)
           if analyze_events:
             subids_found = event_data[event_subid_column].unique().tolist()
             if (int(subid) in subids_found or str(subid) in subids_found):
@@ -111,8 +110,12 @@ def process_and_analyze_data(
       print('SDM Error', f'Failed to load. See error: {traceback.format_exc()}')
           
   if len(day_datasets):
+    print(f'Combining {len(day_datasets)} day datasets')
     combined_day_level_data = pd.concat(day_datasets, ignore_index=True)
+    print(f'Combined day data shape: {combined_day_level_data.shape}')
     combined_day_level_data.to_excel(f'{results_dir}/day_level_results.xlsx', index=None)
+  else:
+    print('WARNING: No day datasets to combine')
 
   if len(curve_features):
     with pd.ExcelWriter(f'{results_dir}/curve_level_results.xlsx', engine='xlsxwriter', mode = 'w') as writer:

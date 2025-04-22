@@ -6,55 +6,63 @@ from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 import pandas as pd
 
 class curveFeaturesWithEvents(curveFeatures):
-  def __init__(self, processed_data_folder, event_file, event_id_column, event_drink_total_column, event_subid_column, event_subtypes):
+  def __init__(self, processed_data_folder, ema_id_column, event_type_column = '', event_type_settings = {}):
     super().__init__(processed_data_folder)
     self.processors = [processor for processor in self.processors if hasattr(processor, 'event_labels')]
-    self.event_data = pd.concat([processor.event_labels for processor in self.processors], ignore_index=True)
-    self.raw_event_data = pd.read_csv(event_file) if event_file[-3:] == 'csv' else pd.read_excel(event_file)
-    self.event_id_column = event_id_column
-    self.event_drink_total_column = event_drink_total_column
-    self.event_subid_column = event_subid_column
+    # Only concatenate events that are already DataFrames
+    self.event_data = pd.concat([processor.events for processor in self.processors if isinstance(processor.events, pd.DataFrame)], ignore_index=True)
     self.event_stat_frames = []
     self.ema_region_columns = [col for col in self.event_data if 'EMA_REGION' in col]
-    self.event_subtypes = event_subtypes
+    self.event_type_column = event_type_column
+    self.event_type_settings = event_type_settings
+    self.ema_id_column = ema_id_column
 
   def label_event_curve_matches(self):
-    self.event_data.drop(columns=['subid'], inplace=True)
     self.event_data['ID'] = self.event_data['ID'].astype(int)
-    self.event_data['ema_id'] = self.event_data['ema_id'].astype(str)
-    self.raw_event_data[self.event_subid_column] = self.raw_event_data[self.event_subid_column].astype(int)
-    self.raw_event_data[self.event_id_column] = self.raw_event_data[self.event_id_column].astype(str)
-    self.event_data = self.event_data.merge(self.raw_event_data, left_on=['ID', 'ema_id'], right_on=[self.event_subid_column, self.event_id_column], how='left')
+    self.event_data[self.ema_id_column] = self.event_data[self.ema_id_column].astype(str)
+    self.event_data.drop(columns=['subid'], inplace=True, errors='ignore')    
     
-    self.event_data['matched'] = self.event_data.groupby(['ID', 'ema_id'])['id_WITHIN_CURVE'].transform(lambda x: int(x.notna().any()))
+    # First mark events that matched to any curve
+    self.event_data['matched'] = self.event_data.groupby(['ID', self.ema_id_column])['curve_match_1'].transform(lambda x: int(x.notna().any()))
+    
+    self.event_data['has_shared_match'] = False
+    self.event_data['shared_curve_id'] = None
+    self.event_data['has_shared_first_match'] = False
+    self.event_data['shared_first_curve_id'] = None
+
+    curve_cols = [f'curve_match_{i}' for i in range(1, 6) if f'curve_match_{i}' in self.event_data.columns]
+    for _, group in self.event_data.groupby('ID'):
+        # Check first curve match only
+        first_curve_ids = group['curve_match_1'].dropna()
+        shared_first_curves = first_curve_ids[first_curve_ids.duplicated(keep=False)]
+        # Mark events that share first curve match
+        shared_first_mask = group['curve_match_1'].isin(shared_first_curves)
+        self.event_data.loc[group.index, 'has_shared_first_match'] = shared_first_mask
+        self.event_data.loc[group.index[shared_first_mask], 'shared_first_curve_id'] = group.loc[group.index[shared_first_mask], 'curve_match_1']
+
+        for i, row1 in group.iterrows():
+            for j, row2 in group.iterrows():
+                if i >= j:
+                    continue
+                curves1 = [row1[col] for col in curve_cols if pd.notna(row1[col])]
+                curves2 = [row2[col] for col in curve_cols if pd.notna(row2[col])]
+                shared_curves = set(curves1) & set(curves2)
+                if shared_curves:
+                    self.event_data.loc[[i,j], 'has_shared_match'] = True
+                    # Store one of the shared curve IDs
+                    shared_curve = list(shared_curves)[0]
+                    self.event_data.loc[[i,j], 'shared_curve_id'] = shared_curve
     self.matched_events = self.event_data[self.event_data['matched']==1]
     self.unmatched_events = self.event_data[self.event_data['matched']!=1]
 
-    if 'alc_only' in self.event_subtypes:
-      self.event_data['alc_only'] = self.event_data.groupby(['ema_id', 'ID'])['label'].transform(lambda x: int(all('drink' in label for label in x)))
-      self.matched_alcohol_events = self.event_data[(self.event_data['alc_only']==1) & (self.event_data['matched']==1)]
-      self.unmatched_alcohol_events = self.event_data[(self.event_data['alc_only']==1) & (self.event_data['matched']!=1)]
-    if 'co_use' in self.event_subtypes:
-      self.event_data['co_use'] = self.event_data.groupby(['ema_id', 'ID'])['label'].transform(
-        lambda x: int(any('drink' in label for label in x) and any('drink' not in label for label in x))
-      )
-      self.matched_co_use_events = self.event_data[(self.event_data['co_use']==1)  & (self.event_data['matched']==1)]
-      self.unmatched_co_use_events = self.event_data[(self.event_data['co_use']==1)  & (self.event_data['matched']!=1)]
-    if 'no_alc' in self.event_subtypes:
-      self.event_data['no_alc'] = self.event_data.groupby(['ema_id', 'ID'])['label'].transform(
-        lambda x: int(not any('drink' in label for label in x))
-      )
-      self.matched_non_alcohol_events = self.event_data[(self.event_data['no_alc']==1)  & (self.event_data['matched']==1)]
-      self.unmatched_non_alcohol_events = self.event_data[(self.event_data['no_alc']==1)  & (self.event_data['matched']!=1)]
-    
     matched = self.matched_events.copy()
-    matched = matched.rename(columns={'ID': 'subid', 'id_WITHIN_CURVE': 'curve_id'}).reset_index(drop=True)
-    matched = matched.drop_duplicates(subset=['subid', 'curve_id', 'ema_id'])
+    matched = matched.rename(columns={'ID': 'subid', 'curve_match_1': 'curve_id'}).reset_index(drop=True)
+    matched = matched.drop_duplicates(subset=['subid', 'curve_id', self.ema_id_column])
     matched['event_rank'] = matched.groupby(['subid', 'curve_id']).cumcount() + 1
-    matched_pivot = matched.pivot(index=['subid', 'curve_id'], columns='event_rank', values='ema_id')
+    matched_pivot = matched.pivot(index=['subid', 'curve_id'], columns='event_rank', values=self.ema_id_column)
     matched_pivot.columns = [f'event_matched_{col}' for col in matched_pivot.columns]
     matched_pivot.reset_index(inplace=True)
-    max_events = matched.groupby(['subid', 'curve_id'])['ema_id'].nunique().max()
+    max_events = matched.groupby(['subid', 'curve_id'])[self.ema_id_column].nunique().max()
     valid_columns = [
       col for col in matched_pivot.columns if col.startswith('event_matched_') 
       and int(col.replace('event_matched_', '')) <= max_events
@@ -64,6 +72,30 @@ class curveFeaturesWithEvents(curveFeatures):
     matched_pivot['subid'] = matched_pivot['subid'].astype(int)
     matched_pivot['curve_id'] = matched_pivot['curve_id'].astype(int)
     self.curve_features = self.curve_features.merge(matched_pivot, on=['subid', 'curve_id'], how='left')
+
+  def set_events_by_type(self):
+    """Set event types based on event_type_settings configuration"""
+    self.event_data['eventuse_merged'] = self.event_data[self.event_type_column].copy()
+    
+    # Initialize counters
+    self.shared_curve_count = 0
+    self.relabeled_event_count = 0
+    
+    for _, group in self.event_data.groupby(['ID', 'curve_match_1']):
+      if len(group) > 1:  # Multiple events matched to same curve
+        self.shared_curve_count += 1
+        # Get all unique labels for events matching this curve
+        all_labels = group[self.event_type_column].unique()
+        
+        # If multiple events match same curve, merge their types according to settings
+        if len(all_labels) > 1:
+          # Check if both substance types are present
+          has_substance_one = self.event_type_settings['substance_one'] in all_labels
+          has_substance_two = self.event_type_settings['substance_two'] in all_labels
+          has_both = (has_substance_one and has_substance_two) or self.event_type_settings['substance_one_and_two'] in all_labels
+          if has_both:
+            self.event_data.loc[group.index, 'eventuse_type_merged'] = self.event_type_settings['substance_one_and_two']
+            self.relabeled_event_count += len(group)
 
   def set_datasets_by_valid_and_match(self):
     valid = (self.curve_features['CURVE_VALID'] == 1)
@@ -79,6 +111,7 @@ class curveFeaturesWithEvents(curveFeatures):
     self.curve_invalid_without_event = self.curve_features[invalid & event_not_found]
 
   def count_matches(self):
+    # Basic counts
     self.counts = {
       'Curves': [len(self.curve_features)],
       'Curves Valid': [len(self.curve_valid)],
@@ -86,28 +119,32 @@ class curveFeaturesWithEvents(curveFeatures):
       'Curves with Event Match': [len(self.curve_with_event)],
       'Valid Curves with Event Match': [len(self.curve_valid_with_event)],
       'Invalid Curves with Event Match': [len(self.curve_invalid_with_event)],
-      'Events': [self.event_data[['ema_id', 'ID']].drop_duplicates().shape[0]],
-      'Events with Curve': [self.matched_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
-      'Events without Curve': [self.unmatched_events[['ema_id', 'ID']].drop_duplicates().shape[0]]
+      'Events': [self.event_data[[self.ema_id_column, 'ID']].drop_duplicates().shape[0]],
+      'Events with Curve': [self.matched_events[[self.ema_id_column, 'ID']].drop_duplicates().shape[0]],
+      'Events without Curve': [self.unmatched_events[[self.ema_id_column, 'ID']].drop_duplicates().shape[0]]
     }
 
-    if 'alc_only' in self.event_subtypes:
-      self.counts.update({
-        'Alc Only Events with Curve': [self.matched_alcohol_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
-        'Alc Only Events without Curve': [self.unmatched_alcohol_events[['ema_id', 'ID']].drop_duplicates().shape[0]]
-      })
-    if 'co_use' in self.event_subtypes:
-      self.counts.update({
-        'Co-Use Events with Curve': [self.matched_co_use_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
-        'Co-Use Events without Curve': [self.unmatched_co_use_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
-      })
-    if 'no_alc' in self.event_subtypes:
-      self.counts.update({
-        'Non-Alc Events with Curve': [self.matched_non_alcohol_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
-        'Non-Alc Events without Curve': [self.unmatched_non_alcohol_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
-      })
+    # Get counts by event type
+    # for event_type in self.event_data['eventuse_merged'].unique():
+    #   if pd.isna(event_type):
+    #     continue
+        
+    #   type_events = self.event_data[self.event_data['eventuse_merged'] == event_type]
+    #   matched_curves = self.curve_features[
+    #     (self.curve_features['event_matched_1'].isin(type_events[self.ema_id_column])) &
+    #     (self.curve_features['subid'].isin(type_events['ID']))
+    #   ]
+      
+    #   valid_curves = matched_curves[matched_curves['CURVE_VALID'] == 1]
+    #   invalid_curves = matched_curves[matched_curves['CURVE_VALID'] != 1]
+      
+    #   self.counts.update({
+    #     f'{event_type} Events': [len(type_events)],
+    #     f'{event_type} Valid Curves': [len(valid_curves)],
+    #     f'{event_type} Invalid Curves': [len(invalid_curves)]
+    #   })
 
-    self.event_stat_frames.append(pd.DataFrame(self.counts))
+    self.event_stat_frames.insert(0, pd.DataFrame(self.counts))
 
   def count_flags_for_curves_with_events(self):
     stats = statModel(self.curve_with_event)
@@ -115,15 +152,13 @@ class curveFeaturesWithEvents(curveFeatures):
       setattr(self, 'counts_' + flag_col, stats.groupby_counts(flag_col))
       self.event_stat_frames.append(getattr(self, 'counts_' + flag_col))
   
+  def count_events_with_multiple_curve_matches(self):
+    count = self.event_data[self.event_data['num_curves_matched'] > 1].shape[0]
+    self.event_stat_frames.append(pd.DataFrame({'Events with Multiple Curve Matches': [count]}))
+  
   def assess_search_quality(self):
-    if 'alc_only' in self.event_subtypes and 'co_use' in self.event_subtypes:
-      dfs = [
-        self.matched_alcohol_events, self.unmatched_alcohol_events,
-        self.matched_co_use_events, self.unmatched_co_use_events,
-      ]
-    else:
-      dfs = [self.matched_events, self.unmatched_events]
-    for df in dfs:
+    
+    for df in [self.matched_events, self.unmatched_events]:
       df_filtered = df.drop_duplicates(subset=['ID']+self.ema_region_columns)  
       stat_model = statModel(df_filtered)
       results = stat_model.continuous_stats_for_columns([col for col in self.ema_region_columns if 'plot' not in col])
@@ -137,16 +172,42 @@ class curveFeaturesWithEvents(curveFeatures):
     self.event_stat_frames.append(valid_feature_stats)
     self.event_stat_frames.append(invalid_feature_stats)
 
+  def compute_person_level_stats(self):
+    """
+    Compute person-level statistics for valid curves with event matches.
+    Adds the results to event_stat_frames.
+    """
+    # Create a copy of the inherited feature types dictionary
+    feature_types = self.person_level_feature_types.copy()
+    
+    # Add any flag columns as categorical
+    for col in self.curve_valid_with_event.columns:
+      if 'FLAG' in col:
+        feature_types[col] = 'categorical'
+    
+    # Compute person-level stats for valid curves with matches
+    stats = statModel(self.curve_valid_with_event)
+    person_stats = stats.get_subid_level_stats(feature_types)
+    
+    # Store the person-level stats as an attribute
+    self.valid_matched_person_stats = person_stats
+
   def run_event_stats(self):
     self.count_matches()
+    self.count_events_with_multiple_curve_matches()
     self.count_flags_for_curves_with_events()
     self.compute_tac_feature_stats()
     self.assess_search_quality()
+    self.compute_person_level_stats()
 
   def export_workbook_events_and_curves(self, file_name):
     with pd.ExcelWriter(file_name, engine = 'xlsxwriter', mode = 'w') as writer:
+      # Add the new Imputation Info tab
+      
       self.curve_features.to_excel(writer, sheet_name='Features', index=False)
       self.event_data.to_excel(writer, sheet_name='Events', index=False)
+      self.valid_matched_person_stats.to_excel(writer, sheet_name='Valid Matched by SubID', index=True)
+      self.compile_imputation_info().to_excel(writer, sheet_name='Imputations', index=False)
       
       row_index = 0
       for i, frame in enumerate(self.curve_stat_frames):
@@ -181,44 +242,17 @@ class curveFeaturesWithEvents(curveFeatures):
          missing_plot_path_text = 'No Plot Available'
       )
 
-      if 'co_use' in self.event_subtypes and 'alc_only' in self.event_subtypes:
-        filtered_unmatched_co_use = (
-          self.unmatched_co_use_events
-          .drop_duplicates(subset=['device_removal_plot_EMA_REGION'])
-          .dropna(subset=['device_removal_plot_EMA_REGION'])
-          .drop_duplicates(subset=['signal_processing_plot_EMA_REGION'])
-          .dropna(subset=['signal_processing_plot_EMA_REGION'])
-        )
-
-        filtered_alcohol_events = (
-          self.unmatched_alcohol_events
-          .drop_duplicates(subset=['device_removal_plot_EMA_REGION'])
-          .dropna(subset=['device_removal_plot_EMA_REGION'])
-          .drop_duplicates(subset=['signal_processing_plot_EMA_REGION'])
-          .dropna(subset=['signal_processing_plot_EMA_REGION'])
-        )
-
-        embed_graphs_into_workbook_tab(
-          writer.book,
-          [
-            filtered_unmatched_co_use['device_removal_plot_EMA_REGION'].tolist() + filtered_alcohol_events['device_removal_plot_EMA_REGION'].tolist(),
-            filtered_unmatched_co_use['signal_processing_plot_EMA_REGION'].tolist() + filtered_alcohol_events['signal_processing_plot_EMA_REGION'].tolist(),
-          ],
-          worksheet_name = 'No Curve with Alc Event',
-          plot_header_text = '', # this will be revised to work as a list (search valid)
-          missing_plot_path_text = 'No Plot Available'
-        )
-      else:
-        embed_graphs_into_workbook_tab(
-          writer.book,
-          [
-            self.unmatched_events['device_removal_plot_EMA_REGION'].tolist(),
-            self.unmatched_events['signal_processing_plot_EMA_REGION'].tolist(),
-          ],
-          worksheet_name = 'No Curve with Alc Event',
-          plot_header_text = '', # this will be revised to work as a list (search valid)
-          missing_plot_path_text = 'No Plot Available'
-        )
+      
+      embed_graphs_into_workbook_tab(
+        writer.book,
+        [
+          self.unmatched_events['device_removal_plot_EMA_REGION'].tolist(),
+          self.unmatched_events['signal_processing_plot_EMA_REGION'].tolist(),
+        ],
+        worksheet_name = 'No Curve - EMA Region',
+        plot_header_text = '', # this will be revised to work as a list (search valid)
+        missing_plot_path_text = 'No Plot Available'
+      )
 
   """
   def clean_out_distant_events(self, distance_threshold=8):
@@ -292,5 +326,4 @@ class curveFeaturesWithEvents(curveFeatures):
     self.events_without_curve = pd.concat([self.events_without_curve, df_missing_events], ignore_index=True)
     self.events_without_curve.sort_values(by=['ID', self.event_id_column], inplace=True)
 
-  
   """

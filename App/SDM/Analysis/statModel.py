@@ -138,3 +138,40 @@ class statModel:
     result_df = pd.DataFrame(r_results)
     result_df.set_index('Column', inplace=True)
     return result_df
+
+  def get_subid_level_stats(self, column_types_dict):
+    """
+    Generate subid-level statistics for a mix of continuous and categorical columns.
+    
+    Args:
+        column_types_dict (dict): Dictionary where keys are column names and values are either 'numeric' or 'categorical'
+        
+    Returns:
+        pd.DataFrame: Summary statistics for each column at the subid level with header attribute
+    """
+    all_stats = []
+    
+    for column, col_type in column_types_dict.items():
+        if col_type == 'numeric':
+            # For numeric columns, get continuous stats grouped by subid
+            stats = self.temp_data.groupby('subid')[column].agg(['mean', 'std', 'sem', 'min', 'max', 'count', 'median'])
+            # Create multi-index columns with original column name as first level
+            stats.columns = pd.MultiIndex.from_product([[column], stats.columns])
+            all_stats.append(stats)
+        elif col_type == 'categorical':
+            # For categorical columns, get counts grouped by subid
+            counts = self.temp_data.groupby(['subid', column]).size().unstack(fill_value=0)
+            # Create multi-index columns with original column name as first level
+            counts.columns = pd.MultiIndex.from_product([[column], counts.columns])
+            all_stats.append(counts)
+    
+    # Combine all statistics into a single dataframe
+    if all_stats:
+        result_df = pd.concat(all_stats, axis=1)
+        # Add header attribute
+        result_df.attrs['header'] = {
+            'description': f'Subid-level statistics summary (n={len(result_df.index)})',
+        }
+        return result_df
+    else:
+        return pd.DataFrame()

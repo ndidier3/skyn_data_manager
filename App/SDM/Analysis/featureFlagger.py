@@ -232,8 +232,8 @@ class featureFlagger():
 
   def flag_incomplete_curve_start(self, percent_cutoff=0.5):
     flag_column_name = f'FLAG_rise_completion_CURVE_<{percent_cutoff}'
-    self.flag_data_below_cutoff(
-      'rise_complete_perc_CURVE', percent_cutoff, flag_column_name
+    self.flag_data_below_and_above_cutoffs(
+      'rise_complete_perc_CURVE', percent_cutoff, 'peak_CURVE', 30, flag_column_name
     )
     return flag_column_name
 
@@ -254,8 +254,8 @@ class featureFlagger():
 
   def flag_incomplete_curve_end(self, percent_cutoff=0.5):
     flag_column_name = f'FLAG_fall_completion_CURVE_<{percent_cutoff}'
-    self.flag_data_below_cutoff(
-      'fall_complete_perc_CURVE', percent_cutoff, flag_column_name
+    self.flag_data_below_and_above_cutoffs(
+      'fall_complete_perc_CURVE', percent_cutoff, 'peak_CURVE', 30, flag_column_name
     )
     return flag_column_name
 

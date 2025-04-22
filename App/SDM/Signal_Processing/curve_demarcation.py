@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from kneed import KneeLocator
+from typing import Union, Tuple, Dict
 
 def get_distortions(data, features, k_max=10):
   distortions = []
@@ -30,70 +31,72 @@ def label_clusters(data, features, optimal_k, scaler):
 
 def get_tac_clusters(data, features):
   distortions, k_values_to_test, scaler = get_distortions(data, features, 10)
-  # optimal_k = get_knee(distortions, k_values_to_test)
-  optimal_k = 2
+  optimal_k = get_knee(distortions, k_values_to_test)
+  # optimal_k = 2
   return label_clusters(data, features, optimal_k, scaler), optimal_k
 
-def determine_curve_threshold(df: pd.DataFrame, default_threshold = 10):
-  try:
-    data = df.copy()
-    #if less than 12 hours of data, not enough data to use k means
-    if (data['TAC'].count() / 60) < 4:
-      return default_threshold, default_threshold
-    else:
-      data.dropna(subset=['TAC'], inplace=True)
-      data['TAC'] = data['TAC'].clip(lower=0)
+def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 10.0) -> Tuple[float, float, Union[float, None], Union[float, None]]:
+    """
+    Determine the threshold for identifying curves in TAC data using k-means clustering.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing TAC data
+        default_threshold (float): Default threshold to use if calculation fails or data is insufficient
+        
+    Returns:
+        tuple[float, float, float | None, float | None]: 
+            - First float: The actual threshold to use (capped between 1 and 10)
+            - Second float: The calculated threshold before capping
+            - Third float: Baseline mean (None if calculation failed)
+            - Fourth float: Baseline standard deviation (None if calculation failed)
+    """
+    try:
+        data = df.copy()
+        
+        # Validate input data
+        if 'TAC' not in data.columns:
+          print("WARNING: Curve threshold identification failed - No 'TAC' column found in data")
+          return default_threshold, default_threshold, None, None
+            
+        # Check for minimum data requirement (4 hours)
+        if (data['TAC'].count() / 60) < 4:
+          print("WARNING: Curve threshold identification failed - Less than 4 hours of TAC data available")
+          return default_threshold, default_threshold, None, None
+            
+        # Calculate features for clustering
+        data['TAC_Change'] = data['TAC'].diff()
+        data['TAC_RollingStd'] = data['TAC'].rolling(window=5, min_periods=1).std()
 
-      data['TAC_Change'] = data['TAC'].diff()
-      data['TAC_RollingStd'] = data['TAC'].rolling(window=5, min_periods=1).std()
-      data.fillna(0, inplace=True)
+        # Clean and prepare data
+        data.dropna(subset=['TAC', 'TAC_Change', 'TAC_RollingStd'], inplace=True)
+        data['TAC'] = data['TAC'].clip(lower=0)
 
-      features = ['TAC', 'TAC_Change', 'TAC_RollingStd']
+        features = ['TAC', 'TAC_Change', 'TAC_RollingStd']
+        data, optimal_k = get_tac_clusters(data, features)
 
-      data, optimal_k = get_tac_clusters(data, features)
+        # Identify baseline cluster and calculate threshold
+        baseline_cluster = data.groupby('Cluster')['TAC'].mean().idxmin()
+        baseline_mean = data[data['Cluster'] == baseline_cluster]['TAC'].mean()
+        baseline_std = data[data['Cluster'] == baseline_cluster]['TAC'].std()
+        
+        # Calculate threshold using 2 standard deviations
+        threshold = baseline_mean + (2 * baseline_std)
 
-      baseline_cluster = data.groupby('Cluster')['TAC'].mean().idxmin()
+        # Log the results
+        print(f"Curve Threshold Identification Results:")
+        print(f"  Optimal K: {optimal_k}")
+        print(f"  Baseline Mean TAC: {baseline_mean:.2f}")
+        print(f"  Baseline Standard Deviation: {baseline_std:.2f}")
+        print(f"  Curve Threshold (Mean + 2SD): {threshold:.2f}")
 
-      baseline_mean = data[data['Cluster'] == baseline_cluster]['TAC'].mean()
-      baseline_std = data[data['Cluster'] == baseline_cluster]['TAC'].std()
-
-      # If optimal_k is < 4, use the 2SD approach
-      if optimal_k < 4:
-        if baseline_mean == 0:
-          threshold = default_threshold
-        else:
-          threshold = baseline_mean + (2 * baseline_std)
-
-        print(f"Optimal K: {optimal_k}")
-        print(f"Baseline Mean TAC: {baseline_mean:.2f}")
-        print(f"Baseline Standard Deviation: {baseline_std:.2f}")
-        print(f"Curve Threshold (Mean + 3SD): {threshold:.2f}")
-
-      # If optimal_k >= 4, use the mean+1SD of the TAC cluster just above baseline
-      elif optimal_k >= 4:
-        cluster_means = data.groupby('Cluster')['TAC'].mean()
-        sorted_clusters = cluster_means.sort_values()
-        baseline_idx = sorted_clusters.index.get_loc(baseline_cluster)
-        second_cluster = sorted_clusters.index[baseline_idx + 1]
-        second_cluster_mean = data[data['Cluster'] == second_cluster]['TAC'].mean()
-        second_cluster_std = data[data['Cluster'] == second_cluster]['TAC'].std()
-        threshold = second_cluster_mean + second_cluster_std
-
-        print(f"Optimal K: {optimal_k}")
-        print(f"Baseline Mean TAC: {baseline_mean:.2f}")
-        print(f"Threshold set to the mean TAC of the next cluster: {threshold:.2f}")
-
-      # Return the threshold based on the logic
-      # if threshold > 30:
-      #   return 15, threshold  
-      if threshold > 10:
-        return 10, threshold
-      # elif threshold < 1:
-      #   return threshold + 1, threshold
-      else:
-        return threshold, threshold
-  except:
-    return default_threshold, default_threshold
+        # Cap threshold between 1 and 10
+        capped_threshold = max(1.0, min(10.0, threshold))
+        
+        return capped_threshold, threshold, baseline_mean, baseline_std
+        
+    except Exception as e:
+        print(f"ERROR: Curve threshold identification failed - {str(e)}")
+        return default_threshold, default_threshold, None, None
   
 def get_start_and_end_of_discrete_curves(df, curve_threshold):
   above_threshold = np.sort(df[df['TAC'] > curve_threshold].index)
@@ -113,9 +116,44 @@ def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separati
       prior_curve_end = merged_curve_start_and_end_indices[-1][1]
       merged_curve_minutes = curve_end - prior_curve_start
       if (curve_start - prior_curve_end) < max_curve_separation_minutes and (merged_curve_minutes < curve_minutes_limit):
-        merged_curve_start_and_end_indices[-1][1] = curve_end  
+        merged_curve_start_and_end_indices[-1][1] = curve_end
+        merged_curve_start_and_end_indices[-1][2] += 1  
       else:
-        merged_curve_start_and_end_indices.append([curve_start, curve_end])  
+        merged_curve_start_and_end_indices.append([curve_start, curve_end, 1])  
     else:
-        merged_curve_start_and_end_indices.append([curve_start, curve_end]) 
+        merged_curve_start_and_end_indices.append([curve_start, curve_end, 1]) 
   return merged_curve_start_and_end_indices 
+
+def get_curve_threshold_from_method(df: pd.DataFrame, curve_threshold_method: Union[str, float, int], default_threshold: float = 10.0) -> Tuple[float, float, Union[float, None], Union[float, None]]:
+    """
+    Determine the curve threshold based on the specified method.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing TAC data
+        curve_threshold_method (str | float | int): Either 'auto' or a numeric threshold
+        default_threshold (float): Default threshold to use if calculation fails
+        
+    Returns:
+        tuple[float, float, float | None, float | None]: 
+            - First float: The actual threshold to use
+            - Second float: The unadjusted threshold
+            - Third float: Baseline mean (None if calculation failed)
+            - Fourth float: Baseline standard deviation (None if calculation failed)
+            
+    Raises:
+        ValueError: If curve_threshold_method is invalid
+    """
+    try:
+        if curve_threshold_method == 'auto':
+            result = determine_curve_threshold(df, default_threshold)
+            if result is None or any(v is None for v in result):
+                raise ValueError("Failed to automatically determine curve threshold")
+            return result
+        elif isinstance(curve_threshold_method, (int, float)):
+            threshold = float(curve_threshold_method)
+            return threshold, threshold, None, None
+        else:
+            raise ValueError(f"Invalid curve_threshold value: {curve_threshold_method}")
+    except Exception as e:
+        print(f"Error determining curve threshold: {str(e)}")
+        return default_threshold, default_threshold, None, None

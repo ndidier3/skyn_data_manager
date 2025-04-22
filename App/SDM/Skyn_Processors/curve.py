@@ -6,13 +6,14 @@ from App.SDM.Analysis.featureFlagger import featureFlagger
 import pandas as pd
 
 class Curve:
-  def __init__(self, df: pd.DataFrame, subid, dataset_identifier, curve_id, curve_start, curve_end, curve_threshold, curve_flags = {}, periphery_flags = {}, periphery_buffer_before = 2, periphery_buffer_after = 2):
+  def __init__(self, df: pd.DataFrame, subid, dataset_identifier, curve_id, curve_start, curve_end, curve_count, curve_threshold, curve_flags = {}, periphery_flags = {}, periphery_buffer_before = 2, periphery_buffer_after = 2):
     
     self.df = df
     self.subid = subid
     self.dataset_identifier = dataset_identifier
 
     self.curve_id = curve_id
+    self.curve_count = curve_count
     self.curve = df.loc[curve_start:curve_end]
     self.curve_flags = curve_flags
     self.valid = False
@@ -143,6 +144,7 @@ class Curve:
       'subid': self.subid,
       'dataset_id': self.dataset_identifier,
       'curve_id': self.curve_id,
+      'curve_count': self.curve_count,
       'curve_threshold': self.curve_threshold,
       **self.device_info,
       **self.periphery_quality_features,
