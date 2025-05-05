@@ -56,20 +56,6 @@ def get_baseline_mean_stdev(df, variable, baseline_count=10):
   else:
     return None, None
   
-def get_curve_threshold(df, variable, baseline_count):
-  
-  base_mean, base_stdev = get_baseline_mean_stdev(df, variable, baseline_count=baseline_count)
-  curve_threshold = base_mean + base_stdev
-  
-  # #too high! curve has probably already started at the beginning of dataset
-  # if (curve_threshold > 20) and (df[variable].min() < (curve_threshold / 2)):
-  #   return (curve_threshold / 2)
-
-  # #if curve threshold is larger than max TAC
-  # if curve_threshold > (df[variable].max()*0.95):
-  #   return base_mean - base_stdev
-    
-  return curve_threshold
 
 def get_rise_duration(df, variable, time_variable, peak_index, curve_threshold):
   if len(df):

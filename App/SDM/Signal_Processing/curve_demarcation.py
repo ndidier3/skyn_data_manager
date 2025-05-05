@@ -4,6 +4,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from kneed import KneeLocator
 from typing import Union, Tuple, Dict
+import traceback
 
 def get_distortions(data, features, k_max=10):
   distortions = []
@@ -55,21 +56,54 @@ def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 10.0)
         
         # Validate input data
         if 'TAC' not in data.columns:
-          print("WARNING: Curve threshold identification failed - No 'TAC' column found in data")
-          return default_threshold, default_threshold, None, None
+            print("WARNING: Curve threshold identification failed - No 'TAC' column found in data")
+            return default_threshold, default_threshold, None, None
             
         # Check for minimum data requirement (4 hours)
         if (data['TAC'].count() / 60) < 4:
-          print("WARNING: Curve threshold identification failed - Less than 4 hours of TAC data available")
-          return default_threshold, default_threshold, None, None
+            print("WARNING: Curve threshold identification failed - Less than 4 hours of TAC data available")
+            return default_threshold, default_threshold, None, None
             
-        # Calculate features for clustering
-        data['TAC_Change'] = data['TAC'].diff()
-        data['TAC_RollingStd'] = data['TAC'].rolling(window=5, min_periods=1).std()
-
         # Clean and prepare data
-        data.dropna(subset=['TAC', 'TAC_Change', 'TAC_RollingStd'], inplace=True)
-        data['TAC'] = data['TAC'].clip(lower=0)
+        # Drop non-wear periods
+        data = data[data['device_worn_model'] == 1].copy()
+        
+        # Handle negative values
+        mask = data['TAC'] < 0
+        if mask.any():
+            data.loc[mask, 'TAC'] = np.random.normal(loc=1.0, scale=0.3, size=mask.sum()).clip(0, 2)
+        
+        # Calculate consecutive indices
+        data['consecutive'] = (data.index.to_series().diff() == 1)
+        data.loc[data.index[0], 'consecutive'] = True  # First row is always consecutive
+        
+        # TAC_Change - only calculate for consecutive rows
+        data['TAC_Change'] = data['TAC'].diff()
+        data.loc[~data['consecutive'], 'TAC_Change'] = np.nan
+        
+        # TAC_RollingStd - use trailing window and ensure all points in window are consecutive
+        window_size = 5
+        data['TAC_RollingStd'] = data['TAC'].rolling(
+            window=window_size,
+            min_periods=window_size  # Require full window for calculation
+        ).std()
+        
+        # Create a mask for windows where all points are consecutive
+        consecutive_mask_throughout_window = data['consecutive'].rolling(
+            window=window_size,
+            min_periods=window_size
+        ).apply(lambda x: x.all()).astype(bool)
+        
+        # Set TAC_RollingStd to NaN where the window contains non-consecutive points
+        data.loc[~consecutive_mask_throughout_window, 'TAC_RollingStd'] = np.nan
+        
+        # Drop any remaining NaN values
+        data = data.dropna(subset=['TAC', 'TAC_Change', 'TAC_RollingStd']).copy()
+        
+        # Verify we still have enough data after cleaning
+        if len(data) < 240:  # Less than 4 hours of data
+            print("WARNING: Curve threshold identification failed - Insufficient data after cleaning")
+            return default_threshold, default_threshold, None, None
 
         features = ['TAC', 'TAC_Change', 'TAC_RollingStd']
         data, optimal_k = get_tac_clusters(data, features)
@@ -96,6 +130,8 @@ def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 10.0)
         
     except Exception as e:
         print(f"ERROR: Curve threshold identification failed - {str(e)}")
+        print("Full traceback:")
+        print(traceback.format_exc())
         return default_threshold, default_threshold, None, None
   
 def get_start_and_end_of_discrete_curves(df, curve_threshold):

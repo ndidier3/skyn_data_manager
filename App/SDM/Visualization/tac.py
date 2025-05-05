@@ -63,7 +63,8 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
     (df['non_wear_buffered']==0) & 
     (df['jump']==0) & 
     (df['plummet']==0) &
-    (df['imputed']==0)
+    (df['imputed']==0) &
+    (df['between_low_quality']==0)
   ]
   gap = df.loc[df['gap_buffered'] == 1]
   gap_imputed = df.loc[df['gap_imputed'] == 1]
@@ -73,6 +74,8 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
   jump_imputed= df.loc[df['jump_imputed'] == 1]
   plummet = df.loc[(df['plummet'] == 1) & (df['jump'] == 0) & (df['non_wear_buffered'] == 0)]
   plummet_imputed = df.loc[df['plummet_imputed'] == 1]
+  between_low_quality = df.loc[df['between_low_quality'] == 1]
+  between_low_quality_imputed = df.loc[df['between_low_quality_imputed'] == 1]
 
   # Create a figure and axis
   fig, ax = plt.subplots(figsize=(16, 7))
@@ -95,20 +98,28 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
   if not plummet.empty:
     ax.scatter(plummet[time_variable], plummet['TAC_pre_imputation'], label='Plummet', 
               color='thistle', marker='v', alpha=0.7, s=12)
+  # Between low quality
+  if not between_low_quality.empty:
+    ax.scatter(between_low_quality[time_variable], between_low_quality['TAC_pre_imputation'],
+               label='Between Low Quality', color='lightgreen', marker='s', alpha=0.7, s=12)
     
   #Imputations (for gaps, non wear, jumps, plumments)
   if not gap_imputed.empty:
-    ax.scatter(gap_imputed[time_variable], gap_imputed['TAC_pre_smoothed'], label='Imputed Gap', 
+    ax.scatter(gap_imputed[time_variable], gap_imputed['TAC'], label='Imputed Gap', 
               marker='o', alpha=1.0, facecolor='gray', edgecolors="black")
   if not non_wear_imputed.empty:
-    ax.scatter(non_wear_imputed[time_variable], non_wear_imputed['TAC_pre_smoothed'], 
+    ax.scatter(non_wear_imputed[time_variable], non_wear_imputed['TAC'], 
                label='Imputed Non-Wear', facecolor='lightpink', edgecolors= "darkred", marker='o', alpha=1.0)
   if not jump_imputed.empty:
-    ax.scatter(jump_imputed[time_variable], jump_imputed['TAC_pre_smoothed'], 
+    ax.scatter(jump_imputed[time_variable], jump_imputed['TAC'], 
               label='Imputed Jump', facecolor='lightblue', edgecolors= "darkblue", marker='o', alpha=1.0)
   if not plummet_imputed.empty:
-    ax.scatter(plummet_imputed[time_variable], plummet_imputed['TAC_pre_smoothed'], 
+    ax.scatter(plummet_imputed[time_variable], plummet_imputed['TAC'], 
                label='Imputed Plummet', facecolor='thistle', edgecolors= "purple", marker='o', alpha=1.0)
+  # Between low quality imputed
+  if not between_low_quality_imputed.empty:
+    ax.scatter(between_low_quality_imputed[time_variable], between_low_quality_imputed['TAC'],
+               label='Imputed Between Low Quality', facecolor='lightgreen', edgecolors="darkgreen", marker='o', alpha=1.0)
   
   # Plot threshold line
   ax.hlines(curve_threshold, xmin=df['datetime'].min(), xmax=df['datetime'].max(), 

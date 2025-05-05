@@ -169,6 +169,8 @@ def get_plummet_indices(df, jump_indices_candidates = (), rolling_n = 5, fall_ra
 def convert_index_sets_to_index_region_pairs(*args, merge_distance = 20):
   combined_indices = sorted(set().union(*args))
   grouped_regions = []
+  between_low_quality_indices = set()  # New set to track between low quality indices
+  
   if combined_indices:
     region_start = combined_indices[0]
     for i in range(1, len(combined_indices)):
@@ -179,15 +181,18 @@ def convert_index_sets_to_index_region_pairs(*args, merge_distance = 20):
     grouped_regions.append([region_start, combined_indices[-1]])
   
   merged_regions = []
-  for region in grouped_regions:
+  for i, region in enumerate(grouped_regions):
     if not merged_regions: 
       merged_regions.append(region)
     elif region[0] > merged_regions[-1][1] + merge_distance:
       merged_regions.append(region)
     else:
+      # Add indices between the regions to between_low_quality_indices
+      between_indices = range(merged_regions[-1][1] + 1, region[0])
+      between_low_quality_indices.update(between_indices)
       merged_regions[-1][1] = region[1]
 
-  return merged_regions
+  return merged_regions, sorted(between_low_quality_indices)  # Return both merged regions and between low quality indices
 
 def label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates):
     imputation_dict = {
@@ -216,9 +221,9 @@ def label_imputation_reason(df, low_quality_region_start, low_quality_region_end
     return df
 
 def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wear = True, impute_jumps = True, impute_plummets = True):
-  df['TAC_pre_imputation'] = df['TAC'].copy()
   df['imputed'] = 0
   df['between_low_quality_imputed'] = 0
+  df['between_low_quality'] = 0  # New column for between low quality indices
 
   # Create DataFrame to store imputation information
   imputation_info = pd.DataFrame(columns=[
@@ -262,7 +267,8 @@ def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wea
   plummet_indices_candidates, plummet_indices = get_plummet_indices(df, jump_indices_candidates=jump_indices_candidates) if impute_plummets else ()
   df.loc[plummet_indices, 'plummet'] = 1
 
-  low_quality_regions = convert_index_sets_to_index_region_pairs(gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates)
+  low_quality_regions, between_low_quality_indices = convert_index_sets_to_index_region_pairs(gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates)
+  df.loc[between_low_quality_indices, 'between_low_quality'] = 1  # Mark between low quality indices
 
   for low_quality_region_start, low_quality_region_end in low_quality_regions:
     

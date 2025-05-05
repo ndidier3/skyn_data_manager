@@ -11,8 +11,9 @@ class skynDay:
     self.device_count = len(self.device_ids)
     self.firmware = self.day_dataset['Firmware Version'].iloc[0]
 
+    self.day_hours = (self.end_day - self.begin_day).total_seconds() / 3600
     self.device_turned_on_duration = self.day_dataset['device_turned_on'].sum() / 60
-    self.device_turned_on_percentage_of_day = self.device_turned_on_duration / 24
+    self.device_turned_on_percentage_of_day = self.device_turned_on_duration / self.day_hours
 
     """
     device_worn_duration will always be equal or less than device_turned_on_duration.

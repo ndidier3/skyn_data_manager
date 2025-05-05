@@ -5,40 +5,34 @@ class featureFlagger():
   """
   Takes event features; adds flags (1=flagged) or validation (1=valid)
   """
-  def __init__(self, features: pd.DataFrame, search_flag_selections = {}, periphery_flag_selections = {}, curve_flag_selections = {}):
+  def __init__(self, features: pd.DataFrame, flag_selections = {}):
     self.ftrs = features
-    self.search_flag_selections = {
-      'flag_sub_negative_10_search': {},
-      'flag_sub_negative_20_search': {},
-      'flag_sub_negative_40_search': {},
-      'flag_non_wear_duration_search': {},
-    }
-    self.search_flag_selections.update(search_flag_selections)
-
-    self.periphery_flag_selections = {
+    self.flag_selections = {
+      # Periphery flags
       'flag_sub_negative_10_periphery': {},
       'flag_sub_negative_20_periphery': {},
       'flag_sub_negative_40_periphery': {},
       'flag_non_wear_periphery': {},
-    }
-    self.periphery_flag_selections.update(periphery_flag_selections)
-
-    self.curve_flag_selections = {
+      
+      # Curve flags
       'flag_device_non_wear_curve': {},
       'flag_device_worn_duration_curve': {},
-      'flag_flatlined_peak': {},
-      'flag_low_flat_curves': {},
-      'flag_curve_start_too_late': {},
+      'flag_flatlined_peak_curve': {},
+      # 'flag_low_flat_curves_curve': {},
+      'flag_curve_start_too_late_curve': {},
       'flag_sub_negative_10_curve': {},
       'flag_device_turned_on_percent_curve': {},
       'flag_starting_non_wear_perc_curve': {},
-      'flag_incomplete_curve_start': {},
-      'flag_extreme_rise_rate': {},
+      'flag_incomplete_curve_start_curve': {},
+      'flag_extreme_rise_rate_curve': {},
       'flag_ending_non_wear_perc_curve': {},
-      'flag_incomplete_curve_end': {},
-      'flag_low_quality': {}
+      'flag_incomplete_curve_end_curve': {},
+      'flag_low_quality_curve': {},
+      'flag_short_curve_duration_curve': {},
+      'flag_too_much_imputation_curve': {},
+      'flag_unimputed_low_quality_percent_curve': {}
     }
-    self.curve_flag_selections.update(curve_flag_selections)
+    self.flag_selections.update(flag_selections)
 
   
   """ Flags will be based on cutoffs for continuous quality features """
@@ -92,12 +86,12 @@ class featureFlagger():
   """ Periphery Quality Assessment """
   def flag_sub_negative_10_periphery(self, percent_cutoff, duration_cutoff = None):
     if duration_cutoff:
-      flag_column_name = f'FLAG_sub_negative_10_PERIPHERY_>{percent_cutoff*100}%_>{duration_cutoff}hrs'
+      flag_column_name = f'FLAG_sub_negative_10_PERIPHERY_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}hrs'
       self.flag_data_above_one_of_two_cutoffs(
         'sub_negative_10_percent_PERIPHERY', percent_cutoff, 'sub_negative_10_duration_PERIPHERY', duration_cutoff, flag_column_name
       )
     else:
-      flag_column_name = f'FLAG_sub_negative_10_PERIPHERY_>{percent_cutoff*100}%'
+      flag_column_name = f'FLAG_sub_negative_10_PERIPHERY_>{int(round(percent_cutoff*100))}%'
       self.flag_data_above_cutoff(
         'sub_negative_10_percent_PERIPHERY', percent_cutoff, flag_column_name
       )
@@ -105,12 +99,12 @@ class featureFlagger():
 
   def flag_sub_negative_20_periphery(self, percent_cutoff, duration_cutoff = None):
     if duration_cutoff:
-      flag_column_name = f'FLAG_sub_negative_20_PERIPHERY_>{percent_cutoff*100}%_>{duration_cutoff}hrs'
+      flag_column_name = f'FLAG_sub_negative_20_PERIPHERY_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}hrs'
       self.flag_data_above_one_of_two_cutoffs(
         'sub_negative_20_percent_PERIPHERY', percent_cutoff, 'sub_negative_20_duration_PERIPHERY', duration_cutoff, flag_column_name
       )
     else:
-      flag_column_name = f'FLAG_sub_negative_20_PERIPHERY_>{percent_cutoff*100}%'
+      flag_column_name = f'FLAG_sub_negative_20_PERIPHERY_>{int(round(percent_cutoff*100))}%'
       self.flag_data_above_cutoff(
         'sub_negative_20_percent_PERIPHERY', percent_cutoff, flag_column_name
       )
@@ -118,19 +112,19 @@ class featureFlagger():
 
   def flag_sub_negative_40_periphery(self, percent_cutoff, duration_cutoff = None):
     if duration_cutoff:
-      flag_column_name = f'FLAG_sub_negative_40_PERIPHERY_>{percent_cutoff*100}%_>{duration_cutoff}hrs'
+      flag_column_name = f'FLAG_sub_negative_40_PERIPHERY_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}hrs'
       self.flag_data_above_one_of_two_cutoffs(
         'sub_negative_40_percent_PERIPHERY', percent_cutoff, 'sub_negative_40_duration_PERIPHERY', duration_cutoff, flag_column_name
       )
     else:
-      flag_column_name = f'FLAG_sub_negative_40_PERIPHERY_>{percent_cutoff*100}%_'
+      flag_column_name = f'FLAG_sub_negative_40_PERIPHERY_>{int(round(percent_cutoff*100))}%'
       self.flag_data_above_cutoff(
         'sub_negative_40_percent_PERIPHERY', percent_cutoff, flag_column_name
       )
     return flag_column_name
 
   def flag_non_wear_periphery(self, percent_cutoff):
-    flag_column_name = f'FLAG_non_wear_PERIPHERY_>{percent_cutoff*100}%'
+    flag_column_name = f'FLAG_non_wear_PERIPHERY_>{int(round(percent_cutoff*100))}%'
     # percent of wear will be assessed, so percent of non-wear needs to be flipped
     percent_cutoff = 1-percent_cutoff 
     self.flag_data_below_cutoff(
@@ -141,7 +135,7 @@ class featureFlagger():
   """ Whole Curve Qaulity Assessment """
   def flag_device_non_wear_curve(self, percent_cutoff, percent_consecutive_cutoff):
     #if flagged, all curve features invalid
-    flag_column_name = f'FLAG_device_non_wear_CURVE_>{(1-percent_cutoff)*100}%_>{percent_consecutive_cutoff*100}%'
+    flag_column_name = f'FLAG_device_non_wear_CURVE_>{int(round((1-percent_cutoff)*100))}%_>{int(round(percent_consecutive_cutoff*100))}%'
     self.flag_data_below_or_above_cutoffs(
       'device_worn_percent_CURVE', percent_cutoff, 'consecutive_non_wear_percent_CURVE', percent_consecutive_cutoff,  flag_column_name
     )
@@ -155,24 +149,23 @@ class featureFlagger():
     )
     return flag_column_name
 
-  def flag_flatlined_peak(self, flatline_percent_cutoff, peak_above):
-    flag_column_name = f'FLAG_flatlined_peak>{flatline_percent_cutoff*100}%flatline_peak>{peak_above}'
+  def flag_flatlined_peak_curve(self, flatline_percent_cutoff, peak_above):
+    flag_column_name = f'FLAG_flatlined_peak_CURVE_>{int(round(flatline_percent_cutoff*100))}%flatline_peak>{peak_above}'
     self.flag_data_above_cutoffs(
       'flatlined_percent_CURVE', flatline_percent_cutoff, 'peak_CURVE', peak_above, flag_column_name
     )
     return flag_column_name
 
-  def flag_low_flat_curves(self, peak_below, peak_to_curve_duration_ratio):
-    flag_column_name = f'FLAG_flat_low_peak<{peak_below}peak_to_curve_duration_ratio>{peak_to_curve_duration_ratio}'
-    self.ftrs['peak_to_curve_duration_ratio'] = self.ftrs['peak_CURVE'] / self.ftrs['duration_CURVE']
-    self.flag_data_below_and_above_cutoffs(
-      'peak_CURVE', peak_below, 'peak_to_curve_duration_ratio', peak_to_curve_duration_ratio, flag_column_name
-    )
-    self.ftrs.drop(['peak_to_curve_duration_ratio'], inplace=True)
+  # def flag_low_flat_curves_curve(self, peak_below, peak_to_curve_duration_ratio):
+  #   flag_column_name = f'FLAG_flat_low_peak<{peak_below}peak_to_curve_duration_ratio>{peak_to_curve_duration_ratio}'
+  #   self.ftrs['peak_to_curve_duration_ratio'] = self.ftrs['peak_CURVE'] / self.ftrs['duration_CURVE']
+  #   self.flag_data_below_and_above_cutoffs(
+  #     'peak_CURVE', peak_below, 'peak_to_curve_duration_ratio', peak_to_curve_duration_ratio, flag_column_name
+  #   )
+  #   self.ftrs.drop(['peak_to_curve_duration_ratio'], inplace=True)
+  #   return flag_column_name
 
-    return flag_column_name
-
-  def flag_curve_start_too_late(self, search_and_curve_delay = 6, peak_below = 20):
+  def flag_curve_start_too_late_curve(self, search_and_curve_delay = 6, peak_below = 20):
     flag_column_name = f'FLAG_search_and_curve_delay>{search_and_curve_delay}hrs_peak<{peak_below}'
     self.ftrs['begin_CURVE'] = pd.to_datetime(self.ftrs['begin_CURVE'])
     self.ftrs['begin_SEARCH'] = pd.to_datetime(self.ftrs['begin_SEARCH'])
@@ -188,35 +181,35 @@ class featureFlagger():
     return flag_column_name
   
   def flag_sub_negative_10_curve(self, percent_cutoff, duration_cutoff):
-    flag_column_name = f'FLAG_sub_negative_10_CURVE_>{percent_cutoff*100}%_>{duration_cutoff}'
+    flag_column_name = f'FLAG_sub_negative_10_CURVE_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}'
     self.flag_data_above_one_of_two_cutoffs(
       'sub_negative_10_percent_CURVE', percent_cutoff, 'sub_negative_10_duration_CURVE', duration_cutoff, flag_column_name
     )
     return flag_column_name
 
   def flag_device_turned_on_percent_curve(self, percent_cutoff = 0.60):
-    flag_column_name = f'FLAG_device_turned_on_percent_CURVE_<{percent_cutoff}'
+    flag_column_name = f'FLAG_device_turned_on_CURVE_<{int(round(percent_cutoff*100))}%'
     self.flag_data_below_cutoff(
       'device_turned_on_percent_CURVE', percent_cutoff, flag_column_name
     )
     return flag_column_name
 
-  def flag_unimputed_low_quality_percent(self, percent_cutoff = 0.25):
-    flag_column = f'FLAG_unimputed_low_quality_percent_CURVE_>{percent_cutoff}'
+  def flag_unimputed_low_quality_percent_curve(self, percent_cutoff = 0.25):
+    flag_column = f'FLAG_unimputed_low_quality_CURVE_>{int(round(percent_cutoff*100))}%'
     self.flag_data_above_cutoff(
       'unimputed_low_quality_percent_CURVE', percent_cutoff, flag_column
     )
     return flag_column
 
-  def flag_too_much_imputation(self, percent_cutoff = 0.6):
-    flag_column = f'FLAG_imputed_percent_CURVE_>{percent_cutoff}'
-    self.flag_data_above_cutoff(
-      'imputed_percent_CURVE', percent_cutoff, flag_column
+  def flag_too_much_imputation_curve(self, percent_cutoff = 0.6, duration_cutoff = 3):
+    flag_column = f'FLAG_imputed_CURVE_>{int(round(percent_cutoff*100))}%_or_duration>{duration_cutoff}hrs'
+    self.flag_data_above_one_of_two_cutoffs(
+      'imputed_percent_CURVE', percent_cutoff, 'imputed_duration_CURVE', duration_cutoff, flag_column
     )
     return flag_column
 
-  def flag_low_quality(self, percent_cutoff = 0.4):
-    flag_column = f'FLAG_low_quality_percent_CURVE_>{percent_cutoff}'
+  def flag_low_quality_curve(self, percent_cutoff = 0.4):
+    flag_column = f'FLAG_low_quality_CURVE_>{int(round(percent_cutoff*100))}%'
     self.flag_data_above_cutoff(
       'low_quality_percent_CURVE', percent_cutoff, flag_column
     )
@@ -224,20 +217,20 @@ class featureFlagger():
 
   """ Rise Quality Assessment """
   def flag_starting_non_wear_perc_curve(self, percent_cutoff = 0.5):
-    flag_column_name = f'FLAG_non_wear_CURVE_start_>{percent_cutoff}'
+    flag_column_name = f'FLAG_non_wear_CURVE_start_>{int(round(percent_cutoff*100))}%'
     self.flag_data_above_cutoff(
       'starting_non_wear_perc_CURVE', percent_cutoff, flag_column_name
     )
     return flag_column_name
 
-  def flag_incomplete_curve_start(self, percent_cutoff=0.5):
-    flag_column_name = f'FLAG_rise_completion_CURVE_<{percent_cutoff}'
+  def flag_incomplete_curve_start_curve(self, percent_cutoff=0.5):
+    flag_column_name = f'FLAG_rise_completion_CURVE_<{int(round(percent_cutoff*100))}%'
     self.flag_data_below_and_above_cutoffs(
       'rise_complete_perc_CURVE', percent_cutoff, 'peak_CURVE', 30, flag_column_name
     )
     return flag_column_name
 
-  def flag_extreme_rise_rate(self, rise_rate_cutoff=430):
+  def flag_extreme_rise_rate_curve(self, rise_rate_cutoff=430):
     flag_column_name = f'FLAG_rise_rate_CURVE_>{rise_rate_cutoff}'
     self.flag_data_above_cutoff(
       'rise_rate_CURVE', rise_rate_cutoff, flag_column_name
@@ -246,16 +239,23 @@ class featureFlagger():
 
   """ Fall Quality Assessment """
   def flag_ending_non_wear_perc_curve(self, percent_cutoff = 0.5):
-    flag_column_name = f'FLAG_non_wear_CURVE_end_>{percent_cutoff}'
+    flag_column_name = f'FLAG_non_wear_CURVE_end_>{int(round(percent_cutoff*100))}%'
     self.flag_data_above_cutoff(
       'ending_non_wear_perc_CURVE', percent_cutoff, flag_column_name
     )
     return flag_column_name
 
-  def flag_incomplete_curve_end(self, percent_cutoff=0.5):
-    flag_column_name = f'FLAG_fall_completion_CURVE_<{percent_cutoff}'
+  def flag_incomplete_curve_end_curve(self, percent_cutoff=0.5):
+    flag_column_name = f'FLAG_fall_completion_CURVE_<{int(round(percent_cutoff*100))}%'
     self.flag_data_below_and_above_cutoffs(
       'fall_complete_perc_CURVE', percent_cutoff, 'peak_CURVE', 30, flag_column_name
+    )
+    return flag_column_name
+
+  def flag_short_curve_duration_curve(self, duration_cutoff=0.25):  # 0.25 hours = 15 minutes
+    flag_column_name = f'FLAG_short_curve_duration_CURVE_<{duration_cutoff}hrs'
+    self.flag_data_below_cutoff(
+      'duration_CURVE', duration_cutoff, flag_column_name
     )
     return flag_column_name
 
@@ -288,94 +288,67 @@ class featureFlagger():
       np.nan #if search invalid
     )
   
-  def run_periphery_flags_and_validation(self):
-    self.periphery_flags = []
+  def run_flags_and_validation(self):
+    # First run periphery flags
+    periphery_flags = []
+    curve_flags = []
     
-    if self.periphery_flag_selections['flag_sub_negative_10_periphery']:
-      flag_sub_negative_10_periphery_column = self.flag_sub_negative_10_periphery(**self.periphery_flag_selections['flag_sub_negative_10_periphery'])
-      self.periphery_flags.append(flag_sub_negative_10_periphery_column)
-
-    if self.periphery_flag_selections['flag_sub_negative_20_periphery']:
-      flag_sub_negative_20_periphery_column = self.flag_sub_negative_20_periphery(**self.periphery_flag_selections['flag_sub_negative_20_periphery'])
-      self.periphery_flags.append(flag_sub_negative_20_periphery_column)
-
-    if self.periphery_flag_selections['flag_sub_negative_40_periphery']:
-      flag_sub_negative_40_periphery_column = self.flag_sub_negative_40_periphery(**self.periphery_flag_selections['flag_sub_negative_40_periphery'])
-      self.periphery_flags.append(flag_sub_negative_40_periphery_column)
-
-    if self.periphery_flag_selections['flag_non_wear_periphery']:
-      flag_non_wear_periphery_column = self.flag_non_wear_periphery(**self.periphery_flag_selections['flag_non_wear_periphery'])
-      self.periphery_flags.append(flag_non_wear_periphery_column)
+    # print("\n=== Starting flag processing ===")
+    # print(f"Total flags in selections: {len(self.flag_selections)}")
+    # print("Flag selections:", self.flag_selections)
     
-    self.validate_periphery('PERIPHERY_VALID', self.periphery_flags)
-
-    return self.periphery_flags
-
-  def run_curve_flags_and_validation(self):
-    if 'PERIPHERY_VALID' not in self.ftrs.columns:
+    # Process flags based on their type
+    for flag_name, flag_params in self.flag_selections.items():
+      # print(f"\nProcessing flag: {flag_name}")
+      # print(f"Parameters: {flag_params}")
+      
+      if flag_params:  # Only process if parameters are provided
+        if flag_name.endswith('_periphery'):
+          # Remove _periphery suffix for method call
+          method_name = flag_name
+          # print(f"Calling periphery method: {method_name}")
+          flag_column = getattr(self, method_name)(**flag_params)
+          # print(f"Generated flag column: {flag_column}")
+          periphery_flags.append(flag_column)
+        elif flag_name.endswith('_curve'):
+          # Remove _curve suffix for method call
+          method_name = flag_name
+          # print(f"Calling curve method: {method_name}")
+          flag_column = getattr(self, method_name)(**flag_params)
+          # print(f"Generated flag column: {flag_column}")
+          curve_flags.append(flag_column)
+      else:
+        print(f"Skipping {flag_name} - no parameters provided")
+    
+    print("\n=== Flag processing complete ===")
+    print(f"Periphery flags generated: {periphery_flags}")
+    print(f"Curve flags generated: {curve_flags}")
+    
+    # Validate periphery first
+    if periphery_flags:
+      print("\nValidating periphery flags...")
+      self.validate_periphery('PERIPHERY_VALID', periphery_flags)
+    else:
+      print("\nNo periphery flags to validate, setting PERIPHERY_VALID = 1")
       self.ftrs['PERIPHERY_VALID'] = 1
-
-    self.curve_feature_flags = []
-
-    if self.curve_flag_selections['flag_device_non_wear_curve']:
-      flag_device_non_wear_curve_column = self.flag_device_non_wear_curve(**self.curve_flag_selections['flag_device_non_wear_curve'])
-      self.curve_feature_flags.append(flag_device_non_wear_curve_column)
-
-    if self.curve_flag_selections['flag_device_worn_duration_curve']:
-      flag_device_worn_duration_curve_column = self.flag_device_worn_duration_curve(**self.curve_flag_selections['flag_device_worn_duration_curve'])
-      self.curve_feature_flags.append(flag_device_worn_duration_curve_column)
-
-    if self.curve_flag_selections['flag_flatlined_peak']:
-      flag_flatlined_percent_curve_column = self.flag_flatlined_peak(**self.curve_flag_selections['flag_flatlined_peak'])
-      self.curve_feature_flags.append(flag_flatlined_percent_curve_column)
-
-    if self.curve_flag_selections['flag_sub_negative_10_curve']:
-      flag_sub_negative_10_curve_column = self.flag_sub_negative_10_curve(**self.curve_flag_selections['flag_sub_negative_10_curve'])
-      self.curve_feature_flags.append(flag_sub_negative_10_curve_column)
-
-    if self.curve_flag_selections['flag_device_turned_on_percent_curve']:
-      flag_device_turned_on_percent_curve_column = self.flag_device_turned_on_percent_curve(**self.curve_flag_selections['flag_device_turned_on_percent_curve'])
-      self.curve_feature_flags.append(flag_device_turned_on_percent_curve_column)
-
-    if self.curve_flag_selections['flag_starting_non_wear_perc_curve']:
-      flag_starting_non_wear_perc_column = self.flag_starting_non_wear_perc_curve(**self.curve_flag_selections['flag_starting_non_wear_perc_curve'])
-      self.curve_feature_flags.append(flag_starting_non_wear_perc_column)
-
-    if self.curve_flag_selections['flag_incomplete_curve_start']:
-      flag_incomplete_curve_start_column = self.flag_incomplete_curve_start(**self.curve_flag_selections['flag_incomplete_curve_start'])
-      self.curve_feature_flags.append(flag_incomplete_curve_start_column)
-
-    if self.curve_flag_selections['flag_extreme_rise_rate']:
-      flag_extreme_rise_rates_column = self.flag_extreme_rise_rate(**self.curve_flag_selections['flag_extreme_rise_rate'])
-      self.curve_feature_flags.append(flag_extreme_rise_rates_column)
-
-    if self.curve_flag_selections['flag_ending_non_wear_perc_curve']:    
-      flag_ending_non_wear_perc_curve_column = self.flag_ending_non_wear_perc_curve(**self.curve_flag_selections['flag_ending_non_wear_perc_curve'])
-      self.curve_feature_flags.append(flag_ending_non_wear_perc_curve_column)
     
-    if self.curve_flag_selections['flag_incomplete_curve_end']:
-      flag_very_incomplete_curve_end_column = self.flag_incomplete_curve_end(**self.curve_flag_selections['flag_incomplete_curve_end'])
-      self.curve_feature_flags.append(flag_very_incomplete_curve_end_column)
+    # Then validate curves
+    if curve_flags:
+      print("\nValidating curve flags...")
+      self.validate_feature('CURVE_VALID', curve_flags)
+    else:
+      print("\nNo curve flags to validate, setting CURVE_VALID = 1")
+      self.ftrs['CURVE_VALID'] = 1
     
-    if self.curve_flag_selections['flag_curve_start_too_late']:
-      flag_curve_start_too_late_column = self.flag_curve_start_too_late(**self.curve_flag_selections['flag_curve_start_too_late'])
-      self.curve_feature_flags.append(flag_curve_start_too_late_column)
-
-    if self.curve_flag_selections['flag_unimputed_low_quality_percent']:
-      flag_curve_unimputed_low_quality_column = self.flag_unimputed_low_quality_percent(**self.curve_flag_selections['flag_unimputed_low_quality_percent'])
-      self.curve_feature_flags.append(flag_curve_unimputed_low_quality_column)
+    # print("\n=== Validation complete ===")
+    # print("Final validation counts:")
+    # print(f"PERIPHERY_VALID counts:\n{self.ftrs['PERIPHERY_VALID'].value_counts()}")
+    # print(f"CURVE_VALID counts:\n{self.ftrs['CURVE_VALID'].value_counts()}")
     
-    if self.curve_flag_selections['flag_too_much_imputation']:
-      flag_too_much_imputation_column = self.flag_too_much_imputation(**self.curve_flag_selections['flag_too_much_imputation'])
-      self.curve_feature_flags.append(flag_too_much_imputation_column)
-    
-    if self.curve_flag_selections['flag_low_quality']:
-      flag_low_quality_column = self.flag_low_quality(**self.curve_flag_selections['flag_low_quality'])
-      self.curve_feature_flags.append(flag_low_quality_column)
-
-    self.validate_feature('CURVE_VALID', self.curve_feature_flags)
-    
-    return self.curve_feature_flags
+    return {
+      'periphery_flags': periphery_flags,
+      'curve_flags': curve_flags
+    }
 
   # """ Search Quality Assessment """
   # def flag_sub_negative_10_search(self, duration_cutoff):

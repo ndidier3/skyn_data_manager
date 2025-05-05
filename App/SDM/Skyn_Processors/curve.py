@@ -6,7 +6,7 @@ from App.SDM.Analysis.featureFlagger import featureFlagger
 import pandas as pd
 
 class Curve:
-  def __init__(self, df: pd.DataFrame, subid, dataset_identifier, curve_id, curve_start, curve_end, curve_count, curve_threshold, curve_flags = {}, periphery_flags = {}, periphery_buffer_before = 2, periphery_buffer_after = 2):
+  def __init__(self, df: pd.DataFrame, subid, dataset_identifier, curve_id, curve_start, curve_end, curve_count, curve_threshold, flag_selections = {}, periphery_flags = {}, periphery_buffer_before = 2, periphery_buffer_after = 2):
     
     self.df = df
     self.subid = subid
@@ -15,7 +15,6 @@ class Curve:
     self.curve_id = curve_id
     self.curve_count = curve_count
     self.curve = df.loc[curve_start:curve_end]
-    self.curve_flags = curve_flags
     self.valid = False
 
     self.curve_threshold = curve_threshold
@@ -25,7 +24,6 @@ class Curve:
       df.loc[self.periphery_start_index:curve_start], 
       df.loc[curve_end:self.periphery_end_index]
     ])
-    self.periphery_flags = periphery_flags
     
     self.region = df.loc[self.periphery_start_index:self.periphery_end_index]
 
@@ -153,9 +151,13 @@ class Curve:
     }
 
     self.features = pd.DataFrame([self.all_features])
-    self.flagger = featureFlagger(self.features, periphery_flag_selections = self.periphery_flags, curve_flag_selections = self.curve_flags)
-    self.periphery_flag_columns = self.flagger.run_periphery_flags_and_validation()
-    self.curve_flag_columns = self.flagger.run_curve_flags_and_validation()
+    print("\nFeatures before flagging:", self.features.columns.tolist())
+    print("\nFlag selections in Curve:", flag_selections)
+    self.flagger = featureFlagger(self.features, flag_selections=flag_selections)
+    flags = self.flagger.run_flags_and_validation()
+    print("\nFlags returned:", flags)
+    self.periphery_flag_columns = flags['periphery_flags']
+    self.curve_flag_columns = flags['curve_flags']
     self.features = self.flagger.ftrs
     self.row = self.features.loc[0]
     self.valid = self.row['CURVE_VALID']

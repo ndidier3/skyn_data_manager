@@ -2,75 +2,66 @@ from App.SDM.Analysis.statModel import statModel
 from App.SDM.Skyn_Processors.ema_region import emaRegion
 from App.SDM.Configuration.file_management import load, save_to_computer
 from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
+from App.SDM.Documenting.report_guide import report_guide
+from App.SDM.User_Interface.Utils.filename_tools import extract_subid
 import os
 import pandas as pd
+import numpy as np
+from scipy import stats
+from scipy.signal import find_peaks
 
 class curveFeatures():
-  def __init__(self, processed_data_folder):
-    self.processors = [load(file[:-4], processed_data_folder) for file in os.listdir(processed_data_folder) if 'processed' in file]
+  def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, subid=None):
+    # Get list of processed files
+    processed_files = [file for file in os.listdir(processed_data_folder) if 'processed' in file]
+    
+    # Filter files by subid if specified
+    if subid is not None:
+        processed_files = [file for file in processed_files if extract_subid(file) == str(subid)]
+        if not processed_files:
+            raise ValueError(f"No processed files found for subid {subid}")
+    
+    # Load only the filtered processors
+    self.processors = [load(file[:-4], processed_data_folder) for file in processed_files]
     self.processors = [processor for processor in self.processors if hasattr(processor, 'curve_features')]
-    self.curve_features = pd.concat([processor.curve_features for processor in self.processors], ignore_index=True)
+    
+    # Create a list of DataFrames with consistent columns
+    dfs = []
+    for processor in self.processors:
+        df = processor.curve_features.copy()
+        # Only keep rows that have plot paths
+        plot_cols = ['smoothed_curve_plot', 'signal_processing_plot', 'device_removal_plot', 'signal_processing_plot_wide']
+        has_plots = df[plot_cols].notna().any(axis=1)
+        df = df[has_plots]
+        dfs.append(df)
+    
+    # Concatenate with consistent columns
+    self.curve_features = pd.concat(dfs, ignore_index=True)
+    
+    # Convert subid and curve_id to int
     self.curve_features[['subid', 'curve_id']] = self.curve_features[['subid', 'curve_id']].astype(int)
-    self.curve_features.drop_duplicates(subset=['subid', 'curve_id'], inplace=True)
+    
+    # Store plot columns before drop_duplicates
+    plot_data = self.curve_features[plot_cols].copy()
+    
+    # Drop duplicates while preserving plot columns
+    self.curve_features = self.curve_features.drop_duplicates(subset=['subid', 'curve_id'])
+    
+    # Restore plot columns
+    for col in plot_cols:
+        if col in plot_data.columns:
+            self.curve_features[col] = plot_data[col]
+    
     self.curve_stat_frames = []
 
-    self.default_tac_features = [
-      'duration_CURVE', 'auc_total_CURVE', 'auc_relative_CURVE', 
-      'peak_CURVE', 'relative_peak_CURVE',
-      'rise_rate_CURVE', 'rise_duration_CURVE',
-      'fall_rate_CURVE',  'fall_duration_CURVE'
-    ]
+    # Store configuration
+    self.smooth_and_impute_attrs = smooth_and_impute_attrs
+    self.curve_attrs = curve_attrs
 
-    self.person_level_feature_types = {
-        # Continuous TAC features
-        'duration_CURVE': 'numeric',
-        'auc_total_CURVE': 'numeric',
-        'auc_relative_CURVE': 'numeric',
-        'peak_CURVE': 'numeric',
-        'relative_peak_CURVE': 'numeric',
-        'rise_rate_CURVE': 'numeric',
-        'rise_duration_CURVE': 'numeric',
-        'fall_rate_CURVE': 'numeric',
-        'fall_duration_CURVE': 'numeric',
-        
-        # Quality features from periphery
-        'total_duration_PERIPHERY': 'numeric',
-        'device_turned_on_duration_PERIPHERY': 'numeric',
-        'device_turned_on_percent_PERIPHERY': 'numeric',
-        'device_worn_duration_PERIPHERY': 'numeric',
-        'device_worn_percent_PERIPHERY': 'numeric',
-        'imputed_duration_PERIPHERY': 'numeric',
-        'imputed_percent_PERIPHERY': 'numeric',
-        'low_quality_duration_PERIPHERY': 'numeric',
-        'low_quality_percent_PERIPHERY': 'numeric',
-        'unimputed_low_quality_duration_PERIPHERY': 'numeric',
-        'unimputed_low_quality_percent_PERIPHERY': 'numeric',
-        
-        # Quality features from curve
-        'total_duration_CURVE': 'numeric',
-        'device_turned_on_duration_CURVE': 'numeric',
-        'device_turned_on_percent_CURVE': 'numeric',
-        'device_worn_duration_CURVE': 'numeric',
-        'device_worn_percent_CURVE': 'numeric',
-        'consecutive_non_wear_duration_CURVE': 'numeric',
-        'consecutive_non_wear_percent_CURVE': 'numeric',
-        'flatline_max_CURVE': 'numeric',
-        'flatlined_percent_CURVE': 'numeric',
-        'jump_duration_CURVE': 'numeric',
-        'jump_percent_CURVE': 'numeric',
-        'plummet_duration_CURVE': 'numeric',
-        'plummet_percent_CURVE': 'numeric',
-        'imputed_duration_CURVE': 'numeric',
-        'imputed_percent_CURVE': 'numeric',
-        'low_quality_duration_CURVE': 'numeric',
-        'low_quality_percent_CURVE': 'numeric',
-        'unimputed_low_quality_duration_CURVE': 'numeric',
-        'unimputed_low_quality_percent_CURVE': 'numeric',
-        
-        # Categorical features
-        'CURVE_VALID': 'categorical',
-        'device_count_REGION': 'categorical'
-    }
+    # Create a copy of the feature types dictionary
+    self.person_level_dtypes = report_guide.person_level_feature_types.copy()
+
+    self.default_tac_features = report_guide.stats_features
 
     self.curve_valid = self.curve_features[self.curve_features['CURVE_VALID'] == 1]
     self.curve_invalid = self.curve_features[self.curve_features['CURVE_VALID'] != 1]
@@ -91,6 +82,17 @@ class curveFeatures():
     invalid = statModel(self.curve_invalid)
     valid_feature_stats = valid.continuous_stats_for_columns(self.default_tac_features)
     invalid_feature_stats = invalid.continuous_stats_for_columns(self.default_tac_features)
+    
+    # Add multi-index header for valid curves
+    valid_feature_stats.columns = pd.MultiIndex.from_product(
+        [['Valid Curves'], valid_feature_stats.columns]
+    )
+    
+    # Add multi-index header for invalid curves
+    invalid_feature_stats.columns = pd.MultiIndex.from_product(
+        [['Invalid Curves'], invalid_feature_stats.columns]
+    )
+    
     self.curve_stat_frames.append(valid_feature_stats)
     self.curve_stat_frames.append(invalid_feature_stats)
 
@@ -105,17 +107,14 @@ class curveFeatures():
     Compute person-level statistics for both continuous and categorical curve features.
     Adds the results to curve_stat_frames.
     """
-    # Create a copy of the feature types dictionary
-    feature_types = self.person_level_feature_types.copy()
-    
     # Add any flag columns as categorical
     for col in self.curve_features.columns:
         if 'FLAG' in col:
-            feature_types[col] = 'categorical'
+            self.person_level_dtypes[col] = 'categorical'
     
     # Compute person-level stats
     stats = statModel(self.curve_features)
-    person_stats = stats.get_subid_level_stats(feature_types)
+    person_stats = stats.get_subid_level_stats(self.person_level_dtypes)
     
     self.person_level_stats = person_stats
 
@@ -124,19 +123,32 @@ class curveFeatures():
     self.count_curve_flags()
     self.compute_person_level_stats()
 
-  def export_workbook_curves(self, file_name):
+  def export_workbook_curves(self, file_name, smooth_and_impute_attrs=None, curve_attrs=None):
     with pd.ExcelWriter(file_name, engine = 'xlsxwriter', mode = 'w') as writer:
-      # Add the new Imputation Info tab
+      # Add tab descriptions
+      report_guide.get_tab_descriptions_dataframe(include_events=False).to_excel(writer, sheet_name='Tab Descriptions', index=False)
       
-      self.curve_features.to_excel(writer, sheet_name='Features', index=False)
-      self.person_level_stats.to_excel(writer, sheet_name='Person Level Stats', index=True)
-      self.compile_imputation_info().to_excel(writer, sheet_name='Imputations', index=False)
+      # Add variable key
+      variable_key = pd.DataFrame({
+          'Variable': list(report_guide.curve_features_descriptions.keys()),
+          'Description': list(report_guide.curve_features_descriptions.values())
+      })
+      variable_key.to_excel(writer, sheet_name='Variable Key', index=False)
       
+      # Add stats
       row_index = 0
       for i, frame in enumerate(self.curve_stat_frames):
         frame.to_excel(writer, sheet_name='Stats', startrow=row_index)
         row_index += len(frame) + 2
-    
+      
+      # Add features
+      self.curve_features.to_excel(writer, sheet_name='Features', index=False)
+      
+      # Add person level stats
+      self.person_level_stats.to_excel(writer, sheet_name='Person Level Stats', index=True)
+      
+      # Add visualization tabs
+
       embed_graphs_into_workbook_tab(
         writer.book,
         [
@@ -145,7 +157,7 @@ class curveFeatures():
           self.curve_invalid['signal_processing_plot_wide'].tolist()
         ],
          worksheet_name = 'Invalid Curves',
-         plot_header_text = '', # this will be revised to work as a list (search valid)
+         plot_header_text = '',
          missing_plot_path_text = 'No Plot Available'
       )
 
@@ -157,6 +169,31 @@ class curveFeatures():
           self.curve_valid['signal_processing_plot_wide'].tolist()
         ],
          worksheet_name = 'Valid Curves',
-         plot_header_text = '', # this will be revised to work as a list (search valid)
+         plot_header_text = '',
          missing_plot_path_text = 'No Plot Available'
       )
+      
+      # Add imputations
+      self.compile_imputation_info().to_excel(writer, sheet_name='Imputations', index=False)
+      
+      # Add run settings
+      run_settings_df = report_guide.get_run_settings_dataframe(
+          smooth_and_impute_attrs=smooth_and_impute_attrs,
+          curve_attrs=curve_attrs
+      )
+      if run_settings_df is not None:
+          run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
+
+def calculate_curve_features(tac_curve, time_points, baseline_value=None):
+    """
+    Calculate features from a TAC curve.
+    
+    Args:
+        tac_curve (np.ndarray): Array of TAC values
+        time_points (np.ndarray): Array of time points in hours
+        baseline_value (float, optional): Baseline TAC value. If None, will be calculated.
+        
+    Returns:
+        dict: Dictionary of curve features
+    """
+    # ... rest of the function ...
