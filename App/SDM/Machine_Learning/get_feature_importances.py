@@ -1,5 +1,4 @@
 import pandas as pd
-import pickle
 
 def get_feature_importances(model, features):
   #std = np.std([model.feature_importances_ for tree in model.estimators_], axis=0)

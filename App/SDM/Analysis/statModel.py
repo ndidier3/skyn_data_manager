@@ -13,9 +13,38 @@ class statModel:
   def filter_out(self, column, value):
     self.temp_data = self.temp_data[self.temp_data[column] != value]
   
-  def groupby_counts(self, column):
+  def groupby_counts(self, column, include_unique_flags=False):
+    """
+    Get counts for a column, with optional unique flag counts.
+    
+    Args:
+        column (str): Column name to count
+        include_unique_flags (bool): If True, adds columns showing counts of rows that are only flagged by this specific flag
+        
+    Returns:
+        pd.DataFrame: Counts with percentages and optional unique flag counts
+    """
+    # Get basic counts
     group_stats = self.temp_data.groupby(column).size().to_frame(name='Count')
     group_stats['%'] = (group_stats['Count'] / group_stats['Count'].sum()) * 100
+    
+    # If this is a flag column and unique flags are requested, calculate unique flag counts
+    if 'FLAG' in column and include_unique_flags:
+        # Get all other flag columns
+        flag_cols = [col for col in self.temp_data.columns if 'FLAG' in col and col != column]
+        
+        # For rows where this flag is 1, check if any other flags are 1
+        if 1 in group_stats.index:
+            # Get rows where this flag is 1
+            flagged_rows = self.temp_data[self.temp_data[column] == 1]
+            # Count rows where this is the only flag set to 1
+            unique_flagged = flagged_rows[~flagged_rows[flag_cols].eq(1).any(axis=1)]
+            unique_count = len(unique_flagged)
+            
+            # Add to stats
+            group_stats.loc[1, 'Unique_Flag_Count'] = unique_count
+            group_stats.loc[1, 'Unique_Flag_%'] = (unique_count / group_stats.loc[1, 'Count']) * 100
+    
     group_stats.columns.name = column
     return group_stats
 

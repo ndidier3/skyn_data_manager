@@ -45,10 +45,6 @@ class curveFeaturesWithEvents(curveFeatures):
             # Create a mapping of (subid, curve_id) to validity
             validity_map = self.curve_features.set_index(['subid', 'curve_id'])[['CURVE_VALID', 'PERIPHERY_VALID']]
             
-            # Debug print to check validity map
-            print(f"\nValidity map for curve match {i}:")
-            print(f"Number of entries in validity map: {len(validity_map)}")
-            
             # Simple lookup function
             def get_curve_validity(row):
                 if pd.isna(row[f'curve_match_{i}']):
@@ -64,34 +60,60 @@ class curveFeaturesWithEvents(curveFeatures):
             
             # Map validity to each curve match
             self.event_data[f'CURVE_and_PERIPHERY_VALID_{i}'] = self.event_data.apply(get_curve_validity, axis=1)
-            
-            # Debug print to verify mapping
-            print(f"\nCurve match {i} validity counts:")
-            print(self.event_data[f'CURVE_and_PERIPHERY_VALID_{i}'].value_counts(dropna=False))
-            print(f"Number of non-null curve matches: {self.event_data[f'curve_match_{i}'].notna().sum()}")
-            print(f"Number of non-null validity values: {self.event_data[f'CURVE_and_PERIPHERY_VALID_{i}'].notna().sum()}")
     
-    for _, group in self.event_data.groupby('ID'):
-        # Check first curve match only
-        first_curve_ids = group['curve_match_1'].dropna()
-        shared_first_curves = first_curve_ids[first_curve_ids.duplicated(keep=False)]
-        # Mark events that share first curve match
-        shared_first_mask = group['curve_match_1'].isin(shared_first_curves)
-        self.event_data.loc[group.index, 'has_shared_first_match'] = shared_first_mask
-        self.event_data.loc[group.index[shared_first_mask], 'shared_first_curve_id'] = group.loc[group.index[shared_first_mask], 'curve_match_1']
+    # Assign valid and invalid curve matches per row
+    curve_match_cols = [f'curve_match_{i}' for i in range(1, 6) if f'curve_match_{i}' in self.event_data.columns]
+    valid_cols = []
+    invalid_cols = []
+    for idx, row in self.event_data.iterrows():
+        valid_matches = []
+        invalid_matches = []
+        for i, col in enumerate(curve_match_cols, 1):
+            val = row[col]
+            valid_flag = row.get(f'CURVE_and_PERIPHERY_VALID_{i}', None)
+            if pd.notna(val):
+                if valid_flag == 1:
+                    valid_matches.append(val)
+                elif valid_flag == 0:
+                    invalid_matches.append(val)
+        # Assign valid matches
+        for j, v in enumerate(valid_matches, 1):
+            colname = f'valid_curve_match_{j}'
+            self.event_data.at[idx, colname] = v
+            if colname not in valid_cols:
+                valid_cols.append(colname)
+        # Assign invalid matches
+        for j, v in enumerate(invalid_matches, 1):
+            colname = f'invalid_curve_match_{j}'
+            self.event_data.at[idx, colname] = v
+            if colname not in invalid_cols:
+                invalid_cols.append(colname)
 
+    for _, group in self.event_data.groupby('ID'):
+        # Check first valid curve match only
+        first_valid_curve_ids = group['valid_curve_match_1'].dropna()
+        shared_first_valid_curves = first_valid_curve_ids[first_valid_curve_ids.duplicated(keep=False)]
+        # Mark events that share first valid curve match
+        shared_first_mask = group['valid_curve_match_1'].isin(shared_first_valid_curves)
+        self.event_data.loc[group.index, 'has_shared_first_match'] = shared_first_mask
+        self.event_data.loc[group.index[shared_first_mask], 'shared_first_curve_id'] = group.loc[group.index[shared_first_mask], 'valid_curve_match_1']
+
+        # Get all valid curve match columns for this group
+        valid_curve_cols = [col for col in group.columns if col.startswith('valid_curve_match_') and not col.endswith('_overlap')]
+        
         for i, row1 in group.iterrows():
             for j, row2 in group.iterrows():
                 if i >= j:
                     continue
-                curves1 = [row1[col] for col in curve_cols if pd.notna(row1[col])]
-                curves2 = [row2[col] for col in curve_cols if pd.notna(row2[col])]
+                curves1 = [row1[col] for col in valid_curve_cols if pd.notna(row1[col])]
+                curves2 = [row2[col] for col in valid_curve_cols if pd.notna(row2[col])]
                 shared_curves = set(curves1) & set(curves2)
                 if shared_curves:
                     self.event_data.loc[[i,j], 'has_shared_match'] = True
                     # Store one of the shared curve IDs
                     shared_curve = list(shared_curves)[0]
                     self.event_data.loc[[i,j], 'shared_curve_id'] = shared_curve
+                    
     self.matched_events = self.event_data[self.event_data['matched']==1]
     self.unmatched_events = self.event_data[self.event_data['matched']!=1]
 
@@ -112,6 +134,17 @@ class curveFeaturesWithEvents(curveFeatures):
     matched_pivot['subid'] = matched_pivot['subid'].astype(int)
     matched_pivot['curve_id'] = matched_pivot['curve_id'].astype(int)
     self.curve_features = self.curve_features.merge(matched_pivot, on=['subid', 'curve_id'], how='left')
+
+    # After assigning all valid/invalid curve match columns, compute counts and binary flags
+    valid_curve_cols = [col for col in self.event_data.columns if col.startswith('valid_curve_match_') and not col.endswith('_overlap')]
+    invalid_curve_cols = [col for col in self.event_data.columns if col.startswith('invalid_curve_match_') and not col.endswith('_overlap')]
+
+    self.event_data['num_valid_curves_matched'] = self.event_data[valid_curve_cols].notna().sum(axis=1)
+    self.event_data['num_invalid_curves_matched'] = self.event_data[invalid_curve_cols].notna().sum(axis=1)
+
+    self.event_data['multiple_valid_curves_matched'] = (self.event_data['num_valid_curves_matched'] > 1) & (self.event_data['num_invalid_curves_matched'] == 0)
+    self.event_data['multiple_invalid_curves_matched'] = (self.event_data['num_invalid_curves_matched'] > 1) & (self.event_data['num_valid_curves_matched'] == 0)
+    self.event_data['multiple_mixed_curves_matched'] = (self.event_data['num_valid_curves_matched'] > 0) & (self.event_data['num_invalid_curves_matched'] > 0) & ((self.event_data['num_valid_curves_matched'] + self.event_data['num_invalid_curves_matched']) > 1)
 
   # def set_events_by_type(self):
   #   """Set event types based on event_type_settings configuration"""
@@ -157,16 +190,27 @@ class curveFeaturesWithEvents(curveFeatures):
       'Curves Valid': [len(self.curve_valid)],
       'Curves Invalid': [len(self.curve_invalid)],
       'Curves with Event Match': [len(self.curve_with_event)],
-      'Valid Curves with Event Match': [len(self.curve_valid_with_event)],
-      'Invalid Curves with Event Match': [len(self.curve_invalid_with_event)],
+      'Curves (Valid) with Event Match': [len(self.curve_valid_with_event)],
+      'Curves (Invalid) with Event Match': [len(self.curve_invalid_with_event)],
       'Events': [self.event_data[['ema_id', 'ID']].drop_duplicates().shape[0]],
-      'Events with Curve': [self.matched_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
-      'Events without Curve': [self.unmatched_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
-      'Events with Valid Curve': [self.matched_events[self.matched_events['CURVE_and_PERIPHERY_VALID_1'] == 1][['ema_id', 'ID']].drop_duplicates().shape[0]],
-      'Events with Invalid Curve': [self.matched_events[self.matched_events['CURVE_and_PERIPHERY_VALID_1'] != 1][['ema_id', 'ID']].drop_duplicates().shape[0]],
-      'Events with Shared First Curve (valid only)': [self.event_data[(self.event_data['has_shared_first_match']) & (self.event_data['CURVE_and_PERIPHERY_VALID_1'] == 1)][['ema_id', 'ID']].drop_duplicates().shape[0]],
-      'Events with Any Shared Curve (valid only)': [self.event_data[(self.event_data['has_shared_match']) & (self.event_data['CURVE_and_PERIPHERY_VALID_1'] == 1)][['ema_id', 'ID']].drop_duplicates().shape[0]],
-      'Events with Multiple Curve Matches': [self.event_data[self.event_data['num_curves_matched'] > 1][['ema_id', 'ID']].drop_duplicates().shape[0]]
+      'Events NOT matched to a Curve': [self.unmatched_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
+      'Events matched to a Curve': [self.matched_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
+      'Events matched to a Valid Curve': [self.matched_events[self.matched_events['valid_curve_match_1'].notna()][['ema_id', 'ID']].drop_duplicates().shape[0]],
+      'Events matched to an Invalid Curve': [self.matched_events[self.matched_events['invalid_curve_match_1'].notna()][['ema_id', 'ID']].drop_duplicates().shape[0]],
+      'Events matched to Multiple Curves': [
+          self.event_data[(self.event_data['num_valid_curves_matched'] + self.event_data['num_invalid_curves_matched']) > 1][['ema_id', 'ID']].drop_duplicates().shape[0]
+      ],
+      'Events matched to Multiple Curves (Valid Only)': [
+          self.event_data[self.event_data['multiple_valid_curves_matched']][['ema_id', 'ID']].drop_duplicates().shape[0]
+      ],
+      'Events matched to Multiple Curves (Invalid Only)': [
+          self.event_data[self.event_data['multiple_invalid_curves_matched']][['ema_id', 'ID']].drop_duplicates().shape[0]
+      ],
+      'Events matched to Multiple Curves (Mixed Valid/Invalid)': [
+          self.event_data[self.event_data['multiple_mixed_curves_matched']][['ema_id', 'ID']].drop_duplicates().shape[0]
+      ],
+      'Events with a Shared Curve (Valid Only)': [self.event_data[self.event_data['has_shared_match']][['ema_id', 'ID']].drop_duplicates().shape[0]],
+      'Events with a Shared Curve (First Match Only, Valid Only)': [self.event_data[self.event_data['has_shared_first_match']][['ema_id', 'ID']].drop_duplicates().shape[0]]
     }
 
     # Get counts by event type
@@ -193,9 +237,30 @@ class curveFeaturesWithEvents(curveFeatures):
 
   def count_flags_for_curves_with_events(self):
     stats = statModel(self.curve_with_event)
-    for flag_col in [col for col in self.curve_with_event.columns if 'FLAG' in col]:
-      setattr(self, 'counts_' + flag_col, stats.groupby_counts(flag_col))
-      self.event_stat_frames.append(getattr(self, 'counts_' + flag_col))
+    flag_cols = [col for col in self.curve_with_event.columns if 'FLAG' in col]
+    flag_stats_list = []
+    total_curves = len(self.curve_with_event)
+    for flag_col in flag_cols:
+      flag_stats = stats.groupby_counts(flag_col, include_unique_flags=True)
+      flag_stats = flag_stats.reset_index()
+      flag_stats['Flag_Column'] = flag_col
+      flag_stats_list.append(flag_stats)
+    if flag_stats_list:
+      combined_flag_stats = pd.concat(flag_stats_list, axis=0, ignore_index=True)
+      # Only keep relevant columns
+      keep_cols = [col for col in combined_flag_stats.columns if col in [
+          'Value', 'Count', 'Unique_Flag_Count', 'Unique_Flag_%', 'Flag_Column'
+      ]]
+      combined_flag_stats = combined_flag_stats[keep_cols]
+      # Filter out rows where 'Unique_Flag_Count' is empty (removes counts of non-flagged curves, only keeping flag counts)
+      combined_flag_stats = combined_flag_stats[combined_flag_stats['Unique_Flag_Count'].notna() & (combined_flag_stats['Unique_Flag_Count'] != '')]
+      # Calculate % of total curves and add column
+      combined_flag_stats['% of Total Curves'] = (combined_flag_stats['Count'] / total_curves) * 100
+      # Sort by 'Count' descending
+      combined_flag_stats = combined_flag_stats.sort_values(by='Count', ascending=False)
+      # Set 'Flag_Column' as the index
+      combined_flag_stats = combined_flag_stats.set_index('Flag_Column')
+      self.event_stat_frames.append(combined_flag_stats)
   
   def assess_search_quality(self):
     
@@ -288,47 +353,189 @@ class curveFeaturesWithEvents(curveFeatures):
       # Add features
       self.curve_features.to_excel(writer, sheet_name='Features', index=False)
       
-      # Add events
-      self.event_data.to_excel(writer, sheet_name='Events', index=False)
+      # Add events - reorder columns according to event_feature_descriptions
+      # Get ordered columns from event_feature_descriptions that exist in event_data
+      ordered_columns = [col for col in report_guide.event_feature_descriptions.keys() if col in self.event_data.columns]
+      # Get remaining columns that aren't in event_feature_descriptions
+      other_columns = [col for col in self.event_data.columns if col not in report_guide.event_feature_descriptions.keys()]
+      # Combine ordered columns with remaining columns
+      event_columns = ordered_columns + other_columns
+      self.event_data[event_columns].to_excel(writer, sheet_name='Events', index=False)
       
       # Add valid matched by subid
       self.valid_matched_person_stats.to_excel(writer, sheet_name='Valid Matched by SubID', index=True)
       
       # Add visualization tabs
-      embed_graphs_into_workbook_tab(
-        writer.book,
-        [
-          self.curve_valid_with_event['device_removal_plot'].tolist(),
-          self.curve_valid_with_event['signal_processing_plot'].tolist(),
-          self.curve_valid_with_event['signal_processing_plot_wide'].tolist()
-        ],
-         worksheet_name = 'Valid Curves',
-         plot_header_text = '',
-         missing_plot_path_text = 'No Plot Available'
-      )
+      # embed_graphs_into_workbook_tab(
+      #   writer.book,
+      #   [
+      #     self.curve_valid_with_event['device_removal_plot'].tolist(),
+      #     self.curve_valid_with_event['signal_processing_plot'].tolist(),
+      #     self.curve_valid_with_event['signal_processing_plot_wide'].tolist()
+      #   ],
+      #    worksheet_name = 'Valid Curves',
+      #    plot_header_text = '',
+      #    missing_plot_path_text = 'No Plot Available'
+      # )
 
-      embed_graphs_into_workbook_tab(
-        writer.book,
-        [
-          self.curve_invalid_with_event['device_removal_plot'].tolist(),
-          self.curve_invalid_with_event['signal_processing_plot'].tolist(),
-          self.curve_invalid_with_event['signal_processing_plot_wide'].tolist()
-        ],
-         worksheet_name = 'Invalid Curves',
-         plot_header_text = '',
-         missing_plot_path_text = 'No Plot Available'
-      )
+      # embed_graphs_into_workbook_tab(
+      #   writer.book,
+      #   [
+      #     self.curve_invalid_with_event['device_removal_plot'].tolist(),
+      #     self.curve_invalid_with_event['signal_processing_plot'].tolist(),
+      #     self.curve_invalid_with_event['signal_processing_plot_wide'].tolist()
+      #   ],
+      #    worksheet_name = 'Invalid Curves',
+      #    plot_header_text = '',
+      #    missing_plot_path_text = 'No Plot Available'
+      # )
       
-      embed_graphs_into_workbook_tab(
-        writer.book,
-        [
-          self.unmatched_events['device_removal_plot_EMA_REGION'].tolist(),
-          self.unmatched_events['signal_processing_plot_EMA_REGION'].tolist(),
-        ],
-        worksheet_name = 'No Curve - EMA Region',
-        plot_header_text = '',
-        missing_plot_path_text = 'No Plot Available'
+      # embed_graphs_into_workbook_tab(
+      #   writer.book,
+      #   [
+      #     self.unmatched_events['device_removal_plot_EMA_REGION'].tolist(),
+      #     self.unmatched_events['signal_processing_plot_EMA_REGION'].tolist(),
+      #   ],
+      #   worksheet_name = 'No Curve - EMA Region',
+      #   plot_header_text = '',
+      #   missing_plot_path_text = 'No Plot Available'
+      # )
+      
+      # Add imputations
+      self.compile_imputation_info().to_excel(writer, sheet_name='Imputations', index=False)
+      
+      # Add run settings
+      run_settings_df = report_guide.get_run_settings_dataframe(
+          smooth_and_impute_attrs=smooth_and_impute_attrs,
+          curve_attrs=curve_attrs,
+          event_attrs=event_attrs,
+          day_attrs=day_attrs
       )
+      if run_settings_df is not None:
+          run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
+
+  def export_sorted_workbook(self, file_name, sort_column, ascending=True, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None):
+    """
+    Export a workbook with features and curves sorted by a specified column.
+    Includes all rows that are flagged (flag=1) for the corresponding flag column and 50 non-flagged rows
+    that are closest to the flag threshold.
+    
+    Args:
+        file_name (str): Name of the output Excel file
+        sort_column (str): Name of the column to sort by
+        ascending (bool): Whether to sort in ascending order (True) or descending order (False)
+        smooth_and_impute_attrs (dict, optional): Smoothing and imputation attributes
+        curve_attrs (dict, optional): Curve attributes
+        event_attrs (dict, optional): Event attributes
+        day_attrs (dict, optional): Day attributes
+    """
+    # Ensure stats are computed
+    if not self.curve_stat_frames or not self.event_stat_frames:
+        self.run_event_stats()
+    
+    with pd.ExcelWriter(file_name, engine='xlsxwriter', mode='w') as writer:
+      # Add tab descriptions
+      report_guide.get_tab_descriptions_dataframe(include_events=True).to_excel(writer, sheet_name='Tab Descriptions', index=False)
+      
+      # Add variable key
+      row_index = 0
+      for name, df in report_guide.get_variable_key_dataframes():
+          df.to_excel(writer, sheet_name='Variable Key', startrow=row_index)
+          row_index += len(df) + 3  # Add 3 rows of spacing
+      
+      # Add stats
+      row_index = 0
+      for i, frame in enumerate(self.curve_stat_frames):
+        frame.to_excel(writer, sheet_name='STATS', startrow=row_index)
+        row_index += len(frame) + 3
+      
+      for i, frame in enumerate(self.event_stat_frames):
+        frame.to_excel(writer, sheet_name='STATS', startrow=row_index)
+        row_index += len(frame) + 3
+      
+      # Sort features
+      sorted_features = self.curve_features.sort_values(by=sort_column, ascending=ascending)
+      print(f"[DEBUG] Total rows after sorting: {len(sorted_features)}")
+      
+      # Find corresponding flag column
+      # Remove _CURVE or _PERIPHERY suffix if present
+      base_column = sort_column.replace('_CURVE', '').replace('_PERIPHERY', '')
+      
+      # Flexibly match any flag column containing the base_column
+      flag_candidates = [col for col in sorted_features.columns if col.startswith('FLAG_') and base_column in col]
+      print(f"[DEBUG] Flag candidates for base_column '{base_column}': {flag_candidates}")
+      flag_column = flag_candidates[0] if flag_candidates else None
+      print(f"[DEBUG] Selected flag column: {flag_column}")
+      
+      if flag_column:
+          # Get flagged and non-flagged rows
+          flagged = sorted_features[sorted_features[flag_column] == 1]
+          non_flagged = sorted_features[sorted_features[flag_column] != 1]
+          print(f"[DEBUG] Flagged rows: {len(flagged)}; Non-flagged rows: {len(non_flagged)}")
+          
+          if len(flagged) > 0:
+              # Determine if flag is for high or low values by comparing means
+              flagged_mean = flagged[sort_column].mean()
+              non_flagged_mean = non_flagged[sort_column].mean()
+              is_high_flag = flagged_mean > non_flagged_mean
+              print(f"[DEBUG] Flagged mean: {flagged_mean}, Non-flagged mean: {non_flagged_mean}, is_high_flag: {is_high_flag}")
+              
+              # Get 50 closest non-flagged rows
+              if is_high_flag:
+                  # For high flags, take the highest 50 non-flagged values
+                  closest_non_flagged = non_flagged.nlargest(50, sort_column)
+              else:
+                  # For low flags, take the lowest 50 non-flagged values
+                  closest_non_flagged = non_flagged.nsmallest(50, sort_column)
+              print(f"[DEBUG] Closest non-flagged rows selected: {len(closest_non_flagged)}")
+              
+              # Combine flagged and closest non-flagged rows
+              selected_indices = sorted(set(flagged.index) | set(closest_non_flagged.index))
+              print(f"[DEBUG] Total selected rows (flagged + closest): {len(selected_indices)}")
+              sorted_features = sorted_features.loc[selected_indices]
+      print(f"[DEBUG] Final rows in Features sheet: {len(sorted_features)}")
+      
+      sorted_features.to_excel(writer, sheet_name='Features', index=False)
+      
+      # Add events - reorder columns according to event_feature_descriptions
+      ordered_columns = [col for col in report_guide.event_feature_descriptions.keys() if col in self.event_data.columns]
+      other_columns = [col for col in self.event_data.columns if col not in report_guide.event_feature_descriptions.keys()]
+      event_columns = ordered_columns + other_columns
+      self.event_data[event_columns].to_excel(writer, sheet_name='Events', index=False)
+      
+      # Add valid matched by subid
+      self.valid_matched_person_stats.to_excel(writer, sheet_name='Valid Matched by SubID', index=True)
+      
+      # Split curves into valid and invalid based on CURVE_VALID
+      valid_curves = sorted_features[sorted_features['CURVE_VALID'] == 1]
+      invalid_curves = sorted_features[sorted_features['CURVE_VALID'] != 1]
+      
+      # Add visualization tabs for valid and invalid curves
+      if not invalid_curves.empty:
+          embed_graphs_into_workbook_tab(
+              writer.book,
+              [
+                  invalid_curves['device_removal_plot'].tolist(),
+                  invalid_curves['signal_processing_plot'].tolist(),
+                  invalid_curves['signal_processing_plot_wide'].tolist()
+              ],
+              worksheet_name='Invalid Curves',
+              plot_header_text='',
+              missing_plot_path_text='No Plot Available'
+          )
+      
+      if not valid_curves.empty:
+          embed_graphs_into_workbook_tab(
+              writer.book,
+              [
+                  valid_curves['device_removal_plot'].tolist(),
+                  valid_curves['signal_processing_plot'].tolist(),
+                  valid_curves['signal_processing_plot_wide'].tolist()
+              ],
+              worksheet_name='Valid Curves',
+              plot_header_text='',
+              missing_plot_path_text='No Plot Available'
+          )
       
       # Add imputations
       self.compile_imputation_info().to_excel(writer, sheet_name='Imputations', index=False)

@@ -39,15 +39,15 @@ class ReportGuide:
             'CURVE_VALID': 'Whether the curve meets validity criteria (1=valid)',
             
             # Curve timing features
-            'begin_CURVE': 'Start time of the curve',
-            'end_CURVE': 'End time of the curve',
-            'first_tac_CURVE': 'First TAC value in the curve',
-            'last_tac_CURVE': 'Last TAC value in the curve',
-            'mean_tac_CURVE': 'Mean TAC value in the curve',
-            'sd_tac_CURVE': 'Standard deviation of TAC values in the curve',
-            'sem_tac_CURVE': 'Standard error of the mean TAC values in the curve',
-            'rise_complete_perc_CURVE': 'Percentage of rise phase that is complete',
-            'fall_complete_perc_CURVE': 'Percentage of fall phase that is complete',
+            'begin': 'Start time of the curve',
+            'end': 'End time of the curve',
+            'first_tac': 'First TAC value in the curve',
+            'last_tac': 'Last TAC value in the curve',
+            'mean_tac': 'Mean TAC value in the curve',
+            'sd_tac': 'Standard deviation of TAC values in the curve',
+            'sem_tac': 'Standard error of the mean TAC values in the curve',
+            'rise_complete_perc': 'Percentage of rise phase that is complete (peak - first_tac)/relative_peak',
+            'fall_complete_perc': 'Percentage of fall phase that is complete (peak - last_tac)/relative_peak',
             
             # Quality features
             'total_duration': 'Total duration of the region (hours)',
@@ -83,8 +83,8 @@ class ReportGuide:
             'consecutive_sub_negative_40_duration': 'Longest consecutive duration of TAC values below -40 (hours)',
             
             # Curve counts
-            'started_curve_count_CURVE': 'Number of discrete curves within the final curve',
-            'complete_curve_count_CURVE': 'Number of discrete curves started and ended within the final curve',
+            'started_curve_count': 'Number of discrete curves within the final curve',
+            'complete_curve_count': 'Number of discrete curves started and ended within the final curve',
             
             # Visualization paths
             'smoothed_curve_plot': 'Path to smoothed curve plot',
@@ -148,10 +148,10 @@ class ReportGuide:
             # Curve matching information
             'matched': 'Whether the event matched to any curve (1=matched)',
             'num_curves_matched': 'Number of curves matched to this event',
-            'has_shared_match': 'Whether the event shares a curve match with another event',
-            'shared_curve_id': 'ID of the shared curve if event shares a match',
-            'has_shared_first_match': 'Whether the event shares its first curve match with another event',
-            'shared_first_curve_id': 'ID of the first shared curve if event shares a first match',
+            'has_shared_match': 'Whether the event shares a valid curve match with another event',
+            'shared_curve_id': 'ID of the shared valid curve if event shares a match',
+            'has_shared_first_match': 'Whether the event shares its first valid curve match with another event',
+            'shared_first_curve_id': 'ID of the first shared valid curve if event shares a first match',
             
             # Curve match details (up to 5 possible matches)
             'curve_match_1': 'ID of the first matched curve',
@@ -165,12 +165,36 @@ class ReportGuide:
             'curve_match_5': 'ID of the fifth matched curve',
             'curve_match_5_overlap': 'Proportion of overlap between event and fifth matched curve',
             
+            # Valid curve match details
+            'valid_curve_match_1': 'ID of the first valid matched curve',
+            'valid_curve_match_2': 'ID of the second valid matched curve',
+            'valid_curve_match_3': 'ID of the third valid matched curve',
+            'valid_curve_match_4': 'ID of the fourth valid matched curve',
+            'valid_curve_match_5': 'ID of the fifth valid matched curve',
+            'valid_curve_match_1_overlap': 'ID of the first valid curve that overlaps with another valid curve',
+            'valid_curve_match_2_overlap': 'ID of the second valid curve that overlaps with another valid curve',
+            'valid_curve_match_3_overlap': 'ID of the third valid curve that overlaps with another valid curve',
+            'valid_curve_match_4_overlap': 'ID of the fourth valid curve that overlaps with another valid curve',
+            'valid_curve_match_5_overlap': 'ID of the fifth valid curve that overlaps with another valid curve',
+            
+            # Invalid curve match details
+            'invalid_curve_match_1': 'ID of the first invalid matched curve',
+            'invalid_curve_match_2': 'ID of the second invalid matched curve',
+            'invalid_curve_match_3': 'ID of the third invalid matched curve',
+            'invalid_curve_match_4': 'ID of the fourth invalid matched curve',
+            'invalid_curve_match_5': 'ID of the fifth invalid matched curve',
+            'invalid_curve_match_1_overlap': 'ID of the first invalid curve that overlaps with another invalid curve',
+            'invalid_curve_match_2_overlap': 'ID of the second invalid curve that overlaps with another invalid curve',
+            'invalid_curve_match_3_overlap': 'ID of the third invalid curve that overlaps with another invalid curve',
+            'invalid_curve_match_4_overlap': 'ID of the fourth invalid curve that overlaps with another invalid curve',
+            'invalid_curve_match_5_overlap': 'ID of the fifth invalid curve that overlaps with another invalid curve',
+            
             # Curve validity information
-            'CURVE_VALID_1': 'Whether the first matched curve is valid (1=valid)',
-            'CURVE_VALID_2': 'Whether the second matched curve is valid (1=valid)',
-            'CURVE_VALID_3': 'Whether the third matched curve is valid (1=valid)',
-            'CURVE_VALID_4': 'Whether the fourth matched curve is valid (1=valid)',
-            'CURVE_VALID_5': 'Whether the fifth matched curve is valid (1=valid)',
+            'CURVE_and_PERIPHERY_VALID_1': 'Whether the first matched curve and its periphery are valid (1=valid)',
+            'CURVE_and_PERIPHERY_VALID_2': 'Whether the second matched curve and its periphery are valid (1=valid)',
+            'CURVE_and_PERIPHERY_VALID_3': 'Whether the third matched curve and its periphery are valid (1=valid)',
+            'CURVE_and_PERIPHERY_VALID_4': 'Whether the fourth matched curve and its periphery are valid (1=valid)',
+            'CURVE_and_PERIPHERY_VALID_5': 'Whether the fifth matched curve and its periphery are valid (1=valid)',
             
             # Event region quality features
             'total_duration_EMA_REGION': 'Total duration of the EMA region (hours)',
@@ -203,25 +227,6 @@ class ReportGuide:
             'device_removal_plot_EMA_REGION': 'Path to device removal plot for EMA region',
             'signal_processing_plot_EMA_REGION': 'Path to signal processing plot for EMA region',
             
-            # Event search region features
-            'search_start_time': 'Start time of the search region',
-            'curve_start_time_limit': 'Time limit for curve start',
-            'curve_end_time_limit': 'Time limit for curve end',
-
-            # Event curve features
-            'curve_not_found_reason': 'Reason why no curve was found for this event',
-            'device_worn_rise_duration_CURVE': 'Duration device was worn during curve rise (hours)',
-            'device_worn_rise_percent_CURVE': 'Percentage of time device was worn during curve rise',
-            'device_worn_fall_duration_CURVE': 'Duration device was worn during curve fall (hours)',
-            'device_worn_fall_percent_CURVE': 'Percentage of time device was worn during curve fall',
-            'gap_imputed_duration_CURVE': 'Duration of gap-imputed data in curve (hours)',
-            'gap_imputed_percent_CURVE': 'Percentage of gap-imputed data in curve',
-            'non_wear_imputed_duration_CURVE': 'Duration of non-wear imputed data in curve (hours)',
-            'non_wear_imputed_percent_CURVE': 'Percentage of non-wear imputed data in curve',
-            'jump_imputed_duration_CURVE': 'Duration of jump-imputed data in curve (hours)',
-            'jump_imputed_percent_CURVE': 'Percentage of jump-imputed data in curve',
-            'plummet_imputed_duration_CURVE': 'Duration of plummet-imputed data in curve (hours)',
-            'plummet_imputed_percent_CURVE': 'Percentage of plummet-imputed data in curve'
         }
 
         # Person-level feature descriptions (used in Valid Matched by SubID tab)
@@ -299,6 +304,7 @@ class ReportGuide:
             
             # Categorical features
             'CURVE_VALID': 'categorical',
+            'PERIPHERY_VALID': 'categorical',
             'device_count_REGION': 'categorical'
         }
 
