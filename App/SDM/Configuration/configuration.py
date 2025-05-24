@@ -6,7 +6,7 @@ from statistics import mode
 from sklearn import preprocessing
 import numpy as np
 import os
-from App.SDM.User_Interface.Utils.filename_tools import stringify_dataset_id
+from App.SDM.Configuration.file_management import stringify_dataset_id
 
 """
 this file contains utilies for loading the date, standardizing formats, retrieving unique identifiers, etc.

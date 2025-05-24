@@ -3,7 +3,7 @@ from App.SDM.Skyn_Processors.ema_region import emaRegion
 from App.SDM.Configuration.file_management import load, save_to_computer
 from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 from App.SDM.Documenting.report_guide import report_guide
-from App.SDM.User_Interface.Utils.filename_tools import extract_subid
+from App.SDM.Configuration.file_management import extract_subid
 import os
 import pandas as pd
 import numpy as np

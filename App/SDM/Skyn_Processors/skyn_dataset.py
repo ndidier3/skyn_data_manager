@@ -3,7 +3,6 @@ from ..Configuration.configuration import *
 from ..Configuration.day_level import get_day_level_indices, create_day_level_dataframe
 from ..Configuration.event_level import get_event_level_indices, create_event_level_dataframe
 from ..Configuration.file_management import *
-from App.SDM.User_Interface.Utils.filename_tools import extract_additional_filename_text
 from ..Crop.crop import *
 from ..Signal_Processing.identify_overlapping_curves import identify_overlapping_curves
 from ..Signal_Processing.smooth_signal import smooth_savgol

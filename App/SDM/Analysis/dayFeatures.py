@@ -1,7 +1,7 @@
 from App.SDM.Analysis.statModel import statModel
 from App.SDM.Configuration.file_management import load, save_to_computer
 from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
-from App.SDM.User_Interface.Utils.filename_tools import extract_subid
+from App.SDM.Configuration.file_management import extract_subid
 import os
 import pandas as pd
 from openpyxl import Workbook
