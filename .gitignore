@@ -2,7 +2,7 @@
 /Results/*
 dist/
 build/
-App/SDM.egg-info/
+App/App.SDM.egg-info/
 setup.py
 test.py
 pyinstaller_command.txt
@@ -13,8 +13,8 @@ venv
 sdm_env
 SDM_prompt.exe
 sdm_user_interface.spec
-sdm.spec
-SDM.exe
+App.SDM.spec
+App.SDM.exe
 App/run.py
 archive/
 sdm_single_file.exe
@@ -36,3 +36,4 @@ App/SDM/Scripts/LINC
 Inputs/Skyn_Data/
 App/SDM/Scripts/LINC/run_curve_analysis.py
 .cursor
+*.egg-info/
