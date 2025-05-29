@@ -5,191 +5,341 @@
       
       <!-- Processing Mode -->
       <div class="form-group mb-4">
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" v-model="isBatchMode">
-          <label class="form-check-label">Batch Processing</label>
+        <div class="processing-mode-toggle">
+          <label class="toggle-label">Single File</label>
+          <div class="toggle-switch" @click="isBatchMode = !isBatchMode">
+            <div class="toggle-slider" :class="{ 'batch-mode': isBatchMode }"></div>
+          </div>
+          <label class="toggle-label">Batch</label>
         </div>
       </div>
 
       <!-- File Selection -->
       <div v-if="!isBatchMode">
-        <div class="row">
-          <div class="col-md-6">
-            <div class="form-group">
-              <label for="subid">Subject ID</label>
-              <input type="text" class="form-control" id="subid" v-model="subid" required>
+        <div class="file-selection mb-4">
+          <div class="file-input-wrapper">
+            <input 
+              type="file" 
+              ref="fileInput"
+              class="file-input" 
+              @change="handleFileSelect"
+              accept=".csv,.xlsx,.xls"
+              style="display: none;"
+            >
+            <div class="file-input-trigger" @click="$refs.fileInput.click()">
+              <i class="fas fa-file-upload"></i>
+              <span>{{ selectedFile ? selectedFile.name : 'Select File' }}</span>
             </div>
           </div>
-          <div class="col-md-6">
-            <div class="form-group">
-              <label for="datasetId">Dataset ID</label>
-              <input type="text" class="form-control" id="datasetId" v-model="datasetId" required>
+          <div v-if="fileError" class="text-danger mt-2">
+            {{ fileError }}
+          </div>
+          <div v-if="selectedFile" class="file-info mt-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <p class="mb-0"><strong>Subject ID:</strong> {{ extractedSubId }}</p>
+              <span class="badge" :class="subjectStatus?.exists ? 'bg-success' : 'bg-secondary'">
+                {{ subjectStatus?.exists ? 'Previously Analyzed' : 'New Subject' }}
+              </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <p class="mb-0"><strong>Study ID:</strong> {{ extractedStudyId }}</p>
+              <span class="badge" :class="studyStatus?.exists ? 'bg-success' : 'bg-secondary'">
+                {{ studyStatus?.exists ? 'Registered Study' : 'New Study' }}
+              </span>
+            </div>
+            <div v-if="hasPriorAnalysis" class="prior-analysis-info mt-3 p-2 border rounded">
+              <p class="mb-2"><i class="fas fa-info-circle me-2"></i>Prior analysis found for this study</p>
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-primary" @click="loadPriorAnalysis">
+                  <i class="fas fa-history me-1"></i>Load Prior Analysis
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @click="startNewAnalysis">
+                  <i class="fas fa-plus me-1"></i>Start New Analysis
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div v-else>
-        <div class="form-group">
-          <label for="inputFolder">Input Folder</label>
-          <input type="text" class="form-control" id="inputFolder" v-model="inputFolder" required>
+        <div class="directory-selection mb-4">
+          <div class="directory-input-wrapper">
+            <input 
+              type="file" 
+              ref="directoryInput"
+              class="directory-input" 
+              @change="handleDirectorySelect"
+              webkitdirectory
+              directory
+            >
+            <div class="directory-input-trigger" @click="$refs.directoryInput.click()">
+              <i class="fas fa-folder-open"></i>
+              <span>{{ selectedDirectory ? selectedDirectory : 'Select Directory' }}</span>
+            </div>
+          </div>
+          <div v-if="directoryError" class="text-danger mt-2">
+            {{ directoryError }}
+          </div>
+          <div v-if="validFiles.length > 0" class="directory-info mt-2">
+            <p class="mb-1"><strong>Valid Files:</strong> {{ validFiles.length }}</p>
+            <div class="valid-files-list">
+              <div v-for="file in validFiles" :key="file" class="valid-file-item">
+                {{ file }}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Settings Tabs -->
-      <ul class="nav nav-tabs settings-tabs" role="tablist">
-        <li class="nav-item" v-for="tab in tabs" :key="tab.id">
-          <a class="nav-link" 
-             :class="{ active: activeTab === tab.id }"
-             @click.prevent="activeTab = tab.id"
-             href="#">
-            {{ tab.name }}
-          </a>
-        </li>
-      </ul>
+      <div v-if="selectedFile && !fileError" class="settings-tabs-container">
+        <ul class="nav nav-tabs settings-tabs" role="tablist">
+          <li class="nav-item" v-for="tab in tabs" :key="tab.id">
+            <a class="nav-link" 
+               :class="{ active: activeTab === tab.id }"
+               @click.prevent="activeTab = tab.id"
+               href="#">
+              {{ tab.name }}
+              <span class="status-indicator" :class="processingStatus[tab.id].status">
+                {{ processingStatus[tab.id].message }}
+              </span>
+            </a>
+          </li>
+        </ul>
 
-      <div class="tab-content settings-tab-content">
-        <!-- Gaps & Non-Wear Settings -->
-        <div v-if="activeTab === 'gaps'" class="tab-content-section">
-          <div class="status-item mb-3">
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="status-label">Fill Gaps with Null Rows</span>
-              <span class="status-badge">Not Complete</span>
-            </div>
-          </div>
-          <div class="status-item mb-3">
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="status-label">Detect Non-Wear</span>
-              <span class="status-badge">Not Complete</span>
-            </div>
-            <div class="d-flex justify-content-between align-items-center mt-2">
-              <label for="nonWearMethod" class="form-label mb-0">Non-Wear Method</label>
-              <select
-                class="form-select w-auto"
-                id="nonWearMethod"
-                v-model="settings.gaps_and_non_wear.non_wear_method"
-                v-if="settings.gaps_and_non_wear.non_wear_method !== undefined"
-                style="min-width: 100px;"
-              >
-                <option value="auto">Auto</option>
-                <option v-for="n in 6" :key="n" :value="(n + 24).toString()">{{ n + 24 }}</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Smooth & Impute Settings -->
-        <div v-if="activeTab === 'smooth'" class="tab-content-section">
-          <div class="status-item mb-3">
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="status-label">Median Smoothing</span>
-              <span class="status-badge">Not Complete</span>
-            </div>
-          </div>
-          <div class="status-item mb-3">
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="status-label">Impute Gaps</span>
-              <span class="status-badge">Not Complete</span>
-            </div>
-          </div>
-          <div class="status-item mb-3">
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="status-label">Impute Non-Wear</span>
-              <span class="status-badge">Not Complete</span>
-            </div>
-          </div>
-          <div class="status-item mb-3">
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="status-label">Impute Jumps</span>
-              <span class="status-badge">Not Complete</span>
-            </div>
-          </div>
-          <div class="status-item mb-3">
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="status-label">Impute Plummets</span>
-              <span class="status-badge">Not Complete</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Curve Analysis Settings -->
-        <div v-if="activeTab === 'curve'" class="tab-content-section">
-          <div class="curve-flags-scroll">
-            <div v-for="flagObj in curveFlagsWithParams" :key="flagObj.flag" class="status-item mb-3">
-              <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="status-label">{{ formatFlagName(flagObj.flag) }}</span>
-                <span class="status-badge">Rule</span>
+        <div class="tab-content settings-tab-content">
+          <!-- Gaps & Non-Wear Settings -->
+          <div v-if="activeTab === 'gaps'" class="tab-content-section">
+            <div class="status-item mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="status-label">Fill Gaps with Null Rows</span>
+                <span class="status-badge" :class="processingStatus.gaps.status">
+                  {{ processingStatus.gaps.message }}
+                </span>
               </div>
-              <div class="flag-params ms-2 mt-2">
-                <div v-for="param in getFlagParams(flagObj.flag)" :key="param" class="flag-param-row mb-2">
-                  <label :for="flagObj.flag + '-' + param" class="flag-param-label me-2">{{ formatParamName(param) }}:</label>
-                  <select
-                    class="form-select w-auto d-inline-block"
-                    :id="flagObj.flag + '-' + param"
-                    v-model="settings.curve.flag_selections[flagObj.flag][param]"
-                    :style="'min-width: 80px;'"
-                  >
-                    <option value="off">Off</option>
-                    <option v-for="opt in getParamOptions(param, settings.curve.flag_selections[flagObj.flag][param])" :key="opt" :value="opt">{{ opt }}</option>
-                  </select>
+            </div>
+            <div class="status-item mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="status-label">Detect Non-Wear</span>
+                <span class="status-badge" :class="processingStatus.gaps.status">
+                  {{ processingStatus.gaps.message }}
+                </span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                <label for="nonWearMethod" class="form-label mb-0">Non-Wear Method</label>
+                <select
+                  class="form-select w-auto"
+                  id="nonWearMethod"
+                  v-model="settings.gaps_and_non_wear.non_wear_method"
+                  style="min-width: 100px;"
+                >
+                  <option :value="'auto'">Auto</option>
+                  <option v-for="n in 6" :key="n" :value="(n + 24).toString()">{{ n + 24 }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Smooth & Impute Settings -->
+          <div v-if="activeTab === 'smooth'" class="tab-content-section">
+            <div class="status-item mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="status-label">Median Smoothing</span>
+                <span class="status-badge" :class="processingStatus.smooth.status">
+                  {{ processingStatus.smooth.message }}
+                </span>
+              </div>
+            </div>
+            <div class="status-item mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="status-label">Impute Gaps</span>
+                <span class="status-badge" :class="processingStatus.smooth.status">
+                  {{ processingStatus.smooth.message }}
+                </span>
+              </div>
+            </div>
+            <div class="status-item mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="status-label">Impute Non-Wear</span>
+                <span class="status-badge" :class="processingStatus.smooth.status">
+                  {{ processingStatus.smooth.message }}
+                </span>
+              </div>
+            </div>
+            <div class="status-item mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="status-label">Impute Jumps</span>
+                <span class="status-badge" :class="processingStatus.smooth.status">
+                  {{ processingStatus.smooth.message }}
+                </span>
+              </div>
+            </div>
+            <div class="status-item mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="status-label">Impute Plummets</span>
+                <span class="status-badge" :class="processingStatus.smooth.status">
+                  {{ processingStatus.smooth.message }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Day Analysis Settings -->
+          <div v-if="activeTab === 'day'" class="tab-content-section">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" 
+                     type="checkbox" 
+                     id="enableDayAnalysis"
+                     v-model="settings.day.enabled">
+              <label class="form-check-label" for="enableDayAnalysis">Run Day Analysis</label>
+            </div>
+            <div v-if="settings.day.enabled">
+              <div class="status-item mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="status-label">Day Analysis</span>
+                  <span class="status-badge" :class="processingStatus.day.status">
+                    {{ processingStatus.day.message }}
+                  </span>
+                </div>
+              </div>
+              <div class="form-group mb-3">
+                <label for="dayStartHour">Day Start Hour</label>
+                <input type="number" 
+                       class="form-control" 
+                       id="dayStartHour"
+                       v-model.number="settings.day.day_start_hour">
+              </div>
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" 
+                       type="checkbox" 
+                       id="makeGraphs"
+                       v-model="settings.day.make_graphs">
+                <label class="form-check-label" for="makeGraphs">Make Graphs</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Curve Analysis Settings -->
+          <div v-if="activeTab === 'curve'" class="tab-content-section">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" 
+                     type="checkbox" 
+                     id="enableCurveAnalysis"
+                     v-model="settings.curve.enabled">
+              <label class="form-check-label" for="enableCurveAnalysis">Run Curve Analysis</label>
+            </div>
+            <div v-if="settings.curve.enabled">
+              <div class="status-item mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="status-label">Curve Analysis</span>
+                  <span class="status-badge" :class="processingStatus.curve.status">
+                    {{ processingStatus.curve.message }}
+                  </span>
+                </div>
+              </div>
+              <div class="curve-flags-scroll">
+                <div v-for="flagObj in curveFlagsWithParams" :key="flagObj.flag" class="status-item mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="status-label">{{ formatFlagName(flagObj.flag) }}</span>
+                    <span class="status-badge">Rule</span>
+                  </div>
+                  <div class="flag-params ms-2 mt-2">
+                    <div v-for="param in getFlagParams(flagObj.flag)" :key="param" class="flag-param-row mb-2">
+                      <label :for="flagObj.flag + '-' + param" class="flag-param-label me-2">{{ formatParamName(param) }}:</label>
+                      <select
+                        class="form-select w-auto d-inline-block"
+                        :id="flagObj.flag + '-' + param"
+                        v-model="settings.curve.flag_selections[flagObj.flag][param]"
+                        :style="'min-width: 80px;'"
+                      >
+                        <option value="off">Off</option>
+                        <option v-for="opt in getParamOptions(param, settings.curve.flag_selections[flagObj.flag][param])" :key="opt" :value="opt">{{ opt }}</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Day Analysis Settings -->
-        <div v-if="activeTab === 'day'" class="tab-content-section">
-          <div class="form-group mb-3">
-            <label for="dayStartHour">Day Start Hour</label>
-            <input type="number" 
-                   class="form-control" 
-                   id="dayStartHour"
-                   v-model.number="settings.day.day_start_hour">
-          </div>
-          <div class="form-check form-switch mb-3">
-            <input class="form-check-input" 
-                   type="checkbox" 
-                   id="makeGraphs"
-                   v-model="settings.day.make_graphs">
-            <label class="form-check-label" for="makeGraphs">Make Graphs</label>
-          </div>
+        <!-- Action Buttons -->
+        <div class="mt-4">
+          <button class="btn btn-secondary" @click="loadDefaults">Load Defaults</button>
+          <button class="btn btn-primary" @click="startProcessing" :disabled="isProcessing">
+            {{ isProcessing ? 'Processing...' : 'Start Processing' }}
+          </button>
         </div>
       </div>
 
-      <!-- Action Buttons -->
-      <div class="mt-4">
-        <button class="btn btn-secondary" @click="loadDefaults">Load Defaults</button>
-        <button class="btn btn-primary" @click="startProcessing">Start Processing</button>
+      <div v-else class="text-center text-muted mt-4">
+        <p>Please select a file or directory to begin</p>
+        <button class="btn btn-link text-muted p-0 mt-2" @click="loadPriorAnalysis">
+          <i class="fas fa-history me-1"></i>or load prior analysis...
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { mapState, mapActions } from 'vuex'
+import { mapState, mapActions, mapGetters } from 'vuex'
+import axios from 'axios'
 
 export default {
   name: 'AnalysisSetup',
   data() {
     return {
       isBatchMode: false,
-      subid: '',
-      datasetId: '',
-      inputFolder: '',
+      selectedFile: null,
+      selectedDirectory: null,
+      fileError: null,
+      directoryError: null,
+      validFiles: [],
+      hasPriorAnalysis: false,
+      priorAnalysisInfo: null,
+      studyStatus: null,
+      subjectStatus: null,
       activeTab: 'gaps',
       tabs: [
         { id: 'gaps', name: 'Gaps & Non-Wear' },
         { id: 'smooth', name: 'Smooth & Impute' },
-        { id: 'curve', name: 'Curve Analysis' },
-        { id: 'day', name: 'Day Analysis' }
+        { id: 'day', name: 'Day Analysis' },
+        { id: 'curve', name: 'Curve Analysis' }
       ]
     }
   },
   computed: {
     ...mapState({
-      settings: state => state.settings.currentSettings
+      settings: state => state.settings.currentSettings,
+      processingStatus: state => state.studies.processingStatus
     }),
+    ...mapGetters('studies', ['isProcessingComplete']),
+    hasLoadedData() {
+      return this.isBatchMode ? this.validFiles.length > 0 : (this.selectedFile && !this.fileError)
+    },
+    isProcessing() {
+      return Object.values(this.processingStatus).some(
+        status => status.status === 'processing'
+      )
+    },
+    extractedSubId() {
+      if (!this.selectedFile) return ''
+      const filename = this.selectedFile.name
+      const pattern = /^(\d{3,6})/
+      const match = pattern.exec(filename)
+      return match ? match[1] : ''
+    },
+    extractedStudyId() {
+      if (!this.selectedFile) return ''
+      try {
+        const studyId = this.selectedFile.name.split('.')[0].split('_')[1]
+        return studyId
+      } catch {
+        return ''
+      }
+    },
     curveFlagsWithParams() {
       // Return an array of { flag, params } for flags with at least one parameter
       const flags = this.settings.curve.flag_selections
@@ -201,13 +351,30 @@ export default {
   created() {
     // Load default settings when component is created
     this.loadDefaults()
+    console.log('Initial settings:', this.settings)
+  },
+  watch: {
+    settings: {
+      handler(newSettings) {
+        console.log('Settings updated:', newSettings)
+        console.log('Non-wear method:', newSettings.gaps_and_non_wear.non_wear_method)
+      },
+      deep: true
+    },
+    'settings.gaps_and_non_wear.non_wear_method': {
+      handler(newValue) {
+        console.log('Non-wear method changed:', newValue)
+      },
+      immediate: true
+    }
   },
   methods: {
     ...mapActions({
       loadDefaultSettings: 'settings/loadDefaultSettings',
       createStudy: 'studies/createStudy',
       processStudy: 'studies/processStudy',
-      showNotification: 'notifications/showNotification'
+      showNotification: 'notifications/showNotification',
+      checkPriorAnalysis: 'studies/checkPriorAnalysis'
     }),
     getFlagParams(flag) {
       // Return all param keys except 'active' and those with empty values
@@ -262,12 +429,28 @@ export default {
     },
     async loadDefaults() {
       try {
-        await this.loadDefaultSettings()
+        const defaultSettings = await this.loadDefaultSettings()
+        console.log('Loaded default settings:', defaultSettings)
+        
+        // Ensure gaps_and_non_wear settings are properly initialized
+        if (!this.settings.gaps_and_non_wear) {
+          this.settings.gaps_and_non_wear = {
+            export_excel: false,
+            non_wear_method: 'auto',
+            fill_gaps: true,
+            detect_non_wear: true
+          }
+        } else if (this.settings.gaps_and_non_wear.non_wear_method === undefined) {
+          this.settings.gaps_and_non_wear.non_wear_method = 'auto'
+        }
+        
+        console.log('Final settings after initialization:', this.settings)
         this.showNotification({
           title: 'Success',
           message: 'Default settings loaded successfully'
         })
       } catch (error) {
+        console.error('Error loading default settings:', error)
         this.showNotification({
           title: 'Error',
           message: 'Failed to load default settings',
@@ -278,18 +461,26 @@ export default {
     async startProcessing() {
       try {
         if (!this.isBatchMode) {
-          if (!this.subid || !this.datasetId) {
-            throw new Error('Subject ID and Dataset ID are required')
+          if (!this.selectedFile) {
+            throw new Error('File is required')
           }
 
+          console.log('Creating study...')
           // Create study
           const study = await this.createStudy({
-            name: `Study ${this.subid}_${this.datasetId}`,
+            name: `Study ${this.extractedSubId}_${this.extractedStudyId}`,
             description: 'Single file processing',
-            subid: this.subid,
-            dataset_identifier: this.datasetId
+            subid: this.extractedSubId,
+            study_id: this.extractedStudyId
           })
+          
+          console.log('Study created:', study)
+          
+          if (!study || !study.study_id) {
+            throw new Error('Failed to create study')
+          }
 
+          console.log('Starting processing...')
           // Process study
           await this.processStudy({
             studyId: study.study_id,
@@ -297,8 +488,8 @@ export default {
               use_prior_save: false,
               smooth_and_impute: true,
               adjust_for_gaps_and_non_wear: true,
-              analyze_days: true,
-              identify_curves: true
+              analyze_days: this.settings.day.enabled,
+              identify_curves: this.settings.curve.enabled
             },
             settings: this.settings
           })
@@ -319,12 +510,182 @@ export default {
           })
         }
       } catch (error) {
+        console.error('Error in startProcessing:', error)
         this.showNotification({
           title: 'Error',
-          message: error.message,
+          message: error.message || 'Failed to start processing',
           type: 'danger'
         })
       }
+    },
+    async loadPriorAnalysis() {
+      try {
+        if (!this.priorAnalysisInfo) {
+          throw new Error('No prior analysis information available')
+        }
+
+        // Load the prior analysis settings and data
+        await this.loadDefaultSettings()
+        // TODO: Load the specific prior analysis data
+        this.showNotification({
+          title: 'Success',
+          message: 'Prior analysis loaded successfully',
+          type: 'success'
+        })
+      } catch (error) {
+        this.showNotification({
+          title: 'Error',
+          message: error.message || 'Failed to load prior analysis',
+          type: 'danger'
+        })
+      }
+    },
+    async startNewAnalysis() {
+      this.hasPriorAnalysis = false
+      this.priorAnalysisInfo = null
+      await this.loadDefaultSettings()
+      this.showNotification({
+        title: 'Info',
+        message: 'Starting new analysis with default settings',
+        type: 'info'
+      })
+    },
+    async handleFileSelect(event) {
+      console.log('File select event triggered:', event);
+      const file = event.target.files[0];
+      console.log('Selected file:', file);
+      if (!file) return;
+
+      try {
+        // Extract study identifier from filename
+        const studyId = this.extractStudyId(file.name);
+        const subId = this.extractSubId(file.name);
+        console.log('Extracted study ID:', studyId);
+        console.log('Extracted subject ID:', subId);
+        
+        if (!studyId || !subId) {
+          this.fileError = 'Invalid filename format. Please ensure the filename follows the required structure.';
+          return;
+        }
+
+        // Store the selected file and clear any errors
+        this.selectedFile = file;
+        this.fileError = null;
+        this.hasPriorAnalysis = false;
+        this.priorAnalysisInfo = null;
+        this.studyStatus = null;
+        this.subjectStatus = null;
+
+        // Check for prior study
+        try {
+          console.log('Checking for prior study...');
+          const studyResponse = await axios.get(`/api/studies/check-prior/${studyId}`);
+          console.log('Prior study response:', studyResponse.data);
+          
+          if (studyResponse.data.exists) {
+            this.studyStatus = {
+              exists: true,
+              study: studyResponse.data.study
+            };
+          } else {
+            this.studyStatus = {
+              exists: false,
+              message: 'New study'
+            };
+          }
+
+          // Check for prior subject analysis
+          console.log('Checking for prior subject analysis...');
+          const subjectResponse = await axios.get(`/api/studies/check-subject/${studyId}/${subId}`);
+          console.log('Prior subject response:', subjectResponse.data);
+          
+          if (subjectResponse.data.exists) {
+            this.subjectStatus = {
+              exists: true,
+              instance: subjectResponse.data.instance
+            };
+          } else {
+            this.subjectStatus = {
+              exists: false,
+              message: 'New subject'
+            };
+          }
+
+          // If both exist, show the prior analysis dialog
+          if (this.studyStatus.exists && this.subjectStatus.exists) {
+            const date = new Date(this.subjectStatus.instance.created_at).toLocaleDateString();
+            const time = new Date(this.subjectStatus.instance.created_at).toLocaleTimeString();
+            
+            if (confirm(`A prior analysis was found from ${date} at ${time}.\n\nWould you like to load it?`)) {
+              await this.loadPriorAnalysis();
+            }
+          }
+        } catch (error) {
+          console.error('Error checking prior analysis:', error);
+          if (error.response) {
+            if (error.response.status === 503) {
+              this.fileError = 'Database connection failed. Please check your database configuration.';
+              console.error('Database connection error:', error.response.data.details);
+            } else {
+              this.fileError = error.response.data.error || 'Error checking for prior analysis. Please try again.';
+              console.error('Server error:', error.response.data.details);
+            }
+          } else if (error.request) {
+            this.fileError = 'No response from server. Please check your connection.';
+            console.error('No response received:', error.request);
+          } else {
+            this.fileError = 'Error setting up request. Please try again.';
+            console.error('Request setup error:', error.message);
+          }
+        }
+      } catch (error) {
+        console.error('Error processing file:', error);
+        this.fileError = 'Error processing file. Please try again.';
+      }
+    },
+    handleDirectorySelect(event) {
+      const files = Array.from(event.target.files)
+      this.directoryError = null
+      this.validFiles = []
+
+      if (files.length === 0) return
+
+      // Get directory path from first file
+      const path = files[0].webkitRelativePath
+      this.selectedDirectory = path.split('/')[0]
+
+      // Validate each file
+      const validFiles = files.filter(file => this.validateFilename(file.name))
+      
+      if (validFiles.length === 0) {
+        this.directoryError = 'No valid files found in directory'
+        return
+      }
+
+      this.validFiles = validFiles.map(file => file.name)
+    },
+    validateFilename(filename) {
+      const subid = this.extractSubId(filename)
+      const studyId = this.extractStudyId(filename)
+      return this.isSubIdValid(subid) && this.isStudyIdValid(studyId)
+    },
+    extractSubId(filename) {
+      const pattern = /^(\d{3,6})/
+      const match = pattern.exec(filename)
+      return match ? match[1] : ''
+    },
+    extractStudyId(filename) {
+      try {
+        return filename.split('.')[0].split('_')[1]
+      } catch {
+        return ''
+      }
+    },
+    isSubIdValid(subid) {
+      return (2 < subid.length) && (7 > subid.length) && /^\d+$/.test(subid)
+    },
+    isStudyIdValid(studyId) {
+      return studyId.length === 3 && /^\d+$/.test(studyId) && studyId !== '000'
     }
   }
 }
@@ -431,5 +792,157 @@ export default {
 }
 .flag-param-value {
   font-family: monospace;
+}
+
+.status-indicator {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 12px;
+  margin-left: 8px;
+}
+
+.status-badge.not_started {
+  background-color: #e9ecef;
+  color: #6c757d;
+}
+
+.status-badge.processing {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.completed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.processing-mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.toggle-label {
+  font-weight: 500;
+  color: #495057;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 24px;
+  background-color: #e9ecef;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.toggle-switch:hover {
+  background-color: #dee2e6;
+}
+
+.toggle-slider {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.toggle-slider.batch-mode {
+  transform: translateX(24px);
+}
+
+.file-selection,
+.directory-selection {
+  border: 2px dashed #dee2e6;
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.file-input-wrapper,
+.directory-input-wrapper {
+  position: relative;
+}
+
+.file-input,
+.directory-input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-input-trigger,
+.directory-input-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.file-input-trigger:hover,
+.directory-input-trigger:hover {
+  background-color: #e9ecef;
+}
+
+.file-info,
+.directory-info {
+  text-align: left;
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.valid-files-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+}
+
+.valid-file-item {
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+  color: #495057;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.valid-file-item:last-child {
+  border-bottom: none;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.35em 0.65em;
+  font-weight: 500;
+}
+
+.bg-success {
+  background-color: #198754 !important;
+}
+
+.bg-secondary {
+  background-color: #6c757d !important;
 }
 </style> 

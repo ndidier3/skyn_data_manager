@@ -8,16 +8,20 @@ const state = {
       impute_gaps: false
     },
     curve: {
+      enabled: false,
       curve_threshold: 0,
       periphery_buffer_before: 0
     },
     day: {
+      enabled: false,
       day_start_hour: 0,
       make_graphs: false
     },
     gaps_and_non_wear: {
       export_excel: false,
-      non_wear_method: 'auto'
+      non_wear_method: 'auto',
+      fill_gaps: true,
+      detect_non_wear: true
     }
   },
   defaultSettings: null
@@ -25,7 +29,17 @@ const state = {
 
 const mutations = {
   SET_CURRENT_SETTINGS(state, settings) {
-    state.currentSettings = settings
+    // Deep merge the settings to preserve nested objects
+    state.currentSettings = {
+      ...state.currentSettings,
+      ...settings,
+      gaps_and_non_wear: {
+        ...state.currentSettings.gaps_and_non_wear,
+        ...settings.gaps_and_non_wear,
+        non_wear_method: settings.gaps_and_non_wear?.non_wear_method || 'auto'
+      }
+    }
+    console.log('Settings after mutation:', state.currentSettings)
   },
   SET_DEFAULT_SETTINGS(state, settings) {
     state.defaultSettings = settings

@@ -10,13 +10,25 @@ const state = {
   eventResults: null,
   eventPlots: null,
   loading: false,
-  error: null
+  error: null,
+  processingStatus: {
+    gaps: { status: 'not_started', message: 'Not Started' },
+    smooth: { status: 'not_started', message: 'Not Started' },
+    day: { status: 'not_started', message: 'Not Started' },
+    curve: { status: 'not_started', message: 'Not Started' }
+  }
 }
 
 const getters = {
   isLoading: state => state.loading,
   hasError: state => state.error !== null,
-  errorMessage: state => state.error
+  errorMessage: state => state.error,
+  processingStatus: state => state.processingStatus,
+  isProcessingComplete: state => {
+    return Object.values(state.processingStatus).every(
+      status => status.status === 'completed'
+    )
+  }
 }
 
 const actions = {
@@ -96,20 +108,43 @@ const actions = {
   },
 
   async processStudy({ commit }, { studyId, options, settings }) {
-    commit('SET_LOADING', true)
     try {
-      const response = await axios.post(`/api/studies/${studyId}/process`, {
-        options,
-        settings
-      })
-      commit('UPDATE_STUDY', response.data)
+        console.log('Processing study with ID:', studyId);  // Debug log
+        
+        // First get the numeric ID for the study
+        const response = await axios.get(`/api/studies/check-prior/${studyId}`);
+        console.log('Check prior response:', response.data);  // Debug log
+        
+        if (!response.data.exists) {
+            // If study doesn't exist at all, throw error
+            throw new Error('Study not found');
+        }
+        
+        // Get the numeric ID from the study object
+        const numericId = response.data.study.id;
+        console.log('Using numeric ID:', numericId);  // Debug log
+        
+        // Process the study
+        const result = await axios.post(`/api/studies/${numericId}/process`, {
+            options,
+            settings
+        });
+        
+        console.log('Process result:', result.data);  // Debug log
+        return result.data;
+    } catch (error) {
+        console.error('Error processing study:', error);
+        throw error;
+    }
+  },
+
+  async checkPriorAnalysis({ commit }, { dataset_identifier }) {
+    try {
+      const response = await axios.get(`/api/studies/check-prior/${dataset_identifier}`)
       return response.data
     } catch (error) {
-      commit('SET_ERROR', 'Failed to process study')
-      console.error('Error processing study:', error)
-      throw error
-    } finally {
-      commit('SET_LOADING', false)
+      console.error('Error checking prior analysis:', error)
+      return null
     }
   }
 }
@@ -150,6 +185,17 @@ const mutations = {
   SET_EVENT_RESULTS(state, results) {
     state.eventResults = results.features
     state.eventPlots = results.plots
+  },
+  SET_PROCESSING_STATUS(state, { step, status, message }) {
+    state.processingStatus[step] = { status, message }
+  },
+  RESET_PROCESSING_STATUS(state) {
+    state.processingStatus = {
+      gaps: { status: 'not_started', message: 'Not Started' },
+      smooth: { status: 'not_started', message: 'Not Started' },
+      day: { status: 'not_started', message: 'Not Started' },
+      curve: { status: 'not_started', message: 'Not Started' }
+    }
   }
 }
 

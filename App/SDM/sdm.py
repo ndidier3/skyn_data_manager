@@ -448,22 +448,6 @@ class SDM:
                              event_attrs={}):
         """
         Process and analyze data for a single subject.
-        
-        Args:
-            subid (str): Subject ID to process
-            event_data (pd.DataFrame): DataFrame containing event data
-            event_subid_column (str): Column name containing subject IDs in event_data
-            use_prior_save (bool): Whether to use previously saved processed data
-            smooth_and_impute (bool): Whether to smooth and impute data
-            adjust_for_gaps_and_non_wear (bool): Whether to adjust for gaps and non-wear
-            analyze_days (bool): Whether to perform day-level analysis
-            identify_curves (bool): Whether to identify curves
-            match_events_to_curves (bool): Whether to match events to curves
-            gaps_and_non_wear_attrs (dict): Attributes for gaps and non-wear adjustment
-            smooth_and_impute_attrs (dict): Attributes for smoothing and imputation
-            curve_attrs (dict): Attributes for curve identification
-            day_attrs (dict): Attributes for day-level analysis
-            event_attrs (dict): Attributes for event-level analysis
         """
         # Store settings
         self.gaps_and_non_wear_attrs = gaps_and_non_wear_attrs
@@ -523,86 +507,92 @@ class SDM:
                 print(f"Creating new processor for {subid}_{dataset_identifier}")
                 sdm_processor = skynDataset(str(file), self.processed_data_out, self.data_out, self.graphs_out, subid, dataset_identifier, 'e' + str(1))
             
+            # Start with gaps and non-wear processing
             if adjust_for_gaps_and_non_wear:
                 try:
                     print(f"Adjusting for gaps and non-wear for {subid}_{dataset_identifier}")
                     sdm_processor.adjust_for_gaps_and_non_wear(**self.gaps_and_non_wear_attrs)
                     self.status[key]['gaps_and_non_wear'] = 'success'
+                    # Save initial state after gaps and non-wear processing
+                    sdm_processor.save_self(valid=True)
                 except Exception as e:
                     error_msg = f"Error adjusting gaps and non-wear for {subid}_{dataset_identifier}: {str(e)}"
                     print(error_msg)
                     self.errors[key]['gaps_and_non_wear'].append(error_msg)
                     self.status[key]['gaps_and_non_wear'] = 'failed'
+                    return  # Stop processing if gaps and non-wear fails
+            
+            # Continue with other processing steps only if gaps and non-wear succeeded
+            if self.status[key]['gaps_and_non_wear'] == 'success':
+                if smooth_and_impute:
+                    try:
+                        print(f"Smoothing and imputing for {subid}_{dataset_identifier}")
+                        sdm_processor.smooth_and_impute(**self.smooth_and_impute_attrs)
+                        self.status[key]['smooth_and_impute'] = 'success'
+                    except Exception as e:
+                        error_msg = f"Error smoothing and imputing for {subid}_{dataset_identifier}: {str(e)}"
+                        print(error_msg)
+                        self.errors[key]['smooth_and_impute'].append(error_msg)
+                        self.status[key]['smooth_and_impute'] = 'failed'
                 
-            if smooth_and_impute:
-                try:
-                    print(f"Smoothing and imputing for {subid}_{dataset_identifier}")
-                    sdm_processor.smooth_and_impute(**self.smooth_and_impute_attrs)
-                    self.status[key]['smooth_and_impute'] = 'success'
-                except Exception as e:
-                    error_msg = f"Error smoothing and imputing for {subid}_{dataset_identifier}: {str(e)}"
-                    print(error_msg)
-                    self.errors[key]['smooth_and_impute'].append(error_msg)
-                    self.status[key]['smooth_and_impute'] = 'failed'
-                
-            if identify_curves:
-                try:
-                    print(f"Identifying curves for {subid}_{dataset_identifier}")
-                    sdm_processor.identify_curves(curve_attrs=self.curve_attrs)
-                    if not match_events_to_curves:
-                        print(f"Making curve graphs for {subid}_{dataset_identifier}")
-                        sdm_processor.make_curve_graphs()
-                        sdm_processor.curve_features.to_excel(f'{self.results_dir}/curve_features_{subid}.xlsx', index=None)
-                        self.curve_features.append(sdm_processor.curve_features)
-                    self.status[key]['identify_curves'] = 'success'
-                except Exception as e:
-                    error_msg = f"Error identifying curves for {subid}_{dataset_identifier}: {str(e)}"
-                    print(error_msg)
-                    self.errors[key]['identify_curves'].append(error_msg)
-                    self.status[key]['identify_curves'] = 'failed'
+                if identify_curves:
+                    try:
+                        print(f"Identifying curves for {subid}_{dataset_identifier}")
+                        sdm_processor.identify_curves(curve_attrs=self.curve_attrs)
+                        if not match_events_to_curves:
+                            print(f"Making curve graphs for {subid}_{dataset_identifier}")
+                            sdm_processor.make_curve_graphs()
+                            sdm_processor.curve_features.to_excel(f'{self.results_dir}/curve_features_{subid}.xlsx', index=None)
+                            self.curve_features.append(sdm_processor.curve_features)
+                        self.status[key]['identify_curves'] = 'success'
+                    except Exception as e:
+                        error_msg = f"Error identifying curves for {subid}_{dataset_identifier}: {str(e)}"
+                        print(error_msg)
+                        self.errors[key]['identify_curves'].append(error_msg)
+                        self.status[key]['identify_curves'] = 'failed'
                     
-            if analyze_days:
-                try:
-                    print(f"Running day analysis for {subid}_{dataset_identifier}")
-                    sdm_processor.run_day_level_analysis(**self.day_attrs)
-                    if not sdm_processor.day_level_data.empty:
-                        print(f"Found day data with shape: {sdm_processor.day_level_data.shape}")
-                        sdm_processor.day_level_data.to_excel(f'{self.results_dir}/day_level_results_{subid}.xlsx', index=None)
-                        self.day_datasets.append(sdm_processor.day_level_data)
-                        self.status[key]['analyze_days'] = 'success'
-                    else:
-                        error_msg = f"WARNING: No day data found for {subid}_{dataset_identifier}"
+                if analyze_days:
+                    try:
+                        print(f"Running day analysis for {subid}_{dataset_identifier}")
+                        sdm_processor.run_day_level_analysis(**self.day_attrs)
+                        if not sdm_processor.day_level_data.empty:
+                            print(f"Found day data with shape: {sdm_processor.day_level_data.shape}")
+                            sdm_processor.day_level_data.to_excel(f'{self.results_dir}/day_level_results_{subid}.xlsx', index=None)
+                            self.day_datasets.append(sdm_processor.day_level_data)
+                            self.status[key]['analyze_days'] = 'success'
+                        else:
+                            error_msg = f"WARNING: No day data found for {subid}_{dataset_identifier}"
+                            print(error_msg)
+                            self.errors[key]['analyze_days'].append(error_msg)
+                            self.status[key]['analyze_days'] = 'failed'
+                    except Exception as e:
+                        error_msg = f"Error running day analysis for {subid}_{dataset_identifier}: {str(e)}"
                         print(error_msg)
                         self.errors[key]['analyze_days'].append(error_msg)
                         self.status[key]['analyze_days'] = 'failed'
-                except Exception as e:
-                    error_msg = f"Error running day analysis for {subid}_{dataset_identifier}: {str(e)}"
-                    print(error_msg)
-                    self.errors[key]['analyze_days'].append(error_msg)
-                    self.status[key]['analyze_days'] = 'failed'
                     
-            if match_events_to_curves:
-                try:
-                    print(f"Configuring event data for {subid}_{dataset_identifier}")
-                    sdm_processor.configure_event_data(**self.event_attrs)
-                    print(f"Making curve graphs for {subid}_{dataset_identifier}")
-                    sdm_processor.make_curve_graphs()
-                    print(f"Setting EMA regions for {subid}_{dataset_identifier}")
-                    sdm_processor.set_ema_regions()
-                    sdm_processor.curve_features.to_excel(f'{self.results_dir}/curve_features_{subid}.xlsx', index=None)
-                    self.curve_features.append(sdm_processor.curve_features)
-                    self.event_datasets.append(sdm_processor.events)
-                    self.status[key]['match_events'] = 'success'
-                except Exception as e:
-                    error_msg = f"Error matching events for {subid}_{dataset_identifier}: {str(e)}"
-                    print(error_msg)
-                    self.errors[key]['match_events'].append(error_msg)
-                    self.status[key]['match_events'] = 'failed'
+                if match_events_to_curves:
+                    try:
+                        print(f"Configuring event data for {subid}_{dataset_identifier}")
+                        sdm_processor.configure_event_data(**self.event_attrs)
+                        print(f"Making curve graphs for {subid}_{dataset_identifier}")
+                        sdm_processor.make_curve_graphs()
+                        print(f"Setting EMA regions for {subid}_{dataset_identifier}")
+                        sdm_processor.set_ema_regions()
+                        sdm_processor.curve_features.to_excel(f'{self.results_dir}/curve_features_{subid}.xlsx', index=None)
+                        self.curve_features.append(sdm_processor.curve_features)
+                        self.event_datasets.append(sdm_processor.events)
+                        self.status[key]['match_events'] = 'success'
+                    except Exception as e:
+                        error_msg = f"Error matching events for {subid}_{dataset_identifier}: {str(e)}"
+                        print(error_msg)
+                        self.errors[key]['match_events'].append(error_msg)
+                        self.status[key]['match_events'] = 'failed'
             
             self.processors.append(sdm_processor)
             
-            # Save SDM state after processing each subject/dataset pair
-            self.save_self(valid=True)
+            # Save final state after all processing
+            self.save_self(valid=self.status[key]['gaps_and_non_wear'] == 'success')
                 
         except Exception as e:
             error_msg = f"\nError processing file {file}:\nError type: {type(e).__name__}\nError message: {str(e)}\nFull traceback:\n{traceback.format_exc()}"

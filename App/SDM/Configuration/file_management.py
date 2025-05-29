@@ -179,3 +179,29 @@ def extract_additional_filename_text(filename):
   
 def stringify_dataset_id(dataset_identifier):
   return "".join(['0' for i in range(0, 3 - len(str(dataset_identifier)))]) + str(dataset_identifier) #gaurantees 3 characters
+
+def save_sdm_instance(sdm_instance, base_dir, subid, dataset_identifier, status='processed'):
+    """
+    Save an SDM instance to a file in a consistent location and format.
+    
+    Args:
+        sdm_instance: The SDM instance to save
+        base_dir (str): Base directory for saving files
+        subid (str): Subject ID
+        dataset_identifier (str): Dataset identifier
+        status (str): Status of the processing ('processed', 'invalid', 'error')
+    
+    Returns:
+        str: Path where the file was saved
+    """
+    # Create the directory structure
+    save_dir = os.path.join(base_dir, 'Inputs', 'Skyn_Data_PROCESSED')
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Create filename with consistent format
+    filename = f'{subid}_{dataset_identifier}_skyn_data_{status}'
+    
+    # Save the file
+    save_to_computer(sdm_instance, filename, save_dir, extension='sdp')
+    
+    return os.path.join(save_dir, f'{filename}.sdp')

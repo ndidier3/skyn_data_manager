@@ -4,7 +4,7 @@ SDM web interface that connects database with SDM instances.
 
 from App.SDM.database.connection import db
 from App.SDM.sdm import SDM
-from App.SDM.Configuration.file_management import load
+from App.SDM.Configuration.file_management import load, save_to_computer, save_sdm_instance
 import os
 
 class SDMWebInterface:
@@ -15,18 +15,21 @@ class SDMWebInterface:
     def get_all_studies(self):
         """Get all studies from the database"""
         return db.execute_query("""
-            SELECT id, name, description, subid, dataset_identifier, 
-                   processing_status, created_at, last_updated
-            FROM sdm_instances
-            ORDER BY created_at DESC
+            SELECT s.id, s.study_id, s.is_registered, s.created_at, s.last_updated,
+                   i.subid, i.processing_status, i.last_error
+            FROM studies s
+            JOIN sdm_instances i ON s.id = i.study_id
+            ORDER BY s.created_at DESC
         """)
 
     def load_study(self, study_id):
         """Load a study's SDM instance"""
         # Get study info from DB
         study = db.execute_single("""
-            SELECT * FROM sdm_instances 
-            WHERE id = %s
+            SELECT s.*, i.subid, i.sdp_file_path 
+            FROM studies s
+            JOIN sdm_instances i ON s.id = i.study_id
+            WHERE s.id = %s
         """, (study_id,))
         
         if not study:
@@ -34,13 +37,27 @@ class SDMWebInterface:
             
         # Load the SDM instance
         try:
-            self.active_sdm = load(study['sdp_file_path'])
+            if os.path.exists(study['sdp_file_path']):
+                self.active_sdm = load(study['sdp_file_path'])
+            else:
+                # If SDP file doesn't exist, create a new SDM instance
+                print(f"SDP file not found at {study['sdp_file_path']}, creating new instance")
+                self.active_sdm = SDM(
+                    project_root=os.path.dirname(self.sdp_storage),
+                    data_input_folder=os.path.dirname(self.sdp_storage).replace('_PROCESSED', '_RAW'),
+                    output_folder_name='web'
+                )
+                self.active_sdm.subid = study['subid']
+                self.active_sdm.dataset_identifier = study['study_id']
+                self.active_sdm.id = study_id
+                
             return {
                 'study_info': study,
                 'status': self.active_sdm.get_status_report(),
                 'settings': self.active_sdm.get_settings()
             }
         except Exception as e:
+            print(f"Error loading study: {str(e)}")  # Debug log
             db.execute_update("""
                 UPDATE sdm_instances 
                 SET last_error = %s, processing_status = 'error'
@@ -117,49 +134,109 @@ class SDMWebInterface:
 
     def process_data(self, study_id, options=None, settings=None):
         """Process data for a study"""
-        if not self.active_sdm or self.active_sdm.id != study_id:
-            self.load_study(study_id)
-            
-        if not self.active_sdm:
-            return None
-            
         try:
-            # Update status to in_progress
-            db.execute_update("""
-                UPDATE sdm_instances 
-                SET processing_status = 'in_progress'
-                WHERE id = %s
+            # Get study info from DB
+            study = db.execute_single("""
+                SELECT s.*, i.subid, i.dataset_identifier
+                FROM studies s
+                JOIN sdm_instances i ON s.id = i.study_id
+                WHERE s.id = %s
             """, (study_id,))
             
-            # Load settings if provided
-            if settings:
-                self.active_sdm.load_settings(settings)
+            if not study:
+                return {'error': 'Study not found'}
             
-            # Process data
+            # Get base directory
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+            
+            # Initialize SDM instance
+            self.active_sdm = SDM(
+                base_dir=base_dir,
+                data_input_folder=os.path.join(base_dir, 'Inputs', 'Skyn_Data_RAW'),
+                processed_data_out=os.path.join(base_dir, 'Inputs', 'Skyn_Data_PROCESSED'),
+                results_dir=os.path.join(base_dir, 'Results'),
+                subid=study['subid'],
+                dataset_identifier=study['dataset_identifier']
+            )
+            
+            # Process the data
             self.active_sdm.process_single_subject(
-                subid=self.active_sdm.subid,
+                subid=study['subid'],
                 **options or {}
             )
-            self.active_sdm.save_self(valid=True)
             
-            # Update status to completed
-            db.execute_update("""
-                UPDATE sdm_instances 
-                SET processing_status = 'completed', last_updated = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (study_id,))
+            # Only mark as registered if processing completed successfully
+            if self.active_sdm.status.get('gaps_and_non_wear') == 'success':
+                print(f"Processing successful, updating registration status")  # Debug log
+                # Update study registration status
+                db.execute_update("""
+                    UPDATE studies s
+                    SET is_registered = TRUE,
+                        last_updated = CURRENT_TIMESTAMP
+                    FROM sdm_instances i
+                    WHERE s.id = i.study_id
+                    AND i.id = %s
+                """, (study_id,))
+                
+                # Save the processed data
+                print(f"Saving processed data")  # Debug log
+                save_path = save_sdm_instance(
+                    self.active_sdm,
+                    base_dir,
+                    study['subid'],
+                    study['dataset_identifier'],
+                    status='processed'
+                )
+                
+                # Update instance status to completed
+                db.execute_update("""
+                    UPDATE sdm_instances 
+                    SET processing_status = 'completed',
+                        sdp_file_path = %s,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (save_path, study_id))
+            else:
+                print(f"Processing failed, saving invalid state")  # Debug log
+                # If processing failed, save invalid state
+                save_path = save_sdm_instance(
+                    self.active_sdm,
+                    base_dir,
+                    study['subid'],
+                    study['dataset_identifier'],
+                    status='invalid'
+                )
+                db.execute_update("""
+                    UPDATE sdm_instances 
+                    SET processing_status = 'error', 
+                        last_error = 'Processing failed',
+                        sdp_file_path = %s,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (save_path, study_id))
             
             return {
                 'status': self.active_sdm.get_status_report(),
                 'settings': self.active_sdm.get_settings()
             }
         except Exception as e:
-            self.active_sdm.save_self(valid=False)
-            db.execute_update("""
-                UPDATE sdm_instances 
-                SET processing_status = 'error', last_error = %s, last_updated = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (str(e), study_id))
+            print(f"Error in process_data: {str(e)}")  # Debug log
+            if self.active_sdm:
+                save_path = save_sdm_instance(
+                    self.active_sdm,
+                    base_dir,
+                    study['subid'],
+                    study['dataset_identifier'],
+                    status='error'
+                )
+                db.execute_update("""
+                    UPDATE sdm_instances 
+                    SET processing_status = 'error', 
+                        last_error = %s,
+                        sdp_file_path = %s,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (str(e), save_path, study_id))
             return {'error': str(e)}
 
     def get_study_status(self, study_id):
