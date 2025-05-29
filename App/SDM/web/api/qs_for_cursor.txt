@@ -1,0 +1,1 @@
+why is subid/dataset_identifier necessary for creating new study? a study has a name and id

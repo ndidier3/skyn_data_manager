@@ -18,7 +18,6 @@ def process_and_analyze_single_subject(
     smooth_and_impute=False,
     adjust_for_gaps_and_non_wear=False,
     analyze_days=False,
-    analyze_events=False,
     identify_curves=False,
     match_events_to_curves=False,
     gaps_and_non_wear_attrs={},
@@ -41,7 +40,6 @@ def process_and_analyze_single_subject(
         smooth_and_impute (bool): Whether to smooth and impute data
         adjust_for_gaps_and_non_wear (bool): Whether to adjust for gaps and non-wear
         analyze_days (bool): Whether to perform day-level analysis
-        analyze_events (bool): Whether to perform event-level analysis
         identify_curves (bool): Whether to identify curves
         match_events_to_curves (bool): Whether to match events to curves
         gaps_and_non_wear_attrs (dict): Attributes for gaps and non-wear adjustment

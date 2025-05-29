@@ -1,0 +1,13 @@
+{
+  "name": "skyn-data-manager",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "App/SDM/web"
+  ],
+  "scripts": {
+    "serve": "cd App/SDM/web && npm run serve",
+    "build": "cd App/SDM/web && npm run build",
+    "lint": "cd App/SDM/web && npm run lint"
+  }
+} 

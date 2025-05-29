@@ -9,7 +9,7 @@ from App.SDM.Scripts.Test.test_settings import (
 )
 
 # Path settings
-project_root = '/users/ndidier/SDM/skyn_data_manager'
+project_root = '/Users/nathandidier/Desktop/Repositories/SDM_web/skyn_data_manager'
 data_input_folder = f'{project_root}/Inputs/Skyn_Data_RAW/TestData'
 processed_data_folder = f'{project_root}/Inputs/Skyn_Data_PROCESSED/TestData'
 cohort_name = 'Test'

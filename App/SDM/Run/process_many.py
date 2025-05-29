@@ -17,7 +17,6 @@ def process_and_analyze_data(
   smooth_and_impute = False,
   adjust_for_gaps_and_non_wear = False,
   analyze_days = False,
-  analyze_events = False,
   identify_curves = False,
   match_events_to_curves = False,
   gaps_and_non_wear_attrs = {},
@@ -114,17 +113,6 @@ def process_and_analyze_data(
         sdm_processor.set_ema_regions()
         curve_features.append(sdm_processor.curve_features)
         event_datasets.append(sdm_processor.events)
-        
-      if analyze_events:
-        subids_found = event_data[event_subid_column].unique().tolist()
-        if (int(subid) in subids_found or str(subid) in subids_found):
-          print(f"Running event level analysis for {subid}_{dataset_identifier}")
-          sdm_processor.run_event_level_analysis(event_data, **event_attrs)
-          event_datasets.append(sdm_processor.event_level_data)
-          processors.append(sdm_processor)
-          no_skyn_data_found.append(sdm_processor.events_with_no_skyn_data)
-        else:
-          print(f"{subid} {dataset_identifier} -- NO Event DATA")
           
     except Exception as e:
       print(f"\nError processing file {file}:")

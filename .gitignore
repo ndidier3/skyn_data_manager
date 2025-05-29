@@ -37,3 +37,4 @@ Inputs/Skyn_Data/
 App/SDM/Scripts/LINC/run_curve_analysis.py
 .cursor
 *.egg-info/
+node_modules
