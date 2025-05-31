@@ -63,37 +63,21 @@
       </div>
 
       <div v-else>
-        <div class="directory-selection mb-4">
-          <div class="directory-input-wrapper">
-            <input 
-              type="file" 
-              ref="directoryInput"
-              class="directory-input" 
-              @change="handleDirectorySelect"
-              webkitdirectory
-              directory
-            >
-            <div class="directory-input-trigger" @click="$refs.directoryInput.click()">
-              <i class="fas fa-folder-open"></i>
-              <span>{{ selectedDirectory ? selectedDirectory : 'Select Directory' }}</span>
-            </div>
-          </div>
-          <div v-if="directoryError" class="text-danger mt-2">
-            {{ directoryError }}
-          </div>
-          <div v-if="validFiles.length > 0" class="directory-info mt-2">
-            <p class="mb-1"><strong>Valid Files:</strong> {{ validFiles.length }}</p>
-            <div class="valid-files-list">
-              <div v-for="file in validFiles" :key="file" class="valid-file-item">
-                {{ file }}
-              </div>
-            </div>
-          </div>
-        </div>
+        <BatchDirectorySelection
+          :selected-directory.sync="selectedDirectory"
+          :directory-error.sync="directoryError"
+          :valid-files.sync="validFiles"
+          :registered-studies="registeredStudies"
+          :is-confirmed="isConfirmed"
+          @directory-selected="handleDirectorySelect"
+          @study-registered="handleStudyRegistered"
+          @confirmed="isConfirmed = true"
+          @revise="isConfirmed = false"
+        />
       </div>
 
       <!-- Settings Tabs -->
-      <div v-if="selectedFile && !fileError" class="settings-tabs-container">
+      <div v-if="isConfirmed" class="settings-tabs-container">
       <ul class="nav nav-tabs settings-tabs" role="tablist">
         <li class="nav-item" v-for="tab in tabs" :key="tab.id">
           <a class="nav-link" 
@@ -274,8 +258,8 @@
       </div>
 
       <div v-else class="text-center text-muted mt-4">
-        <p>Please select a file or directory to begin</p>
-        <button class="btn btn-link text-muted p-0 mt-2" @click="loadPriorAnalysis">
+        <p v-if="!hasLoadedData">Please select a file or directory to begin</p>
+        <button v-if="!hasLoadedData" class="btn btn-link text-muted p-0 mt-2" @click="loadPriorAnalysis">
           <i class="fas fa-history me-1"></i>or load prior analysis...
         </button>
       </div>
@@ -289,6 +273,63 @@
       @proceed-to-analysis="handleProceedToAnalysis"
       @modal-canceled="handleModalCancel"
     ></StudyRegistrationModal>
+
+    <!-- Add this after the StudyRegistrationModal component -->
+    <div v-if="showBatchRegistrationModal" class="modal-backdrop" @click="closeBatchRegistration"></div>
+    
+    <div v-if="showBatchRegistrationModal" class="modal-container">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h2>Register New Studies</h2>
+          <button class="close-button" @click="closeBatchRegistration">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+          <p class="mb-4">Found {{ batchStudies.length }} studies in the selected directory.</p>
+          
+          <div class="studies-table">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Study ID</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="study in batchStudies" :key="study.studyId">
+                  <td>{{ study.studyId }}</td>
+                  <td>
+                    <span class="badge" :class="study.exists ? 'bg-success' : 'bg-secondary'">
+                      {{ study.exists ? 'Registered' : 'Not Registered' }}
+                    </span>
+                  </td>
+                  <td>
+                    <button 
+                      v-if="!study.exists"
+                      class="btn btn-primary btn-sm"
+                      @click="registerBatchStudy(study)"
+                    >
+                      Register
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="modal-footer mt-4">
+            <button 
+              class="btn btn-primary"
+              :disabled="!canProceedWithBatch"
+              @click="proceedWithBatch"
+            >
+              Proceed with Processing
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -296,17 +337,25 @@
 import { mapState, mapActions, mapGetters } from 'vuex'
 import axios from 'axios'
 import StudyRegistrationModal from '@/components/StudyRegistrationModal.vue'
+import ProcessingModeToggle from '@/components/ProcessingModeToggle.vue'
+import FileSelection from '@/components/FileSelection.vue'
+import BatchDirectorySelection from '@/components/BatchDirectorySelection.vue'
+import AnalysisSettings from '@/components/AnalysisSettings.vue'
 
 export default {
   name: 'AnalysisSetup',
   components: {
+    ProcessingModeToggle,
+    FileSelection,
+    BatchDirectorySelection,
+    AnalysisSettings,
     StudyRegistrationModal
   },
   data() {
     return {
       isBatchMode: false,
       selectedFile: null,
-      selectedDirectory: null,
+      selectedDirectory: '',
       fileError: null,
       directoryError: null,
       validFiles: [],
@@ -316,12 +365,17 @@ export default {
       subjectStatus: null,
       activeTab: 'gaps',
       showRegistrationModal: false,
+      showBatchRegistrationModal: false,
+      batchStudies: [],
+      currentBatchStudy: null,
+      registeredStudies: new Set(),
       tabs: [
         { id: 'gaps', name: 'Gaps & Non-Wear' },
         { id: 'smooth', name: 'Smooth & Impute' },
         { id: 'day', name: 'Day Analysis' },
         { id: 'curve', name: 'Curve Analysis' }
-      ]
+      ],
+      isConfirmed: false
     }
   },
   computed: {
@@ -360,6 +414,9 @@ export default {
       return Object.keys(flags)
         .filter(flag => this.getFlagParams(flag).length > 0)
         .map(flag => ({ flag, params: flags[flag] }))
+    },
+    canProceedWithBatch() {
+      return this.batchStudies.every(study => study.exists)
     }
   },
   created() {
@@ -522,12 +579,79 @@ export default {
           // Navigate to results view
           this.$router.push('/results')
         } else {
-          // TODO: Implement batch processing
-          this.showNotification({
-            title: 'Error',
-            message: 'Batch processing not implemented yet',
-            type: 'warning'
+          // Batch processing
+          if (!this.selectedDirectory) {
+            throw new Error('Directory is required')
+          }
+
+          // Get all files in directory
+          const files = await this.getFilesInDirectory(this.selectedDirectory)
+          const validFiles = files.filter(file => {
+            const ext = file.name.split('.').pop().toLowerCase()
+            return ['csv', 'xlsx', 'xls'].includes(ext)
           })
+
+          if (validFiles.length === 0) {
+            throw new Error('No valid files found in directory')
+          }
+
+          // Process each file
+          for (const file of validFiles) {
+            try {
+              // Extract study and subject IDs
+              const studyId = file.name.split('.')[0].split('_')[1]
+              const subId = file.name.split('.')[0].split('_')[0]
+
+              // Check if study exists
+              const studyResponse = await axios.get(`/api/studies/${studyId}`)
+              let study = studyResponse.data
+
+              // If study doesn't exist, create it
+              if (!study) {
+                const createResponse = await axios.post('/api/studies', {
+                  study_id: studyId,
+                  name: `Study ${studyId}`,
+                  description: `Automatically created from batch import`
+                })
+                study = createResponse.data
+              }
+
+              // Create SDM instance
+              await axios.post('/api/studies/instances', {
+                study_id: studyId,
+                subid: subId,
+                sdp_file_path: file.name
+              })
+
+              // Process the study
+              await this.processStudy({
+                studyId: studyId,
+                options: {
+                  use_prior_save: false,
+                  smooth_and_impute: true,
+                  adjust_for_gaps_and_non_wear: true,
+                  analyze_days: this.settings.day.enabled,
+                  identify_curves: this.settings.curve.enabled
+                },
+                settings: this.settings
+              })
+            } catch (error) {
+              console.error(`Error processing file ${file.name}:`, error)
+              this.showNotification({
+                title: 'Error',
+                message: `Failed to process ${file.name}: ${error.message}`,
+                type: 'danger'
+              })
+            }
+          }
+
+          this.showNotification({
+            title: 'Success',
+            message: `Processed ${validFiles.length} files`
+          })
+
+          // Navigate to results view
+          this.$router.push('/results')
         }
       } catch (error) {
         console.error('Error in startProcessing:', error)
@@ -571,48 +695,20 @@ export default {
       })
     },
     async handleStudyRegistered(studyData) {
-      try {
-        // Update study status
-        this.studyStatus = {
-          exists: true,
-          study: studyData
-        }
-        
-        // Update subject status
-        this.subjectStatus = {
-          exists: false,
-          message: 'New File'
-        }
-        
-        // Close the modal but keep the file selected
-        this.showRegistrationModal = false
-        
-        // Show success notification
-        this.showNotification({
-          type: 'success',
-          title: 'Success',
-          message: 'Study registered successfully',
-          timeout: 4000
-        })
-        
-        // Force a UI update to ensure all components re-render with new state
-        this.$nextTick(() => {
-          console.log('State after registration:', {
-            file: this.selectedFile?.name,
-            studyStatus: this.studyStatus,
-            subjectStatus: this.subjectStatus,
-            hasPriorAnalysis: this.hasPriorAnalysis
-          })
-        })
-      } catch (error) {
-        console.error('Error registering study:', error)
-        this.showNotification({
-          type: 'error',
-          title: 'Error',
-          message: 'Failed to register study. Please try again.',
-          requiresManualRemoval: true
-        })
-      }
+      // Add the study to the registeredStudies Set
+      this.registeredStudies.add(studyData.study_id)
+      // Create a new Set to trigger reactivity
+      this.registeredStudies = new Set(this.registeredStudies)
+      // Force a re-render of the BatchDirectorySelection component
+      this.$nextTick(() => {
+        this.$forceUpdate()
+      })
+      this.showNotification({
+        type: 'success',
+        title: 'Success',
+        message: 'Study registered successfully',
+        timeout: 4000
+      })
     },
     handleProceedToAnalysis(study) {
       // Handle proceeding to analysis
@@ -731,39 +827,9 @@ export default {
       }
     },
     async handleDirectorySelect(event) {
-      const files = Array.from(event.target.files)
-      this.directoryError = null
-      this.validFiles = []
-
-      if (files.length === 0) return
-
-      // Get directory path from first file
-      const path = files[0].webkitRelativePath
-      this.selectedDirectory = path.split('/')[0]
-
-      // Validate each file
-      const validFiles = files.filter(file => this.validateFilename(file.name))
-      
-      if (validFiles.length === 0) {
-        this.directoryError = 'No valid files found in directory'
-        return
-      }
-
-      this.validFiles = validFiles.map(file => file.name)
-
-      // Check if any study needs registration
-      const studyIds = new Set(validFiles.map(file => this.extractStudyId(file.name)))
-      for (const studyId of studyIds) {
-        try {
-          const response = await axios.get(`/api/studies/check-prior/${studyId}`)
-          if (!response.data.exists) {
-            this.showRegistrationModal = true
-            break
-          }
-        } catch (error) {
-          console.error('Error checking study registration:', error)
-        }
-      }
+      // The actual directory selection is now handled by BatchDirectorySelection
+      // This method is kept for any additional processing needed at the parent level
+      console.log('Directory selected:', this.selectedDirectory)
     },
     validateFilename(filename) {
       const subid = this.extractSubId(filename)
@@ -787,6 +853,104 @@ export default {
     },
     isStudyIdValid(studyId) {
       return studyId.length === 3 && /^\d+$/.test(studyId) && studyId !== '000'
+    },
+    registerBatchStudy(study) {
+      this.currentBatchStudy = study
+      this.showRegistrationModal = true
+    },
+    closeBatchRegistration() {
+      this.showBatchRegistrationModal = false
+      this.batchStudies = []
+    },
+    async proceedWithBatch() {
+      if (!this.canProceedWithBatch) return
+
+      try {
+        // First, check which studies need to be registered
+        const studyIds = new Set()
+        this.validFiles.forEach(file => {
+          const studyId = this.extractStudyId(file)
+          if (studyId) studyIds.add(studyId)
+        })
+
+        // Check each study's registration status
+        for (const studyId of studyIds) {
+          if (!this.registeredStudies.has(studyId)) {
+            try {
+              const response = await axios.get(`/api/studies/${studyId}`)
+              if (response.data) {
+                // Study exists in database, add to registeredStudies
+                this.registeredStudies.add(studyId)
+              } else {
+                // Study doesn't exist, show registration modal
+                this.currentBatchStudy = { studyId, exists: false }
+                this.showRegistrationModal = true
+                return // Stop processing until study is registered
+              }
+            } catch (error) {
+              console.error(`Error checking study ${studyId}:`, error)
+              this.showNotification({
+                title: 'Error',
+                message: `Failed to check study ${studyId}: ${error.message}`,
+                type: 'danger'
+              })
+              return
+            }
+          }
+        }
+
+        // Process each file
+        for (const file of this.validFiles) {
+          try {
+            // Extract study and subject IDs
+            const studyId = this.extractStudyId(file)
+            const subId = this.extractSubId(file)
+
+            // Create SDM instance
+            await axios.post('/api/studies/instances', {
+              study_id: studyId,
+              subid: subId,
+              sdp_file_path: file
+            })
+
+            // Process the study
+            await this.processStudy({
+              studyId: studyId,
+              options: {
+                use_prior_save: false,
+                smooth_and_impute: true,
+                adjust_for_gaps_and_non_wear: true,
+                analyze_days: this.settings.day.enabled,
+                identify_curves: this.settings.curve.enabled
+              },
+              settings: this.settings
+            })
+          } catch (error) {
+            console.error(`Error processing file ${file}:`, error)
+            this.showNotification({
+              title: 'Error',
+              message: `Failed to process ${file}: ${error.message}`,
+              type: 'danger'
+            })
+          }
+        }
+
+        this.showNotification({
+          title: 'Success',
+          message: `Processed ${this.validFiles.length} files`
+        })
+
+        // Close the modal and navigate to results
+        this.closeBatchRegistration()
+        this.$router.push('/results')
+      } catch (error) {
+        console.error('Error in batch processing:', error)
+        this.showNotification({
+          title: 'Error',
+          message: error.message || 'Failed to process batch',
+          type: 'danger'
+        })
+      }
     }
   }
 }
