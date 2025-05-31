@@ -46,20 +46,67 @@ const actions = {
   },
 
   async fetchStudyDetails({ commit }, studyId) {
-    commit('SET_LOADING', true)
     try {
-      const response = await axios.get(`/api/studies/${studyId}`)
-      commit('SET_SELECTED_STUDY', response.data)
+      commit('SET_LOADING', true)
       
-      // Fetch all results for the study
-      await Promise.all([
-        actions.fetchDayResults({ commit }, studyId),
-        actions.fetchCurveResults({ commit }, studyId),
-        actions.fetchEventResults({ commit }, studyId)
-      ])
+      // Ensure studyId is a string
+      const studyIdStr = String(studyId)
+      
+      // Fetch study details
+      const response = await axios.get(`/api/studies/${studyIdStr}`)
+      commit('SET_CURRENT_STUDY', response.data)
+      
+      // Fetch day results if available
+      try {
+        const daysResponse = await axios.get(`/api/studies/${studyIdStr}/days`)
+        commit('SET_DAY_RESULTS', daysResponse.data)
+      } catch (error) {
+        if (error.response?.status === 404) {
+          // Day analysis not run, set empty results
+          commit('SET_DAY_RESULTS', { features: [], plots: [] })
+        } else {
+          // Only log unexpected errors
+          console.error('Unexpected error fetching day results:', error)
+        }
+      }
+      
+      // Fetch curve results if available
+      try {
+        const curvesResponse = await axios.get(`/api/studies/${studyIdStr}/curves`)
+        commit('SET_CURVE_RESULTS', curvesResponse.data)
+      } catch (error) {
+        if (error.response?.status === 404) {
+          // Curve analysis not run, set empty results
+          commit('SET_CURVE_RESULTS', { features: [], plots: [] })
+        } else {
+          // Only log unexpected errors
+          console.error('Unexpected error fetching curve results:', error)
+        }
+      }
+      
+      // Fetch event results if available
+      try {
+        const eventsResponse = await axios.get(`/api/studies/${studyIdStr}/events`)
+        commit('SET_EVENT_RESULTS', eventsResponse.data)
+      } catch (error) {
+        if (error.response?.status === 404) {
+          // Event analysis not run, set empty results
+          commit('SET_EVENT_RESULTS', { features: [], plots: [] })
+        } else {
+          // Only log unexpected errors
+          console.error('Unexpected error fetching event results:', error)
+        }
+      }
+      
+      return response.data
     } catch (error) {
-      commit('SET_ERROR', 'Failed to fetch study details')
-      console.error('Error fetching study details:', error)
+      // Only log and throw unexpected errors
+      if (error.response?.status !== 404) {
+        console.error('Unexpected error fetching study details:', error)
+        throw error
+      }
+      // For 404s, just return null
+      return null
     } finally {
       commit('SET_LOADING', false)
     }
@@ -67,28 +114,46 @@ const actions = {
 
   async fetchDayResults({ commit }, studyId) {
     try {
-      const response = await axios.get(`/api/studies/${studyId}/days`)
+      const studyIdStr = String(studyId)
+      const response = await axios.get(`/api/studies/${studyIdStr}/days`)
       commit('SET_DAY_RESULTS', response.data)
     } catch (error) {
-      console.error('Error fetching day results:', error)
+      if (error.response?.status !== 404) {
+        console.error('Unexpected error fetching day results:', error)
+        throw error
+      }
+      // Set empty results for 404s without throwing
+      commit('SET_DAY_RESULTS', { features: [], plots: [] })
     }
   },
 
   async fetchCurveResults({ commit }, studyId) {
     try {
-      const response = await axios.get(`/api/studies/${studyId}/curves`)
+      const studyIdStr = String(studyId)
+      const response = await axios.get(`/api/studies/${studyIdStr}/curves`)
       commit('SET_CURVE_RESULTS', response.data)
     } catch (error) {
-      console.error('Error fetching curve results:', error)
+      if (error.response?.status !== 404) {
+        console.error('Unexpected error fetching curve results:', error)
+        throw error
+      }
+      // Set empty results for 404s without throwing
+      commit('SET_CURVE_RESULTS', { features: [], plots: [] })
     }
   },
 
   async fetchEventResults({ commit }, studyId) {
     try {
-      const response = await axios.get(`/api/studies/${studyId}/events`)
+      const studyIdStr = String(studyId)
+      const response = await axios.get(`/api/studies/${studyIdStr}/events`)
       commit('SET_EVENT_RESULTS', response.data)
     } catch (error) {
-      console.error('Error fetching event results:', error)
+      if (error.response?.status !== 404) {
+        console.error('Unexpected error fetching event results:', error)
+        throw error
+      }
+      // Set empty results for 404s without throwing
+      commit('SET_EVENT_RESULTS', { features: [], plots: [] })
     }
   },
 
@@ -145,6 +210,9 @@ const mutations = {
   },
   SET_STUDIES(state, studies) {
     state.list = studies
+  },
+  SET_CURRENT_STUDY(state, study) {
+    state.selected = study
   },
   SET_SELECTED_STUDY(state, study) {
     state.selected = study

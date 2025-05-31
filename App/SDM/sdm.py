@@ -2,7 +2,7 @@
 Skyn Data Manager (SDM) - Main Orchestrator
 
 This module contains the main SDM class that orchestrates the entire data processing and analysis pipeline.
-It manages the workflow of processing raw Skyn data, performing analyses, and generating reports.
+It manages the workflow of processing raw Skyn data and performing analyses.
 """
 
 from App.SDM.Skyn_Processors.skyn_dataset import skynDataset
@@ -12,11 +12,9 @@ from App.SDM.Configuration.file_management import (
     extract_dataset_identifier, 
     extract_subid,
     save_to_computer, 
-    create_save_directories, 
-    load, 
-    create_individual_plot_folder
+    create_web_save_directories, 
+    load
 )
-from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 import traceback
 from datetime import date, datetime
 import pandas as pd
@@ -29,14 +27,8 @@ class SDM:
     This class manages the entire workflow of:
     1. Processing raw Skyn data files
     2. Performing various analyses (curve features, day-level analysis, etc.)
-    3. Generating reports and visualizations
+    3. Preparing data for web UI visualization
     4. Tracking processing status and errors
-    
-    The class maintains state about the processing workflow, including:
-    - Processing status for each step
-    - Error logs
-    - Processing settings
-    - Results and outputs
     """
     
     def __init__(self, project_root, data_input_folder, output_folder_name='cohort'):
@@ -56,17 +48,13 @@ class SDM:
         self.processed_data_out = data_input_folder.replace('_RAW', '_PROCESSED')
         self.results_dir = f'{project_root}/Results/{output_folder_name}/{date.today().strftime("%m.%d.%Y")}'
         self.data_out = f'{self.results_dir}/Datasets'
-        self.graphs_out = f'{self.results_dir}/Plots'
-        self.analyses_out = f'{self.results_dir}/Model_Performance'
         
         # Create directories
-        create_save_directories(
+        create_web_save_directories(
             project_root, 
             self.processed_data_out, 
             output_folder_name, 
-            self.data_out, 
-            self.graphs_out, 
-            self.analyses_out
+            self.data_out
         )
         
         # Initialize storage for results
@@ -117,33 +105,23 @@ class SDM:
                 'export_results': []
             }
 
-    def process_data(self, 
-                    use_prior_save=True,
-                    smooth_and_impute=False,
-                    adjust_for_gaps_and_non_wear=False,
-                    analyze_days=False,
-                    identify_curves=False,
-                    match_events_to_curves=False,
-                    gaps_and_non_wear_attrs={},
-                    smooth_and_impute_attrs={},
-                    curve_attrs={},
-                    day_attrs={'day_start_hour': 0, 'make_graphs': True},
-                    event_attrs={}):
+    def process_single_subject(self,
+                             subid,
+                             event_data=pd.DataFrame(),
+                             event_subid_column='ID',
+                             use_prior_save=True,
+                             smooth_and_impute=False,
+                             adjust_for_gaps_and_non_wear=False,
+                             analyze_days=False,
+                             identify_curves=False,
+                             match_events_to_curves=False,
+                             gaps_and_non_wear_attrs={},
+                             smooth_and_impute_attrs={},
+                             curve_attrs={},
+                             day_attrs={'day_start_hour': 0},
+                             event_attrs={}):
         """
-        Process raw data files through the SDM pipeline.
-        
-        Args:
-            use_prior_save (bool): Whether to use previously saved processed data
-            smooth_and_impute (bool): Whether to smooth and impute data
-            adjust_for_gaps_and_non_wear (bool): Whether to adjust for gaps and non-wear
-            analyze_days (bool): Whether to perform day-level analysis
-            identify_curves (bool): Whether to identify curves
-            match_events_to_curves (bool): Whether to match events to curves
-            gaps_and_non_wear_attrs (dict): Attributes for gap and non-wear processing
-            smooth_and_impute_attrs (dict): Attributes for smoothing and imputation
-            curve_attrs (dict): Attributes for curve identification
-            day_attrs (dict): Attributes for day-level analysis
-            event_attrs (dict): Attributes for event matching
+        Process and analyze data for a single subject.
         """
         # Store settings
         self.gaps_and_non_wear_attrs = gaps_and_non_wear_attrs
@@ -152,80 +130,97 @@ class SDM:
         self.day_attrs = day_attrs
         self.event_attrs = event_attrs
 
+        # Find the file for the specified subject
         files = [os.path.join(self.data_input_folder, file) for file in os.listdir(self.data_input_folder)]
+        subject_files = [f for f in files if str(subid) in os.path.basename(f)]
         
-        for file in files:
-            try:
-                subid = extract_subid(os.path.basename(file))
-                print(f"\nProcessing file for subject {subid}")
-                dataset_identifier = extract_dataset_identifier(os.path.basename(file))
-                print(f"Dataset identifier: {dataset_identifier}")
-                
-                if dataset_identifier == '':
-                    print(f"Warning: Empty dataset identifier for file: {file}")
-                    continue
-                
-                if not os.path.isfile(file):
-                    print(f"Error: Invalid file path: {file}")
-                    continue
-                    
-                sdm_processor = None
-                prior_processor_loaded = False
-                
-                if use_prior_save:
-                    try:
-                        print(f"Attempting to load prior save for {subid}_{dataset_identifier}")
-                        sdm_processor = load(f'{subid}_{dataset_identifier}_skyn_data_processed.sdp', self.processed_data_out)
-                        sdm_processor.data_out_folder = self.data_out
-                        sdm_processor.plot_folder = create_individual_plot_folder(self.graphs_out, subid)
-                        prior_processor_loaded = True
-                        print(f"Successfully loaded prior save for {subid}_{dataset_identifier}")
-                    except Exception as e:
-                        error_msg = f"Failed to load prior save for {subid}_{dataset_identifier}: {str(e)}"
-                        print(error_msg)
-                        self.errors['gaps_and_non_wear'].append(error_msg)
-                        continue
+        if not subject_files:
+            error_msg = f"No files found for subject {subid}"
+            print(error_msg)
+            return
+            
+        file = subject_files[0]  # Take the first matching file
+        
+        try:
+            print(f"\nProcessing file for subject {subid}")
+            dataset_identifier = extract_dataset_identifier(os.path.basename(file))
+            print(f"Dataset identifier: {dataset_identifier}")
+            
+            if dataset_identifier == '':
+                error_msg = f"Warning: Empty dataset identifier for file: {file}"
+                print(error_msg)
+                return
+            
+            if not os.path.isfile(file):
+                error_msg = f"Error: Invalid file path: {file}"
+                print(error_msg)
+                return
 
-                if not prior_processor_loaded:
-                    print(f"Creating new processor for {subid}_{dataset_identifier}")
-                    sdm_processor = skynDataset(str(file), self.processed_data_out, self.data_out, self.graphs_out, subid, dataset_identifier, 'e' + str(1))
+            # Initialize status tracking for this subject-dataset pair
+            self._initialize_subject_dataset_status(subid, dataset_identifier)
+            key = self._get_subject_dataset_key(subid, dataset_identifier)
                 
-                if adjust_for_gaps_and_non_wear:
-                    try:
-                        print(f"Adjusting for gaps and non-wear for {subid}_{dataset_identifier}")
-                        sdm_processor.adjust_for_gaps_and_non_wear(**self.gaps_and_non_wear_attrs)
-                        self.status['gaps_and_non_wear'] = 'success'
-                    except Exception as e:
-                        error_msg = f"Error adjusting gaps and non-wear for {subid}_{dataset_identifier}: {str(e)}"
-                        print(error_msg)
-                        self.errors['gaps_and_non_wear'].append(error_msg)
-                        self.status['gaps_and_non_wear'] = 'failed'
-                    
+            sdm_processor = None
+            prior_processor_loaded = False
+            
+            if use_prior_save:
+                try:
+                    print(f"Attempting to load prior save for {subid}_{dataset_identifier}")
+                    sdm_processor = load(f'{subid}_{dataset_identifier}_skyn_data_processed.sdp', self.processed_data_out)
+                    sdm_processor.data_out_folder = self.data_out
+                    prior_processor_loaded = True
+                    print(f"Successfully loaded prior save for {subid}_{dataset_identifier}")
+                except Exception as e:
+                    error_msg = f"Failed to load prior save for {subid}_{dataset_identifier}: {str(e)}"
+                    print(error_msg)
+                    self.errors[key]['gaps_and_non_wear'].append(error_msg)
+                    return
+
+            if not prior_processor_loaded:
+                print(f"Creating new processor for {subid}_{dataset_identifier}")
+                sdm_processor = skynDataset(str(file), self.processed_data_out, self.data_out, subid, dataset_identifier, 'e' + str(1))
+            
+            # Start with gaps and non-wear processing
+            if adjust_for_gaps_and_non_wear:
+                try:
+                    print(f"Adjusting for gaps and non-wear for {subid}_{dataset_identifier}")
+                    sdm_processor.adjust_for_gaps_and_non_wear(**self.gaps_and_non_wear_attrs)
+                    self.status[key]['gaps_and_non_wear'] = 'success'
+                    # Save initial state after gaps and non-wear processing
+                    sdm_processor.save_self(valid=True)
+                except Exception as e:
+                    error_msg = f"Error adjusting gaps and non-wear for {subid}_{dataset_identifier}: {str(e)}"
+                    print(error_msg)
+                    self.errors[key]['gaps_and_non_wear'].append(error_msg)
+                    self.status[key]['gaps_and_non_wear'] = 'failed'
+                    return  # Stop processing if gaps and non-wear fails
+                
+            # Continue with other processing steps only if gaps and non-wear succeeded
+            if self.status[key]['gaps_and_non_wear'] == 'success':
                 if smooth_and_impute:
                     try:
                         print(f"Smoothing and imputing for {subid}_{dataset_identifier}")
                         sdm_processor.smooth_and_impute(**self.smooth_and_impute_attrs)
-                        self.status['smooth_and_impute'] = 'success'
+                        self.status[key]['smooth_and_impute'] = 'success'
                     except Exception as e:
                         error_msg = f"Error smoothing and imputing for {subid}_{dataset_identifier}: {str(e)}"
                         print(error_msg)
-                        self.errors['smooth_and_impute'].append(error_msg)
-                        self.status['smooth_and_impute'] = 'failed'
-                    
+                        self.errors[key]['smooth_and_impute'].append(error_msg)
+                        self.status[key]['smooth_and_impute'] = 'failed'
+                
                 if identify_curves:
                     try:
                         print(f"Identifying curves for {subid}_{dataset_identifier}")
                         sdm_processor.identify_curves(curve_attrs=self.curve_attrs)
                         if not match_events_to_curves:
-                            print(f"Making curve graphs for {subid}_{dataset_identifier}")
-                            sdm_processor.make_curve_graphs()
+                            sdm_processor.curve_features.to_excel(f'{self.results_dir}/curve_features_{subid}.xlsx', index=None)
                             self.curve_features.append(sdm_processor.curve_features)
-                        self.status['identify_curves'] = 'success'
+                        self.status[key]['identify_curves'] = 'success'
                     except Exception as e:
                         error_msg = f"Error identifying curves for {subid}_{dataset_identifier}: {str(e)}"
                         print(error_msg)
-                        self.errors['identify_curves'].append(error_msg)
-                        self.status['identify_curves'] = 'failed'
+                        self.errors[key]['identify_curves'].append(error_msg)
+                        self.status[key]['identify_curves'] = 'failed'
                         
                 if analyze_days:
                     try:
@@ -233,43 +228,49 @@ class SDM:
                         sdm_processor.run_day_level_analysis(**self.day_attrs)
                         if not sdm_processor.day_level_data.empty:
                             print(f"Found day data with shape: {sdm_processor.day_level_data.shape}")
+                            sdm_processor.day_level_data.to_excel(f'{self.results_dir}/day_level_results_{subid}.xlsx', index=None)
                             self.day_datasets.append(sdm_processor.day_level_data)
-                            self.status['analyze_days'] = 'success'
+                            self.status[key]['analyze_days'] = 'success'
                         else:
                             error_msg = f"WARNING: No day data found for {subid}_{dataset_identifier}"
                             print(error_msg)
-                            self.errors['analyze_days'].append(error_msg)
-                            self.status['analyze_days'] = 'failed'
+                            self.errors[key]['analyze_days'].append(error_msg)
+                            self.status[key]['analyze_days'] = 'failed'
                     except Exception as e:
                         error_msg = f"Error running day analysis for {subid}_{dataset_identifier}: {str(e)}"
                         print(error_msg)
-                        self.errors['analyze_days'].append(error_msg)
-                        self.status['analyze_days'] = 'failed'
+                        self.errors[key]['analyze_days'].append(error_msg)
+                        self.status[key]['analyze_days'] = 'failed'
                         
                 if match_events_to_curves:
                     try:
                         print(f"Configuring event data for {subid}_{dataset_identifier}")
                         sdm_processor.configure_event_data(**self.event_attrs)
-                        print(f"Making curve graphs for {subid}_{dataset_identifier}")
-                        sdm_processor.make_curve_graphs()
                         print(f"Setting EMA regions for {subid}_{dataset_identifier}")
                         sdm_processor.set_ema_regions()
+                        sdm_processor.curve_features.to_excel(f'{self.results_dir}/curve_features_{subid}.xlsx', index=None)
                         self.curve_features.append(sdm_processor.curve_features)
                         self.event_datasets.append(sdm_processor.events)
-                        self.status['match_events'] = 'success'
+                        self.status[key]['match_events'] = 'success'
                     except Exception as e:
                         error_msg = f"Error matching events for {subid}_{dataset_identifier}: {str(e)}"
                         print(error_msg)
-                        self.errors['match_events'].append(error_msg)
-                        self.status['match_events'] = 'failed'
+                        self.errors[key]['match_events'].append(error_msg)
+                        self.status[key]['match_events'] = 'failed'
+            
+            self.processors.append(sdm_processor)
+            
+            # Save final state after all processing
+            self.save_self(valid=self.status[key]['gaps_and_non_wear'] == 'success')
                 
-                self.processors.append(sdm_processor)
-                    
-            except Exception as e:
-                error_msg = f"\nError processing file {file}:\nError type: {type(e).__name__}\nError message: {str(e)}\nFull traceback:\n{traceback.format_exc()}"
-                print(error_msg)
-                self.errors['gaps_and_non_wear'].append(error_msg)
-                print("\n")
+        except Exception as e:
+            error_msg = f"\nError processing file {file}:\nError type: {type(e).__name__}\nError message: {str(e)}\nFull traceback:\n{traceback.format_exc()}"
+            print(error_msg)
+            if 'key' in locals():
+                self.errors[key]['gaps_and_non_wear'].append(error_msg)
+            print("\n")
+            # Save SDM state even if there was an error
+            self.save_self(valid=False)
 
     def analyze_curves(self, include_events=False, event_attrs=None, day_attrs=None):
         """
@@ -297,7 +298,7 @@ class SDM:
                 )
                 analyzer.run_event_stats()
                 analyzer.export_workbook_events_and_curves(
-                    f'{self.analyses_out}/curve_features_with_events.xlsx',
+                    f'{self.results_dir}/curve_features_with_events.xlsx',
                     smooth_and_impute_attrs=self.smooth_and_impute_attrs,
                     curve_attrs=self.curve_attrs,
                     event_attrs=self.event_attrs,
@@ -311,8 +312,8 @@ class SDM:
                 )
                 analyzer.run_stats()
                 analyzer.export_workbook_curves(
-                    f'{self.analyses_out}/curve_features.xlsx',
-                    include_plots=True,
+                    f'{self.results_dir}/curve_features.xlsx',
+                    include_plots=False,
                     export_imputations=True
                 )
             self.status['analyze_curves'] = 'success'
@@ -430,178 +431,6 @@ class SDM:
             self.day_attrs = settings_dict['day_attrs']
         if 'event_attrs' in settings_dict:
             self.event_attrs = settings_dict['event_attrs']
-
-    def process_single_subject(self,
-                             subid,
-                             event_data=pd.DataFrame(),
-                             event_subid_column='ID',
-                             use_prior_save=True,
-                             smooth_and_impute=False,
-                             adjust_for_gaps_and_non_wear=False,
-                             analyze_days=False,
-                             identify_curves=False,
-                             match_events_to_curves=False,
-                             gaps_and_non_wear_attrs={},
-                             smooth_and_impute_attrs={},
-                             curve_attrs={},
-                             day_attrs={'day_start_hour': 0, 'make_graphs': True},
-                             event_attrs={}):
-        """
-        Process and analyze data for a single subject.
-        """
-        # Store settings
-        self.gaps_and_non_wear_attrs = gaps_and_non_wear_attrs
-        self.smooth_and_impute_attrs = smooth_and_impute_attrs
-        self.curve_attrs = curve_attrs
-        self.day_attrs = day_attrs
-        self.event_attrs = event_attrs
-
-        # Find the file for the specified subject
-        files = [os.path.join(self.data_input_folder, file) for file in os.listdir(self.data_input_folder)]
-        subject_files = [f for f in files if str(subid) in os.path.basename(f)]
-        
-        if not subject_files:
-            error_msg = f"No files found for subject {subid}"
-            print(error_msg)
-            return
-            
-        file = subject_files[0]  # Take the first matching file
-        
-        try:
-            print(f"\nProcessing file for subject {subid}")
-            dataset_identifier = extract_dataset_identifier(os.path.basename(file))
-            print(f"Dataset identifier: {dataset_identifier}")
-            
-            if dataset_identifier == '':
-                error_msg = f"Warning: Empty dataset identifier for file: {file}"
-                print(error_msg)
-                return
-            
-            if not os.path.isfile(file):
-                error_msg = f"Error: Invalid file path: {file}"
-                print(error_msg)
-                return
-
-            # Initialize status tracking for this subject-dataset pair
-            self._initialize_subject_dataset_status(subid, dataset_identifier)
-            key = self._get_subject_dataset_key(subid, dataset_identifier)
-                
-            sdm_processor = None
-            prior_processor_loaded = False
-            
-            if use_prior_save:
-                try:
-                    print(f"Attempting to load prior save for {subid}_{dataset_identifier}")
-                    sdm_processor = load(f'{subid}_{dataset_identifier}_skyn_data_processed.sdp', self.processed_data_out)
-                    sdm_processor.data_out_folder = self.data_out
-                    sdm_processor.plot_folder = create_individual_plot_folder(self.graphs_out, subid)
-                    prior_processor_loaded = True
-                    print(f"Successfully loaded prior save for {subid}_{dataset_identifier}")
-                except Exception as e:
-                    error_msg = f"Failed to load prior save for {subid}_{dataset_identifier}: {str(e)}"
-                    print(error_msg)
-                    self.errors[key]['gaps_and_non_wear'].append(error_msg)
-                    return
-
-            if not prior_processor_loaded:
-                print(f"Creating new processor for {subid}_{dataset_identifier}")
-                sdm_processor = skynDataset(str(file), self.processed_data_out, self.data_out, self.graphs_out, subid, dataset_identifier, 'e' + str(1))
-            
-            # Start with gaps and non-wear processing
-            if adjust_for_gaps_and_non_wear:
-                try:
-                    print(f"Adjusting for gaps and non-wear for {subid}_{dataset_identifier}")
-                    sdm_processor.adjust_for_gaps_and_non_wear(**self.gaps_and_non_wear_attrs)
-                    self.status[key]['gaps_and_non_wear'] = 'success'
-                    # Save initial state after gaps and non-wear processing
-                    sdm_processor.save_self(valid=True)
-                except Exception as e:
-                    error_msg = f"Error adjusting gaps and non-wear for {subid}_{dataset_identifier}: {str(e)}"
-                    print(error_msg)
-                    self.errors[key]['gaps_and_non_wear'].append(error_msg)
-                    self.status[key]['gaps_and_non_wear'] = 'failed'
-                    return  # Stop processing if gaps and non-wear fails
-                
-            # Continue with other processing steps only if gaps and non-wear succeeded
-            if self.status[key]['gaps_and_non_wear'] == 'success':
-                if smooth_and_impute:
-                    try:
-                        print(f"Smoothing and imputing for {subid}_{dataset_identifier}")
-                        sdm_processor.smooth_and_impute(**self.smooth_and_impute_attrs)
-                        self.status[key]['smooth_and_impute'] = 'success'
-                    except Exception as e:
-                        error_msg = f"Error smoothing and imputing for {subid}_{dataset_identifier}: {str(e)}"
-                        print(error_msg)
-                        self.errors[key]['smooth_and_impute'].append(error_msg)
-                        self.status[key]['smooth_and_impute'] = 'failed'
-                
-                if identify_curves:
-                    try:
-                        print(f"Identifying curves for {subid}_{dataset_identifier}")
-                        sdm_processor.identify_curves(curve_attrs=self.curve_attrs)
-                        if not match_events_to_curves:
-                            print(f"Making curve graphs for {subid}_{dataset_identifier}")
-                            sdm_processor.make_curve_graphs()
-                            sdm_processor.curve_features.to_excel(f'{self.results_dir}/curve_features_{subid}.xlsx', index=None)
-                            self.curve_features.append(sdm_processor.curve_features)
-                        self.status[key]['identify_curves'] = 'success'
-                    except Exception as e:
-                        error_msg = f"Error identifying curves for {subid}_{dataset_identifier}: {str(e)}"
-                        print(error_msg)
-                        self.errors[key]['identify_curves'].append(error_msg)
-                        self.status[key]['identify_curves'] = 'failed'
-                        
-                if analyze_days:
-                    try:
-                        print(f"Running day analysis for {subid}_{dataset_identifier}")
-                        sdm_processor.run_day_level_analysis(**self.day_attrs)
-                        if not sdm_processor.day_level_data.empty:
-                            print(f"Found day data with shape: {sdm_processor.day_level_data.shape}")
-                            sdm_processor.day_level_data.to_excel(f'{self.results_dir}/day_level_results_{subid}.xlsx', index=None)
-                            self.day_datasets.append(sdm_processor.day_level_data)
-                            self.status[key]['analyze_days'] = 'success'
-                        else:
-                            error_msg = f"WARNING: No day data found for {subid}_{dataset_identifier}"
-                            print(error_msg)
-                            self.errors[key]['analyze_days'].append(error_msg)
-                            self.status[key]['analyze_days'] = 'failed'
-                    except Exception as e:
-                        error_msg = f"Error running day analysis for {subid}_{dataset_identifier}: {str(e)}"
-                        print(error_msg)
-                        self.errors[key]['analyze_days'].append(error_msg)
-                        self.status[key]['analyze_days'] = 'failed'
-                        
-                if match_events_to_curves:
-                    try:
-                        print(f"Configuring event data for {subid}_{dataset_identifier}")
-                        sdm_processor.configure_event_data(**self.event_attrs)
-                        print(f"Making curve graphs for {subid}_{dataset_identifier}")
-                        sdm_processor.make_curve_graphs()
-                        print(f"Setting EMA regions for {subid}_{dataset_identifier}")
-                        sdm_processor.set_ema_regions()
-                        sdm_processor.curve_features.to_excel(f'{self.results_dir}/curve_features_{subid}.xlsx', index=None)
-                        self.curve_features.append(sdm_processor.curve_features)
-                        self.event_datasets.append(sdm_processor.events)
-                        self.status[key]['match_events'] = 'success'
-                    except Exception as e:
-                        error_msg = f"Error matching events for {subid}_{dataset_identifier}: {str(e)}"
-                        print(error_msg)
-                        self.errors[key]['match_events'].append(error_msg)
-                        self.status[key]['match_events'] = 'failed'
-            
-            self.processors.append(sdm_processor)
-            
-            # Save final state after all processing
-            self.save_self(valid=self.status[key]['gaps_and_non_wear'] == 'success')
-                
-        except Exception as e:
-            error_msg = f"\nError processing file {file}:\nError type: {type(e).__name__}\nError message: {str(e)}\nFull traceback:\n{traceback.format_exc()}"
-            print(error_msg)
-            if 'key' in locals():
-                self.errors[key]['gaps_and_non_wear'].append(error_msg)
-            print("\n")
-            # Save SDM state even if there was an error
-            self.save_self(valid=False)
 
     def save_self(self, valid=True):
         """

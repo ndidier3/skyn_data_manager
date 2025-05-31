@@ -108,6 +108,40 @@ def create_save_directories(project_root, processed_data_out, output_folder_name
   if not os.path.exists(f'{project_root}/Results/Error_Logs'):
     os.mkdir(f'{project_root}/Results/Error_Logs')
 
+def create_web_save_directories(project_root, processed_data_out, output_folder_name, data_out):
+  """
+  Create directories needed for web app version of SDM.
+  Only creates essential directories for data processing and storage.
+  
+  Args:
+      project_root (str): Root directory of the project
+      processed_data_out (str): Directory for processed data
+      output_folder_name (str): Name for output folder
+      data_out (str): Directory for processed data output
+  """
+  # Create processed data directory
+  if not os.path.exists(processed_data_out):
+    os.makedirs(processed_data_out, exist_ok=True)
+    
+  # Create results directory structure
+  results_dir = f'{project_root}/Results/{output_folder_name}'
+  if not os.path.exists(results_dir):
+    os.makedirs(results_dir, exist_ok=True)
+    
+  # Create dated results directory
+  dated_results_dir = f'{results_dir}/{date.today().strftime("%m.%d.%Y")}'
+  if not os.path.exists(dated_results_dir):
+    os.makedirs(dated_results_dir, exist_ok=True)
+    
+  # Create data output directory
+  if not os.path.exists(data_out):
+    os.makedirs(data_out, exist_ok=True)
+    
+  # Create error logs directory
+  error_logs_dir = f'{project_root}/Results/Error_Logs'
+  if not os.path.exists(error_logs_dir):
+    os.makedirs(error_logs_dir, exist_ok=True)
+
 def create_individual_plot_folder(graphs_out, subid):
   # Create subid plot folder within the plot folder
   subid_plot_folder = f'{graphs_out}/{subid}/'
