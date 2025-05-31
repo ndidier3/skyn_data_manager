@@ -38,7 +38,7 @@
             <div class="d-flex justify-content-between align-items-center mb-2">
               <p class="mb-0"><strong>Subject ID:</strong> {{ extractedSubId }}</p>
               <span class="badge" :class="subjectStatus?.exists ? 'bg-success' : 'bg-secondary'">
-                {{ subjectStatus?.exists ? 'Previously Analyzed' : 'New Subject' }}
+                {{ subjectStatus?.exists ? 'Previously Processed' : 'New File' }}
               </span>
             </div>
             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -48,10 +48,10 @@
               </span>
             </div>
             <div v-if="hasPriorAnalysis" class="prior-analysis-info mt-3 p-2 border rounded">
-              <p class="mb-2"><i class="fas fa-info-circle me-2"></i>Prior analysis found for this study</p>
+              <p class="mb-2"><i class="fas fa-info-circle me-2"></i>Previous analysis found for this file</p>
               <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-outline-primary" @click="loadPriorAnalysis">
-                  <i class="fas fa-history me-1"></i>Load Prior Analysis
+                  <i class="fas fa-history me-1"></i>Load Previous Analysis
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @click="startNewAnalysis">
                   <i class="fas fa-plus me-1"></i>Start New Analysis
@@ -94,74 +94,74 @@
 
       <!-- Settings Tabs -->
       <div v-if="selectedFile && !fileError" class="settings-tabs-container">
-        <ul class="nav nav-tabs settings-tabs" role="tablist">
-          <li class="nav-item" v-for="tab in tabs" :key="tab.id">
-            <a class="nav-link" 
-               :class="{ active: activeTab === tab.id }"
-               @click.prevent="activeTab = tab.id"
-               href="#">
-              {{ tab.name }}
+      <ul class="nav nav-tabs settings-tabs" role="tablist">
+        <li class="nav-item" v-for="tab in tabs" :key="tab.id">
+          <a class="nav-link" 
+             :class="{ active: activeTab === tab.id }"
+             @click.prevent="activeTab = tab.id"
+             href="#">
+            {{ tab.name }}
               <span class="status-indicator" :class="processingStatus[tab.id].status">
                 {{ processingStatus[tab.id].message }}
               </span>
-            </a>
-          </li>
-        </ul>
+          </a>
+        </li>
+      </ul>
 
-        <div class="tab-content settings-tab-content">
-          <!-- Gaps & Non-Wear Settings -->
-          <div v-if="activeTab === 'gaps'" class="tab-content-section">
-            <div class="status-item mb-3">
-              <div class="d-flex justify-content-between align-items-center">
-                <span class="status-label">Fill Gaps with Null Rows</span>
+      <div class="tab-content settings-tab-content">
+        <!-- Gaps & Non-Wear Settings -->
+        <div v-if="activeTab === 'gaps'" class="tab-content-section">
+          <div class="status-item mb-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="status-label">Fill Gaps with Null Rows</span>
                 <span class="status-badge" :class="processingStatus.gaps.status">
                   {{ processingStatus.gaps.message }}
                 </span>
-              </div>
-            </div>
-            <div class="status-item mb-3">
-              <div class="d-flex justify-content-between align-items-center">
-                <span class="status-label">Detect Non-Wear</span>
-                <span class="status-badge" :class="processingStatus.gaps.status">
-                  {{ processingStatus.gaps.message }}
-                </span>
-              </div>
-              <div class="d-flex justify-content-between align-items-center mt-2">
-                <label for="nonWearMethod" class="form-label mb-0">Non-Wear Method</label>
-                <select
-                  class="form-select w-auto"
-                  id="nonWearMethod"
-                  v-model="settings.gaps_and_non_wear.non_wear_method"
-                  style="min-width: 100px;"
-                >
-                  <option :value="'auto'">Auto</option>
-                  <option v-for="n in 6" :key="n" :value="(n + 24).toString()">{{ n + 24 }}</option>
-                </select>
-              </div>
             </div>
           </div>
+          <div class="status-item mb-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="status-label">Detect Non-Wear</span>
+                <span class="status-badge" :class="processingStatus.gaps.status">
+                  {{ processingStatus.gaps.message }}
+                </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <label for="nonWearMethod" class="form-label mb-0">Non-Wear Method</label>
+              <select
+                class="form-select w-auto"
+                id="nonWearMethod"
+                v-model="settings.gaps_and_non_wear.non_wear_method"
+                style="min-width: 100px;"
+              >
+                  <option :value="'auto'">Auto</option>
+                <option v-for="n in 6" :key="n" :value="(n + 24).toString()">{{ n + 24 }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
-          <!-- Smooth & Impute Settings -->
-          <div v-if="activeTab === 'smooth'" class="tab-content-section">
-            <div class="status-item mb-3">
-              <div class="d-flex justify-content-between align-items-center">
-                <span class="status-label">Median Smoothing</span>
+        <!-- Smooth & Impute Settings -->
+        <div v-if="activeTab === 'smooth'" class="tab-content-section">
+          <div class="status-item mb-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="status-label">Median Smoothing</span>
                 <span class="status-badge" :class="processingStatus.smooth.status">
                   {{ processingStatus.smooth.message }}
                 </span>
-              </div>
             </div>
-            <div class="status-item mb-3">
-              <div class="d-flex justify-content-between align-items-center">
-                <span class="status-label">Impute Gaps</span>
+          </div>
+          <div class="status-item mb-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="status-label">Impute Gaps</span>
                 <span class="status-badge" :class="processingStatus.smooth.status">
                   {{ processingStatus.smooth.message }}
                 </span>
-              </div>
             </div>
-            <div class="status-item mb-3">
-              <div class="d-flex justify-content-between align-items-center">
-                <span class="status-label">Impute Non-Wear</span>
+          </div>
+          <div class="status-item mb-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="status-label">Impute Non-Wear</span>
                 <span class="status-badge" :class="processingStatus.smooth.status">
                   {{ processingStatus.smooth.message }}
                 </span>
@@ -173,10 +173,10 @@
                 <span class="status-badge" :class="processingStatus.smooth.status">
                   {{ processingStatus.smooth.message }}
                 </span>
-              </div>
             </div>
-            <div class="status-item mb-3">
-              <div class="d-flex justify-content-between align-items-center">
+          </div>
+          <div class="status-item mb-3">
+            <div class="d-flex justify-content-between align-items-center">
                 <span class="status-label">Impute Plummets</span>
                 <span class="status-badge" :class="processingStatus.smooth.status">
                   {{ processingStatus.smooth.message }}
@@ -195,8 +195,8 @@
               <label class="form-check-label" for="enableDayAnalysis">Run Day Analysis</label>
             </div>
             <div v-if="settings.day.enabled">
-              <div class="status-item mb-3">
-                <div class="d-flex justify-content-between align-items-center">
+          <div class="status-item mb-3">
+            <div class="d-flex justify-content-between align-items-center">
                   <span class="status-label">Day Analysis</span>
                   <span class="status-badge" :class="processingStatus.day.status">
                     {{ processingStatus.day.message }}
@@ -216,12 +216,12 @@
                        id="makeGraphs"
                        v-model="settings.day.make_graphs">
                 <label class="form-check-label" for="makeGraphs">Make Graphs</label>
-              </div>
             </div>
           </div>
+        </div>
 
-          <!-- Curve Analysis Settings -->
-          <div v-if="activeTab === 'curve'" class="tab-content-section">
+        <!-- Curve Analysis Settings -->
+        <div v-if="activeTab === 'curve'" class="tab-content-section">
             <div class="form-check form-switch mb-3">
               <input class="form-check-input" 
                      type="checkbox" 
@@ -238,35 +238,35 @@
                   </span>
                 </div>
               </div>
-              <div class="curve-flags-scroll">
-                <div v-for="flagObj in curveFlagsWithParams" :key="flagObj.flag" class="status-item mb-3">
-                  <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="status-label">{{ formatFlagName(flagObj.flag) }}</span>
-                    <span class="status-badge">Rule</span>
-                  </div>
-                  <div class="flag-params ms-2 mt-2">
-                    <div v-for="param in getFlagParams(flagObj.flag)" :key="param" class="flag-param-row mb-2">
-                      <label :for="flagObj.flag + '-' + param" class="flag-param-label me-2">{{ formatParamName(param) }}:</label>
-                      <select
-                        class="form-select w-auto d-inline-block"
-                        :id="flagObj.flag + '-' + param"
-                        v-model="settings.curve.flag_selections[flagObj.flag][param]"
-                        :style="'min-width: 80px;'"
-                      >
-                        <option value="off">Off</option>
-                        <option v-for="opt in getParamOptions(param, settings.curve.flag_selections[flagObj.flag][param])" :key="opt" :value="opt">{{ opt }}</option>
-                      </select>
-                    </div>
-                  </div>
+          <div class="curve-flags-scroll">
+            <div v-for="flagObj in curveFlagsWithParams" :key="flagObj.flag" class="status-item mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="status-label">{{ formatFlagName(flagObj.flag) }}</span>
+                <span class="status-badge">Rule</span>
+              </div>
+              <div class="flag-params ms-2 mt-2">
+                <div v-for="param in getFlagParams(flagObj.flag)" :key="param" class="flag-param-row mb-2">
+                  <label :for="flagObj.flag + '-' + param" class="flag-param-label me-2">{{ formatParamName(param) }}:</label>
+                  <select
+                    class="form-select w-auto d-inline-block"
+                    :id="flagObj.flag + '-' + param"
+                    v-model="settings.curve.flag_selections[flagObj.flag][param]"
+                    :style="'min-width: 80px;'"
+                  >
+                    <option value="off">Off</option>
+                    <option v-for="opt in getParamOptions(param, settings.curve.flag_selections[flagObj.flag][param])" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
                 </div>
               </div>
             </div>
           </div>
+          </div>
         </div>
+      </div>
 
-        <!-- Action Buttons -->
-        <div class="mt-4">
-          <button class="btn btn-secondary" @click="loadDefaults">Load Defaults</button>
+      <!-- Action Buttons -->
+      <div class="mt-4">
+        <button class="btn btn-secondary" @click="loadDefaults">Load Defaults</button>
           <button class="btn btn-primary" @click="startProcessing" :disabled="isProcessing">
             {{ isProcessing ? 'Processing...' : 'Start Processing' }}
           </button>
@@ -280,15 +280,28 @@
         </button>
       </div>
     </div>
+
+    <StudyRegistrationModal
+      :show.sync="showRegistrationModal"
+      :study-id="extractedStudyId"
+      :sub-id="extractedSubId"
+      @study-registered="handleStudyRegistered"
+      @proceed-to-analysis="handleProceedToAnalysis"
+      @modal-canceled="handleModalCancel"
+    ></StudyRegistrationModal>
   </div>
 </template>
 
 <script>
 import { mapState, mapActions, mapGetters } from 'vuex'
 import axios from 'axios'
+import StudyRegistrationModal from '@/components/StudyRegistrationModal.vue'
 
 export default {
   name: 'AnalysisSetup',
+  components: {
+    StudyRegistrationModal
+  },
   data() {
     return {
       isBatchMode: false,
@@ -302,6 +315,7 @@ export default {
       studyStatus: null,
       subjectStatus: null,
       activeTab: 'gaps',
+      showRegistrationModal: false,
       tabs: [
         { id: 'gaps', name: 'Gaps & Non-Wear' },
         { id: 'smooth', name: 'Smooth & Impute' },
@@ -366,6 +380,18 @@ export default {
         console.log('Non-wear method changed:', newValue)
       },
       immediate: true
+    },
+    studyStatus: {
+      handler(newStatus) {
+        console.log('Study status changed:', newStatus)
+        if (newStatus?.exists) {
+          // Ensure file details remain visible when study is registered
+          this.$nextTick(() => {
+            console.log('UI updated after study registration')
+          })
+        }
+      },
+      deep: true
     }
   },
   methods: {
@@ -446,15 +472,18 @@ export default {
         
         console.log('Final settings after initialization:', this.settings)
         this.showNotification({
+          type: 'success',
           title: 'Success',
-          message: 'Default settings loaded successfully'
+          message: 'Default settings loaded successfully',
+          timeout: 4000 // Dismiss after 4 seconds
         })
       } catch (error) {
         console.error('Error loading default settings:', error)
         this.showNotification({
+          type: 'error',
           title: 'Error',
           message: 'Failed to load default settings',
-          type: 'danger'
+          requiresManualRemoval: true
         })
       }
     },
@@ -465,25 +494,16 @@ export default {
             throw new Error('File is required')
           }
 
-          console.log('Creating study...')
-          // Create study
-          const study = await this.createStudy({
-            name: `Study ${this.extractedSubId}_${this.extractedStudyId}`,
-            description: 'Single file processing',
-            subid: this.extractedSubId,
-            study_id: this.extractedStudyId
-          })
-          
-          console.log('Study created:', study)
-          
-          if (!study || !study.study_id) {
-            throw new Error('Failed to create study')
+          // Check if study exists
+          if (!this.studyStatus?.exists) {
+            this.showRegistrationModal = true
+            return
           }
 
           console.log('Starting processing...')
           // Process study
           await this.processStudy({
-            studyId: study.study_id,
+            studyId: this.studyStatus.study.study_id,
             options: {
               use_prior_save: false,
               smooth_and_impute: true,
@@ -550,6 +570,66 @@ export default {
         type: 'info'
       })
     },
+    async handleStudyRegistered(studyData) {
+      try {
+        // Update study status
+        this.studyStatus = {
+          exists: true,
+          study: studyData
+        }
+        
+        // Update subject status
+        this.subjectStatus = {
+          exists: false,
+          message: 'New File'
+        }
+        
+        // Close the modal but keep the file selected
+        this.showRegistrationModal = false
+        
+        // Show success notification
+        this.showNotification({
+          type: 'success',
+          title: 'Success',
+          message: 'Study registered successfully',
+          timeout: 4000
+        })
+        
+        // Force a UI update to ensure all components re-render with new state
+        this.$nextTick(() => {
+          console.log('State after registration:', {
+            file: this.selectedFile?.name,
+            studyStatus: this.studyStatus,
+            subjectStatus: this.subjectStatus,
+            hasPriorAnalysis: this.hasPriorAnalysis
+          })
+        })
+      } catch (error) {
+        console.error('Error registering study:', error)
+        this.showNotification({
+          type: 'error',
+          title: 'Error',
+          message: 'Failed to register study. Please try again.',
+          requiresManualRemoval: true
+        })
+      }
+    },
+    handleProceedToAnalysis(study) {
+      // Handle proceeding to analysis
+      console.log('Proceeding to analysis for study:', study)
+      // Add any additional logic you need
+    },
+    handleModalCancel() {
+      // Clear the selected file and reset the file input
+      this.selectedFile = null;
+      if (this.$refs.fileInput) {
+        this.$refs.fileInput.value = '';
+      }
+      this.showRegistrationModal = false;
+      this.fileError = null;
+      this.studyStatus = null;
+      this.subjectStatus = null;
+    },
     async handleFileSelect(event) {
       console.log('File select event triggered:', event);
       const file = event.target.files[0];
@@ -571,10 +651,14 @@ export default {
         // Store the selected file and clear any errors
         this.selectedFile = file;
         this.fileError = null;
-        this.hasPriorAnalysis = false;
-        this.priorAnalysisInfo = null;
-        this.studyStatus = null;
-        this.subjectStatus = null;
+        
+        // Only reset these if we're not coming from study registration
+        if (!this.studyStatus?.exists) {
+          this.hasPriorAnalysis = false;
+          this.priorAnalysisInfo = null;
+          this.studyStatus = null;
+          this.subjectStatus = null;
+        }
 
         // Check for prior study
         try {
@@ -588,10 +672,13 @@ export default {
               study: studyResponse.data.study
             };
           } else {
+            console.log('New study detected, showing registration modal');
             this.studyStatus = {
               exists: false,
               message: 'New study'
             };
+            this.showRegistrationModal = true;
+            return; // Stop here and wait for modal submission
           }
 
           // Check for prior subject analysis
@@ -607,7 +694,7 @@ export default {
           } else {
             this.subjectStatus = {
               exists: false,
-              message: 'New subject'
+              message: 'New File'
             };
           }
 
@@ -616,7 +703,7 @@ export default {
             const date = new Date(this.subjectStatus.instance.created_at).toLocaleDateString();
             const time = new Date(this.subjectStatus.instance.created_at).toLocaleTimeString();
             
-            if (confirm(`A prior analysis was found from ${date} at ${time}.\n\nWould you like to load it?`)) {
+            if (confirm(`This file was previously processed on ${date} at ${time}.\n\nWould you like to load the previous analysis?`)) {
               await this.loadPriorAnalysis();
             }
           }
@@ -643,7 +730,7 @@ export default {
         this.fileError = 'Error processing file. Please try again.';
       }
     },
-    handleDirectorySelect(event) {
+    async handleDirectorySelect(event) {
       const files = Array.from(event.target.files)
       this.directoryError = null
       this.validFiles = []
@@ -663,6 +750,20 @@ export default {
       }
 
       this.validFiles = validFiles.map(file => file.name)
+
+      // Check if any study needs registration
+      const studyIds = new Set(validFiles.map(file => this.extractStudyId(file.name)))
+      for (const studyId of studyIds) {
+        try {
+          const response = await axios.get(`/api/studies/check-prior/${studyId}`)
+          if (!response.data.exists) {
+            this.showRegistrationModal = true
+            break
+          }
+        } catch (error) {
+          console.error('Error checking study registration:', error)
+        }
+      }
     },
     validateFilename(filename) {
       const subid = this.extractSubId(filename)

@@ -521,7 +521,7 @@ class SDM:
                     self.errors[key]['gaps_and_non_wear'].append(error_msg)
                     self.status[key]['gaps_and_non_wear'] = 'failed'
                     return  # Stop processing if gaps and non-wear fails
-            
+                
             # Continue with other processing steps only if gaps and non-wear succeeded
             if self.status[key]['gaps_and_non_wear'] == 'success':
                 if smooth_and_impute:
@@ -550,7 +550,7 @@ class SDM:
                         print(error_msg)
                         self.errors[key]['identify_curves'].append(error_msg)
                         self.status[key]['identify_curves'] = 'failed'
-                    
+                        
                 if analyze_days:
                     try:
                         print(f"Running day analysis for {subid}_{dataset_identifier}")
@@ -570,7 +570,7 @@ class SDM:
                         print(error_msg)
                         self.errors[key]['analyze_days'].append(error_msg)
                         self.status[key]['analyze_days'] = 'failed'
-                    
+                        
                 if match_events_to_curves:
                     try:
                         print(f"Configuring event data for {subid}_{dataset_identifier}")

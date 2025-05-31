@@ -126,8 +126,8 @@ const actions = {
         
         // Process the study
         const result = await axios.post(`/api/studies/${numericId}/process`, {
-            options,
-            settings
+        options,
+        settings
         });
         
         console.log('Process result:', result.data);  // Debug log
@@ -166,11 +166,11 @@ const mutations = {
     state.list.push(study)
   },
   UPDATE_STUDY(state, updatedStudy) {
-    const index = state.list.findIndex(s => s.id === updatedStudy.id)
+    const index = state.list.findIndex(s => s.study_id === updatedStudy.study_id)
     if (index !== -1) {
       state.list.splice(index, 1, updatedStudy)
     }
-    if (state.selected && state.selected.id === updatedStudy.id) {
+    if (state.selected && state.selected.study_id === updatedStudy.study_id) {
       state.selected = updatedStudy
     }
   },

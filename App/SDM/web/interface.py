@@ -14,55 +14,39 @@ class SDMWebInterface:
 
     def get_all_studies(self):
         """Get all studies from the database"""
-        return db.execute_query("""
-            SELECT s.id, s.study_id, s.is_registered, s.created_at, s.last_updated,
-                   i.subid, i.processing_status, i.last_error
+        query = """
+            SELECT s.study_id, s.created_at, s.last_updated,
+                   COUNT(i.id) as instance_count
             FROM studies s
-            JOIN sdm_instances i ON s.id = i.study_id
+            LEFT JOIN sdm_instances i ON s.study_id = i.study_id
+            GROUP BY s.study_id, s.created_at, s.last_updated
             ORDER BY s.created_at DESC
-        """)
+        """
+        try:
+            results = db.execute_query(query)
+            return [dict(row) for row in results]
+        except Exception as e:
+            print(f"Error getting studies: {str(e)}")
+            return []
 
     def load_study(self, study_id):
-        """Load a study's SDM instance"""
-        # Get study info from DB
-        study = db.execute_single("""
-            SELECT s.*, i.subid, i.sdp_file_path 
+        """Load a specific study from the database"""
+        query = """
+            SELECT s.study_id, s.name, s.description,
+                   s.created_at, s.last_updated,
+                   COUNT(i.id) as instance_count
             FROM studies s
-            JOIN sdm_instances i ON s.id = i.study_id
-            WHERE s.id = %s
-        """, (study_id,))
-        
-        if not study:
-            return None
-            
-        # Load the SDM instance
+            LEFT JOIN sdm_instances i ON s.study_id = i.study_id
+            WHERE s.study_id = %s
+            GROUP BY s.study_id, s.name, s.description, s.created_at, s.last_updated
+        """
         try:
-            if os.path.exists(study['sdp_file_path']):
-                self.active_sdm = load(study['sdp_file_path'])
-            else:
-                # If SDP file doesn't exist, create a new SDM instance
-                print(f"SDP file not found at {study['sdp_file_path']}, creating new instance")
-                self.active_sdm = SDM(
-                    project_root=os.path.dirname(self.sdp_storage),
-                    data_input_folder=os.path.dirname(self.sdp_storage).replace('_PROCESSED', '_RAW'),
-                    output_folder_name='web'
-                )
-                self.active_sdm.subid = study['subid']
-                self.active_sdm.dataset_identifier = study['study_id']
-                self.active_sdm.id = study_id
-                
-            return {
-                'study_info': study,
-                'status': self.active_sdm.get_status_report(),
-                'settings': self.active_sdm.get_settings()
-            }
+            result = db.execute_single(query, (study_id,))
+            if result:
+                return dict(result)
+            return None
         except Exception as e:
-            print(f"Error loading study: {str(e)}")  # Debug log
-            db.execute_update("""
-                UPDATE sdm_instances 
-                SET last_error = %s, processing_status = 'error'
-                WHERE id = %s
-            """, (str(e), study_id))
+            print(f"Error loading study: {str(e)}")
             return None
 
     def get_day_features(self, study_id):
@@ -114,21 +98,32 @@ class SDMWebInterface:
             'quality_metrics': self.active_sdm.ema_region_features
         }
 
-    def create_study(self, name, description, subid, dataset_identifier):
+    def create_study(self, name, description, subid, study_id):
         """Create a new study"""
         try:
             # Create SDP file path
-            sdp_path = os.path.join(self.sdp_storage, f'{subid}_{dataset_identifier}_skyn_data_processed.sdp')
+            sdp_path = os.path.join(self.sdp_storage, f'{subid}_{study_id}_skyn_data_processed.sdp')
             
             # Create study in database
             result = db.execute_single("""
-                INSERT INTO sdm_instances 
-                (name, description, subid, dataset_identifier, sdp_file_path)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id
-            """, (name, description, subid, dataset_identifier, sdp_path))
+                INSERT INTO studies 
+                (name, description, study_id)
+                VALUES (%s, %s, %s)
+                RETURNING study_id
+            """, (name, description, study_id))
             
-            return {'study_id': result['id']}
+            # Create SDM instance
+            instance_result = db.execute_single("""
+                INSERT INTO sdm_instances 
+                (study_id, subid, sdp_file_path)
+                VALUES (%s, %s, %s)
+                RETURNING id
+            """, (study_id, subid, sdp_path))
+            
+            return {
+                'study_id': result['study_id'],
+                'instance_id': instance_result['id']
+            }
         except Exception as e:
             return {'error': str(e)}
 
@@ -187,7 +182,7 @@ class SDMWebInterface:
                     study['dataset_identifier'],
                     status='processed'
                 )
-                
+            
                 # Update instance status to completed
                 db.execute_update("""
                     UPDATE sdm_instances 
@@ -206,13 +201,13 @@ class SDMWebInterface:
                     study['dataset_identifier'],
                     status='invalid'
                 )
-                db.execute_update("""
-                    UPDATE sdm_instances 
+            db.execute_update("""
+                UPDATE sdm_instances 
                     SET processing_status = 'error', 
                         last_error = 'Processing failed',
                         sdp_file_path = %s,
                         last_updated = CURRENT_TIMESTAMP
-                    WHERE id = %s
+                WHERE id = %s
                 """, (save_path, study_id))
             
             return {
@@ -229,13 +224,13 @@ class SDMWebInterface:
                     study['dataset_identifier'],
                     status='error'
                 )
-                db.execute_update("""
-                    UPDATE sdm_instances 
+            db.execute_update("""
+                UPDATE sdm_instances 
                     SET processing_status = 'error', 
                         last_error = %s,
                         sdp_file_path = %s,
                         last_updated = CURRENT_TIMESTAMP
-                    WHERE id = %s
+                WHERE id = %s
                 """, (str(e), save_path, study_id))
             return {'error': str(e)}
 
