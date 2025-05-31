@@ -111,23 +111,10 @@ const actions = {
     try {
         console.log('Processing study with ID:', studyId);  // Debug log
         
-        // First get the numeric ID for the study
-        const response = await axios.get(`/api/studies/check-prior/${studyId}`);
-        console.log('Check prior response:', response.data);  // Debug log
-        
-        if (!response.data.exists) {
-            // If study doesn't exist at all, throw error
-            throw new Error('Study not found');
-        }
-        
-        // Get the numeric ID from the study object
-        const numericId = response.data.study.id;
-        console.log('Using numeric ID:', numericId);  // Debug log
-        
-        // Process the study
-        const result = await axios.post(`/api/studies/${numericId}/process`, {
-        options,
-        settings
+        // Process the study directly with the study_id
+        const result = await axios.post(`/api/studies/${studyId}/process`, {
+            options,
+            settings
         });
         
         console.log('Process result:', result.data);  // Debug log

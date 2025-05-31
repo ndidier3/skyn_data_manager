@@ -132,10 +132,10 @@ class SDMWebInterface:
         try:
             # Get study info from DB
             study = db.execute_single("""
-                SELECT s.*, i.subid, i.dataset_identifier
+                SELECT s.*, i.subid, i.sdp_file_path
                 FROM studies s
-                JOIN sdm_instances i ON s.id = i.study_id
-                WHERE s.id = %s
+                JOIN sdm_instances i ON s.study_id = i.study_id
+                WHERE s.study_id = %s
             """, (study_id,))
             
             if not study:
@@ -146,92 +146,72 @@ class SDMWebInterface:
             
             # Initialize SDM instance
             self.active_sdm = SDM(
-                base_dir=base_dir,
+                project_root=base_dir,
                 data_input_folder=os.path.join(base_dir, 'Inputs', 'Skyn_Data_RAW'),
-                processed_data_out=os.path.join(base_dir, 'Inputs', 'Skyn_Data_PROCESSED'),
-                results_dir=os.path.join(base_dir, 'Results'),
-                subid=study['subid'],
-                dataset_identifier=study['dataset_identifier']
+                output_folder_name=study['study_id']  # Use study_id as output folder name
             )
             
             # Process the data
             self.active_sdm.process_single_subject(
                 subid=study['subid'],
-                **options or {}
+                use_prior_save=options.get('use_prior_save', False),
+                smooth_and_impute=options.get('smooth_and_impute', True),
+                adjust_for_gaps_and_non_wear=options.get('adjust_for_gaps_and_non_wear', True),
+                analyze_days=options.get('analyze_days', False),
+                identify_curves=options.get('identify_curves', False),
+                gaps_and_non_wear_attrs=settings.get('gaps_and_non_wear', {}),
+                smooth_and_impute_attrs=settings.get('smooth_and_impute', {}),
+                curve_attrs=settings.get('curve', {}),
+                day_attrs=settings.get('day', {})
             )
             
-            # Only mark as registered if processing completed successfully
-            if self.active_sdm.status.get('gaps_and_non_wear') == 'success':
-                print(f"Processing successful, updating registration status")  # Debug log
-                # Update study registration status
-                db.execute_update("""
-                    UPDATE studies s
-                    SET is_registered = TRUE,
-                        last_updated = CURRENT_TIMESTAMP
-                    FROM sdm_instances i
-                    WHERE s.id = i.study_id
-                    AND i.id = %s
-                """, (study_id,))
-                
-                # Save the processed data
-                print(f"Saving processed data")  # Debug log
-                save_path = save_sdm_instance(
-                    self.active_sdm,
-                    base_dir,
-                    study['subid'],
-                    study['dataset_identifier'],
-                    status='processed'
-                )
+            # Save the processed data to a consistent location
+            save_dir = os.path.join(base_dir, 'Inputs', 'Skyn_Data_PROCESSED')
+            os.makedirs(save_dir, exist_ok=True)
             
-                # Update instance status to completed
-                db.execute_update("""
-                    UPDATE sdm_instances 
-                    SET processing_status = 'completed',
-                        sdp_file_path = %s,
-                        last_updated = CURRENT_TIMESTAMP
-                    WHERE id = %s
-                """, (save_path, study_id))
-            else:
-                print(f"Processing failed, saving invalid state")  # Debug log
-                # If processing failed, save invalid state
-                save_path = save_sdm_instance(
-                    self.active_sdm,
-                    base_dir,
-                    study['subid'],
-                    study['dataset_identifier'],
-                    status='invalid'
-                )
+            # Create a consistent filename based on study and subject
+            filename = f"{study['subid']}_{study['study_id']}_skyn_data_processed.sdp"
+            save_path = os.path.join(save_dir, filename)
+            
+            # Save the SDM instance
+            save_to_computer(self.active_sdm, filename, save_dir)
+            
+            # Update the database with the new file path
             db.execute_update("""
                 UPDATE sdm_instances 
-                    SET processing_status = 'error', 
-                        last_error = 'Processing failed',
-                        sdp_file_path = %s,
-                        last_updated = CURRENT_TIMESTAMP
-                WHERE id = %s
-                """, (save_path, study_id))
+                SET processing_status = 'completed',
+                    sdp_file_path = %s,
+                    last_updated = CURRENT_TIMESTAMP
+                WHERE study_id = %s AND subid = %s
+            """, (save_path, study_id, study['subid']))
             
             return {
                 'status': self.active_sdm.get_status_report(),
                 'settings': self.active_sdm.get_settings()
             }
+            
         except Exception as e:
-            print(f"Error in process_data: {str(e)}")  # Debug log
-            if self.active_sdm:
-                save_path = save_sdm_instance(
-                    self.active_sdm,
-                    base_dir,
-                    study['subid'],
-                    study['dataset_identifier'],
-                    status='error'
-                )
-            db.execute_update("""
-                UPDATE sdm_instances 
-                    SET processing_status = 'error', 
+            print(f"Error in process_data: {str(e)}")
+            # Save error state
+            try:
+                save_dir = os.path.join(base_dir, 'Inputs', 'Skyn_Data_PROCESSED')
+                os.makedirs(save_dir, exist_ok=True)
+                filename = f"{study['subid']}_{study['study_id']}_skyn_data_error.sdp"
+                save_path = os.path.join(save_dir, filename)
+                save_to_computer(self.active_sdm, filename, save_dir)
+                
+                # Update database with error state
+                db.execute_update("""
+                    UPDATE sdm_instances 
+                    SET processing_status = 'error',
                         last_error = %s,
                         sdp_file_path = %s,
                         last_updated = CURRENT_TIMESTAMP
-                WHERE id = %s
-                """, (str(e), save_path, study_id))
+                    WHERE study_id = %s AND subid = %s
+                """, (str(e), save_path, study_id, study['subid']))
+            except Exception as save_error:
+                print(f"Error saving error state: {str(save_error)}")
+            
             return {'error': str(e)}
 
     def get_study_status(self, study_id):

@@ -699,6 +699,16 @@ export default {
       this.registeredStudies.add(studyData.study_id)
       // Create a new Set to trigger reactivity
       this.registeredStudies = new Set(this.registeredStudies)
+      
+      // Update the studyStatus to reflect the newly registered study
+      this.studyStatus = {
+        exists: true,
+        study: studyData
+      }
+      
+      // Set isConfirmed to true to show the settings
+      this.isConfirmed = true
+      
       // Force a re-render of the BatchDirectorySelection component
       this.$nextTick(() => {
         this.$forceUpdate()
@@ -767,11 +777,13 @@ export default {
               exists: true,
               study: studyResponse.data.study
             };
+            // Set isConfirmed to true since study is already registered
+            this.isConfirmed = true;
           } else {
             console.log('New study detected, showing registration modal');
             this.studyStatus = {
               exists: false,
-              message: 'New study'
+              message: 'New Study'
             };
             this.showRegistrationModal = true;
             return; // Stop here and wait for modal submission
