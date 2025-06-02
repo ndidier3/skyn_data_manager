@@ -2,8 +2,8 @@
   <div class="form-group mb-4">
     <div class="processing-mode-toggle">
       <label class="toggle-label">Single File</label>
-      <div class="toggle-switch" @click="$emit('update:isBatchMode', !isBatchMode)">
-        <div class="toggle-slider" :class="{ 'batch-mode': isBatchMode }"></div>
+      <div class="toggle-switch" @click="$emit('input', !value)">
+        <div class="toggle-slider" :class="{ 'batch-mode': value }"></div>
       </div>
       <label class="toggle-label">Batch</label>
     </div>
@@ -14,7 +14,7 @@
 export default {
   name: 'ProcessingModeToggle',
   props: {
-    isBatchMode: {
+    value: {
       type: Boolean,
       required: true
     }

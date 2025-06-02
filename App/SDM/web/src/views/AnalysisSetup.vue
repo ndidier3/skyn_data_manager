@@ -4,15 +4,9 @@
       <h2>Analysis Setup</h2>
       
       <!-- Processing Mode -->
-      <div class="form-group mb-4">
-        <div class="processing-mode-toggle">
-          <label class="toggle-label">Single File</label>
-          <div class="toggle-switch" @click="isBatchMode = !isBatchMode">
-            <div class="toggle-slider" :class="{ 'batch-mode': isBatchMode }"></div>
-          </div>
-          <label class="toggle-label">Batch</label>
-        </div>
-      </div>
+      <ProcessingModeToggle
+        v-model="isBatchMode"
+      />
 
       <!-- File Selection -->
       <div v-if="!isBatchMode">
@@ -705,9 +699,6 @@ export default {
         exists: true,
         study: studyData
       }
-      
-      // Set isConfirmed to true to show the settings
-      this.isConfirmed = true
       
       // Force a re-render of the BatchDirectorySelection component
       this.$nextTick(() => {
