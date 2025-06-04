@@ -12,6 +12,7 @@ class ReportGuide:
             '_CURVE': 'The main TAC curve region where the alcohol concentration rises and falls',
             '_PERIPHERY': 'The region before and after the curve, used for quality assessment',
             '_REGION': 'The region consisting of CURVE + PERIPHERY',
+            '_EMA_REGION': 'The 12-hour region starting at the earliest timestamp of the event',
         }
         self._curve_feature_descriptions = {
             # Basic identifiers

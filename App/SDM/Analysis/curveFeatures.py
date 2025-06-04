@@ -112,17 +112,49 @@ class curveFeatures():
     flag_cols = [col for col in self.curve_features.columns if 'FLAG' in col]
     flag_stats_list = []
     total_curves = len(self.curve_features)
+    
+    # Create a DataFrame with just the flag columns for easier comparison
+    flag_df = self.curve_features[flag_cols].copy()
+    
+    # Define the desired order of flags
+    desired_flag_order = [
+        'FLAG_sub_negative_10_PERIPHERY_>80%_>2hrs',
+        'FLAG_sub_negative_20_PERIPHERY_>40%_>1.5hrs',
+        'FLAG_sub_negative_40_PERIPHERY_>20%_>0.5hrs',
+        'FLAG_non_wear_PERIPHERY_>40%',
+        'FLAG_flatlined_peak_CURVE_>20%flatline_peak>350',
+        'FLAG_sub_negative_10_CURVE_>20%_>1.0',
+        'FLAG_rise_completion_CURVE_<50%',
+        'FLAG_rise_rate_CURVE_>430',
+        'FLAG_fall_completion_CURVE_<50%',
+        'FLAG_short_curve_duration_CURVE_<0.25hrs',
+        'FLAG_imputed_CURVE_>40%_or_duration>3hrs',
+        'FLAG_unimputed_low_quality_CURVE_>20%'
+    ]
+    
+    # Filter flag_cols to only include flags that exist in the data
+    flag_cols = [col for col in desired_flag_order if col in flag_cols]
+    
     for flag_col in flag_cols:
       flag_stats = stats.groupby_counts(flag_col, include_unique_flags=True)
       flag_stats = flag_stats.reset_index()
       flag_stats['Flag_Column'] = flag_col
+      
+      # Add columns for shared counts with other flags in the desired order
+      for other_flag in flag_cols:
+        if other_flag != flag_col:
+          # Calculate how many curves have both flags
+          shared_count = ((flag_df[flag_col] == 1) & (flag_df[other_flag] == 1)).sum()
+          flag_stats[f'shared_count_{other_flag}'] = shared_count
+      
       flag_stats_list.append(flag_stats)
+    
     if flag_stats_list:
       combined_flag_stats = pd.concat(flag_stats_list, axis=0, ignore_index=True)
       # Only keep relevant columns (adjust as needed)
       keep_cols = [col for col in combined_flag_stats.columns if col in [
           'Value', 'Count', '%', 'Unique_Flag_Count', 'Unique_Flag_%', 'Flag_Column'
-      ]]
+      ] or col.startswith('shared_count_')]
       combined_flag_stats = combined_flag_stats[keep_cols]
       # Filter out rows where 'Unique_Flag_Count' is empty (removes counts of non-flagged curves, only keeping flag counts)
       combined_flag_stats = combined_flag_stats[combined_flag_stats['Unique_Flag_Count'].notna() & (combined_flag_stats['Unique_Flag_Count'] != '')]
@@ -131,10 +163,31 @@ class curveFeatures():
       # Drop the old '%' column if it exists
       if '%' in combined_flag_stats.columns:
           combined_flag_stats = combined_flag_stats.drop(columns=['%'])
-      # Sort by 'Count' descending
-      combined_flag_stats = combined_flag_stats.sort_values(by='Count', ascending=False)
+      
       # Set 'Flag_Column' as the index
       combined_flag_stats = combined_flag_stats.set_index('Flag_Column')
+      
+      # Set diagonal values to null (flag can't share with itself)
+      for flag_col in flag_cols:
+          col_name = f'shared_count_{flag_col}'
+          if col_name in combined_flag_stats.columns:
+              combined_flag_stats.loc[flag_col, col_name] = np.nan
+      
+      # Reorder columns to put '% of Total Curves' after 'Count'
+      cols = combined_flag_stats.columns.tolist()
+      count_idx = cols.index('Count')
+      pct_idx = cols.index('% of Total Curves')
+      cols.remove('% of Total Curves')
+      cols.insert(count_idx + 1, '% of Total Curves')
+      
+      # Reorder shared count columns according to desired_flag_order
+      shared_count_cols = [col for col in cols if col.startswith('shared_count_')]
+      other_cols = [col for col in cols if not col.startswith('shared_count_')]
+      ordered_shared_cols = [f'shared_count_{flag}' for flag in desired_flag_order if f'shared_count_{flag}' in shared_count_cols]
+      cols = other_cols + ordered_shared_cols
+      
+      combined_flag_stats = combined_flag_stats[cols]
+      
       self.curve_stat_frames.append(combined_flag_stats)
 
   def compute_person_level_stats(self):
@@ -235,11 +288,11 @@ class curveFeatures():
       if run_settings_df is not None:
           run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
 
-  def export_sorted_workbook(self, file_name, sort_column, ascending=True, smooth_and_impute_attrs=None, curve_attrs=None):
+  def export_sorted_workbook(self, file_name, sort_column, ascending=True, smooth_and_impute_attrs=None, curve_attrs=None, flag_prefix=None):
     """
     Export a workbook with features and curves sorted by a specified column.
-    Includes all rows that are flagged (flag=1) for the corresponding flag column and 50 non-flagged rows
-    that are closest to the flag threshold.
+    Includes only rows that are uniquely flagged (have the specified flag but no other flags)
+    and 50 non-flagged rows that are closest to the flag threshold.
     
     Args:
         file_name (str): Name of the output Excel file
@@ -247,6 +300,7 @@ class curveFeatures():
         ascending (bool): Whether to sort in ascending order (True) or descending order (False)
         smooth_and_impute_attrs (dict, optional): Smoothing and imputation attributes
         curve_attrs (dict, optional): Curve attributes
+        flag_prefix (str, optional): The exact flag column name to use for filtering
     """
     # Ensure stats are computed
     if not self.curve_stat_frames:
@@ -272,22 +326,34 @@ class curveFeatures():
       # Sort features
       sorted_features = self.curve_features.sort_values(by=sort_column, ascending=ascending)
       
-      # Find corresponding flag column
-      # Remove _CURVE or _PERIPHERY suffix if present
-      base_column = sort_column.replace('_CURVE', '').replace('_PERIPHERY', '')
-      
-      # Flexibly match any flag column containing the base_column
-      flag_candidates = [col for col in sorted_features.columns if col.startswith('FLAG_') and base_column in col]
-      flag_column = flag_candidates[0] if flag_candidates else None
+      # Use provided flag prefix if available, otherwise try to find it
+      if flag_prefix and flag_prefix in sorted_features.columns:
+          flag_column = flag_prefix
+      else:
+          # Find corresponding flag column
+          # Remove _CURVE or _PERIPHERY suffix if present
+          base_column = sort_column.replace('_CURVE', '').replace('_PERIPHERY', '')
+          
+          # Flexibly match any flag column containing the base_column
+          flag_candidates = [col for col in sorted_features.columns if col.startswith('FLAG_') and base_column in col]
+          flag_column = flag_candidates[0] if flag_candidates else None
       
       if flag_column:
-          # Get flagged and non-flagged rows
+          # Get all flag columns
+          all_flag_cols = [col for col in sorted_features.columns if col.startswith('FLAG_')]
+          
+          # Get rows that have the target flag
           flagged = sorted_features[sorted_features[flag_column] == 1]
+          
+          # Filter to only include rows that have no other flags
+          uniquely_flagged = flagged[flagged[all_flag_cols].sum(axis=1) == 1]
+          
+          # Get non-flagged rows
           non_flagged = sorted_features[sorted_features[flag_column] != 1]
           
-          if len(flagged) > 0:
+          if len(uniquely_flagged) > 0:
               # Determine if flag is for high or low values by comparing means
-              flagged_mean = flagged[sort_column].mean()
+              flagged_mean = uniquely_flagged[sort_column].mean()
               non_flagged_mean = non_flagged[sort_column].mean()
               is_high_flag = flagged_mean > non_flagged_mean
               
@@ -299,8 +365,8 @@ class curveFeatures():
                   # For low flags, take the lowest 50 non-flagged values
                   closest_non_flagged = non_flagged.nsmallest(50, sort_column)
               
-              # Combine flagged and closest non-flagged rows
-              selected_indices = sorted(set(flagged.index) | set(closest_non_flagged.index))
+              # Combine uniquely flagged and closest non-flagged rows
+              selected_indices = sorted(set(uniquely_flagged.index) | set(closest_non_flagged.index))
               sorted_features = sorted_features.loc[selected_indices]
       
       sorted_features.to_excel(writer, sheet_name='Features', index=False)
@@ -311,17 +377,33 @@ class curveFeatures():
       
       # Add visualization tabs for valid and invalid curves
       if not invalid_curves.empty:
-          embed_graphs_into_workbook_tab(
-              writer.book,
-              [
-                  invalid_curves['device_removal_plot'].tolist(),
-                  invalid_curves['signal_processing_plot'].tolist(),
-                  invalid_curves['signal_processing_plot_wide'].tolist()
-              ],
-              worksheet_name='Invalid Curves',
-              plot_header_text='',
-              missing_plot_path_text='No Plot Available'
-          )
+          if flag_column:
+              all_flag_cols = [col for col in invalid_curves.columns if col.startswith('FLAG_')]
+              uniquely_flagged = invalid_curves[invalid_curves[all_flag_cols].sum(axis=1) == 1]
+              if not uniquely_flagged.empty:
+                  embed_graphs_into_workbook_tab(
+                      writer.book,
+                      [
+                          uniquely_flagged['device_removal_plot'].tolist(),
+                          uniquely_flagged['signal_processing_plot'].tolist(),
+                          uniquely_flagged['signal_processing_plot_wide'].tolist()
+                      ],
+                      worksheet_name='Invalid Curves',
+                      plot_header_text='',
+                      missing_plot_path_text='No Plot Available'
+                  )
+          else:
+              embed_graphs_into_workbook_tab(
+                  writer.book,
+                  [
+                      invalid_curves['device_removal_plot'].tolist(),
+                      invalid_curves['signal_processing_plot'].tolist(),
+                      invalid_curves['signal_processing_plot_wide'].tolist()
+                  ],
+                  worksheet_name='Invalid Curves',
+                  plot_header_text='',
+                  missing_plot_path_text='No Plot Available'
+              )
       
       if not valid_curves.empty:
           embed_graphs_into_workbook_tab(
