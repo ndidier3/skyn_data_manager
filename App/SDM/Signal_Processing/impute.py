@@ -92,18 +92,15 @@ def get_jump_indices(df, rolling_n=5, rise_rate_threshold=40, projected_tac_chan
         jump_indices.update(indices_to_add)
         #projection will start at value before jump occured
         projected_tac_upward = recent_values[0]
-        projected_tac_downward = recent_values[0]
         count = 0  
         
         for count in range(max_jump_labeling_length):
           idx = i + rolling_n + count
           if idx >= len(tac_values):  # Prevent out-of-bounds error
             break
-          distance_to_projected_tac = min(abs(projected_tac_upward - tac_values[idx]), abs(projected_tac_downward - tac_values[idx]))
-          if idx >= len(tac_values) or (distance_to_projected_tac < 10):
+          if idx >= len(tac_values) or (tac_values[idx] < projected_tac_upward):
             break
           projected_tac_upward += projected_tac_change_rate
-          projected_tac_downward -= projected_tac_change_rate
 
           indices_to_add.add(df_indices[idx])
           #for jumps but not plummets
@@ -166,6 +163,34 @@ def get_plummet_indices(df, jump_indices_candidates = (), rolling_n = 5, fall_ra
   plummet_indices = sorted(plummet_indices, key=lambda idx: df.index.get_loc(idx))
   return plummet_indices_candidates, plummet_indices
 
+def get_extreme_negative_indices(df, negative_threshold = -10):
+  """
+  Get indices where TAC values are below a negative threshold.
+  These values are physically impossible since TAC should always be non-negative.
+  
+  Args:
+    df: DataFrame containing TAC values
+    negative_threshold: Threshold below which values are considered extreme negative (default: -10)
+    
+  Returns:
+    Tuple of (extreme_negative_indices_candidates, extreme_negative_indices)
+    - extreme_negative_indices_candidates: Indices that are candidates for imputation
+    - extreme_negative_indices: All indices with extreme negative values
+  """
+  extreme_negative_indices = set()
+  extreme_negative_indices_candidates = set()
+  
+  # Find all indices where TAC is below threshold
+  negative_mask = df['TAC'] < negative_threshold
+  extreme_negative_indices.update(df[negative_mask].index)
+  extreme_negative_indices_candidates.update(df[negative_mask].index)
+  
+  # Sort indices to maintain order
+  extreme_negative_indices = sorted(extreme_negative_indices, key=lambda idx: df.index.get_loc(idx))
+  extreme_negative_indices_candidates = sorted(extreme_negative_indices_candidates, key=lambda idx: df.index.get_loc(idx))
+  
+  return extreme_negative_indices_candidates, extreme_negative_indices
+
 def convert_index_sets_to_index_region_pairs(*args, merge_distance = 20):
   combined_indices = sorted(set().union(*args))
   grouped_regions = []
@@ -194,10 +219,11 @@ def convert_index_sets_to_index_region_pairs(*args, merge_distance = 20):
 
   return merged_regions, sorted(between_low_quality_indices)  # Return both merged regions and between low quality indices
 
-def label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates):
+def label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates, extreme_negative_indices_candidates):
     imputation_dict = {
       'gap_imputed': [],
       'non_wear_imputed': [],
+      'extreme_negative_imputed': [],
       'jump_imputed': [],
       'plummet_imputed': [],
       'between_low_quality_imputed': []
@@ -208,6 +234,8 @@ def label_imputation_reason(df, low_quality_region_start, low_quality_region_end
         imputation_dict['gap_imputed'].append(idx)
       elif idx in non_wear_indices:
         imputation_dict['non_wear_imputed'].append(idx)
+      elif idx in extreme_negative_indices_candidates:
+        imputation_dict['extreme_negative_imputed'].append(idx)
       elif idx in jump_indices_candidates:
         imputation_dict['jump_imputed'].append(idx)
       elif idx in plummet_indices_candidates:
@@ -220,7 +248,7 @@ def label_imputation_reason(df, low_quality_region_start, low_quality_region_end
     
     return df
 
-def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wear = True, impute_jumps = True, impute_plummets = True):
+def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wear = True, impute_jumps = True, impute_plummets = True, impute_extreme_negative = True):
   df['imputed'] = 0
   df['between_low_quality_imputed'] = 0
   df['between_low_quality'] = 0  # New column for between low quality indices
@@ -257,6 +285,12 @@ def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wea
   non_wear_indices = get_non_wear_indices(df) if impute_non_wear else ()
   df.loc[non_wear_indices, 'non_wear_buffered'] = 1
 
+  # Add extreme negative values detection
+  df['extreme_negative'] = 0
+  df['extreme_negative_imputed'] = 0
+  extreme_negative_indices_candidates, extreme_negative_indices = get_extreme_negative_indices(df) if impute_extreme_negative else ()
+  df.loc[extreme_negative_indices, 'extreme_negative'] = 1
+
   df['jump'] = 0
   df['jump_imputed'] = 0
   jump_indices_candidates, jump_indices = get_jump_indices(df) if impute_jumps else ()
@@ -267,7 +301,13 @@ def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wea
   plummet_indices_candidates, plummet_indices = get_plummet_indices(df, jump_indices_candidates=jump_indices_candidates) if impute_plummets else ()
   df.loc[plummet_indices, 'plummet'] = 1
 
-  low_quality_regions, between_low_quality_indices = convert_index_sets_to_index_region_pairs(gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates)
+  low_quality_regions, between_low_quality_indices = convert_index_sets_to_index_region_pairs(
+    gap_indices, 
+    non_wear_indices, 
+    jump_indices_candidates, 
+    plummet_indices_candidates,
+    extreme_negative_indices_candidates
+  )
   df.loc[between_low_quality_indices, 'between_low_quality'] = 1  # Mark between low quality indices
 
   for low_quality_region_start, low_quality_region_end in low_quality_regions:
@@ -334,7 +374,7 @@ def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wea
       predictions = predictions.flatten()  # Ensures it's always 1D
       df.iloc[x_non_wear.index, df.columns.get_loc('TAC')] = predictions
       df.iloc[x_non_wear.index, df.columns.get_loc('imputed')] = 1
-      df = label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates)
+      df = label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates, extreme_negative_indices_candidates)
       
       imputation_attempt['was_imputed'] = True
     else:

@@ -317,27 +317,16 @@ class featureFlagger():
           flag_column = getattr(self, method_name)(**flag_params)
           # print(f"Generated flag column: {flag_column}")
           curve_flags.append(flag_column)
-      else:
-        print(f"Skipping {flag_name} - no parameters provided")
-    
-    print("\n=== Flag processing complete ===")
-    print(f"Periphery flags generated: {periphery_flags}")
-    print(f"Curve flags generated: {curve_flags}")
-    
     # Validate periphery first
     if periphery_flags:
-      print("\nValidating periphery flags...")
       self.validate_periphery('PERIPHERY_VALID', periphery_flags)
     else:
-      print("\nNo periphery flags to validate, setting PERIPHERY_VALID = 1")
       self.ftrs['PERIPHERY_VALID'] = 1
     
     # Then validate curves
     if curve_flags:
-      print("\nValidating curve flags...")
       self.validate_feature('CURVE_VALID', curve_flags)
     else:
-      print("\nNo curve flags to validate, setting CURVE_VALID = 1")
       self.ftrs['CURVE_VALID'] = 1
     
     # print("\n=== Validation complete ===")

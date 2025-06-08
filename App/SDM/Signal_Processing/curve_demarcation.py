@@ -134,8 +134,8 @@ def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 10.0)
         print(traceback.format_exc())
         return default_threshold, default_threshold, None, None
   
-def get_start_and_end_of_discrete_curves(df, curve_threshold):
-  above_threshold = np.sort(df[df['TAC'] > curve_threshold].index)
+def get_start_and_end_of_discrete_curves(df, curve_threshold, TAC_column = 'TAC'):
+  above_threshold = np.sort(df[df[TAC_column] > curve_threshold].index)
   gaps = np.diff(above_threshold)
   split_points = np.where(gaps > 1)[0]
   consecutive_sequences = np.split(above_threshold, split_points + 1)

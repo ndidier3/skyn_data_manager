@@ -25,7 +25,7 @@ signal_quality_feature_key = pd.DataFrame({
 
 signal_quality_aggregate_features = [
   'Dataset_ID',
-  'DayNo',
+  'day_no',
   'device_turned_on_duration',
   'device_turned_on_percentage_of_day',
   'device_worn_duration',

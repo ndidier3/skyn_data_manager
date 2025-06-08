@@ -41,8 +41,8 @@ class dayFeatures():
             
         self.day_features = pd.concat([processor.day_level_data for processor in self.processors])
             
-        self.day_features[['SubID', 'DayNo']] = self.day_features[['SubID', 'DayNo']].astype(int)
-        self.day_features.drop_duplicates(subset=['SubID', 'DayNo'], inplace=True)
+        self.day_features[['SubID', 'day_no']] = self.day_features[['SubID', 'day_no']].astype(int)
+        self.day_features.drop_duplicates(subset=['SubID', 'day_no'], inplace=True)
         self.day_stat_frames = []
 
         # Define default day-level features to analyze based on day_level_dataframe

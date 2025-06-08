@@ -19,12 +19,14 @@ def process_and_analyze_data(
   analyze_days = False,
   analyze_events = False,
   identify_curves = False,
+  identify_raw_curves = False,
   match_events_to_curves = False,
   gaps_and_non_wear_attrs = {},
   smooth_and_impute_attrs = {},
   curve_attrs = {},
   day_attrs = {'day_start_hour': 0, 'make_graphs': True},
-  event_attrs = {}
+  event_attrs = {},
+  subids_to_process = None
 ):
   
   """ CREATE SAVE DIRECTORIES"""
@@ -42,6 +44,7 @@ def process_and_analyze_data(
   processors = []
   day_datasets = []
   curve_features = []
+  raw_curve_features = []
   event_datasets = []
   event_curve_matches = []
   no_skyn_data_found = []
@@ -49,6 +52,12 @@ def process_and_analyze_data(
   for file in files:
     try:
       subid = extract_subid(os.path.basename(file))
+      
+      # Skip if subid is not in the list of subids to process
+      if subids_to_process is not None and int(subid) not in subids_to_process:
+        print(f"\nSkipping file for subject {subid} - not in subids_to_process list")
+        continue
+        
       print(f"\nProcessing file for subject {subid}")
       dataset_identifier = extract_dataset_identifier(os.path.basename(file))
       print(f"Dataset identifier: {dataset_identifier}")
@@ -95,7 +104,12 @@ def process_and_analyze_data(
           print(f"Making curve graphs for {subid}_{dataset_identifier}")
           sdm_processor.make_curve_graphs()
           curve_features.append(sdm_processor.curve_features)
-          
+      
+      if identify_raw_curves:
+        print(f"Identifying raw curves for {subid}_{dataset_identifier}")
+        sdm_processor.identify_curves_with_unimputed_tac(curve_attrs=curve_attrs)
+        raw_curve_features.append(sdm_processor.raw_curve_features)
+
       if analyze_days:
         print(f"Running day analysis for {subid}_{dataset_identifier}")
         sdm_processor.run_day_level_analysis(**day_attrs)
@@ -149,6 +163,13 @@ def process_and_analyze_data(
       combined_curve_features.to_excel(writer, index=None, sheet_name="Features")
       print(f'Combined curve features shape: {combined_curve_features.shape}')
   
+  if len(raw_curve_features):
+    print(f'Combining {len(raw_curve_features)} raw curve feature datasets')
+    with pd.ExcelWriter(f'{results_dir}/raw_curve_level_results.xlsx', engine='xlsxwriter', mode = 'w') as writer:
+      combined_raw_curve_features = pd.concat(raw_curve_features, ignore_index=True)
+      combined_raw_curve_features.to_excel(writer, index=None, sheet_name="Features")
+      print(f'Combined raw curve features shape: {combined_raw_curve_features.shape}')
+
   if len(event_curve_matches):
     print(f'Combining {len(event_curve_matches)} event curve match datasets')
     with pd.ExcelWriter(f'{results_dir}/curve_level_results.xlsx', engine='xlsxwriter', mode = 'w') as writer:

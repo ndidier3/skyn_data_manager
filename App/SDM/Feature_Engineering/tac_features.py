@@ -337,3 +337,5 @@ def count_started_curves(df, tac_variable, threshold=10, min_length=5):
       duration = 0  # Reset duration counter
 
   return crossing_count
+
+

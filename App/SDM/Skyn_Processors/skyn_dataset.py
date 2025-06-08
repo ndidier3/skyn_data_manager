@@ -10,7 +10,6 @@ from ..Signal_Processing.impute import impute_low_quality_data
 from ..Signal_Processing.fill_device_off_gaps import fill_device_off_gaps
 from ..Signal_Processing.label_device_non_wear import label_device_non_wear_using_cutoff, label_device_non_wear_using_model, compare_non_wear_methods
 from ..Signal_Processing.label_signal_stability import *
-from ..Signal_Processing.label_negative_values import label_negative_values
 from ..Signal_Processing.curve_demarcation import get_curve_threshold_from_method, get_start_and_end_of_discrete_curves, merge_nearby_curves
 from ..Skyn_Processors.skyn_day import skynDay
 from ..Skyn_Processors.alcohol_event import alcoholEvent
@@ -106,13 +105,14 @@ class skynDataset:
         'negative_duration_PERIPHERY',
         'sub_negative_10_duration_PERIPHERY',
         'sub_negative_10_percent_PERIPHERY',
-        'consecutive_sub_negative_10_duration_PERIPHERY',
+        'sub_negative_10_sum_PERIPHERY',
+        # 'consecutive_sub_negative_10_duration_PERIPHERY',
         'sub_negative_20_duration_PERIPHERY',
         'sub_negative_20_percent_PERIPHERY',
-        'consecutive_sub_negative_20_duration_PERIPHERY',
-        'sub_negative_40_duration_PERIPHERY',
-        'sub_negative_40_percent_PERIPHERY',
-        'consecutive_sub_negative_40_duration_PERIPHERY',
+        # 'consecutive_sub_negative_20_duration_PERIPHERY',
+        # 'sub_negative_40_duration_PERIPHERY',
+        # 'sub_negative_40_percent_PERIPHERY',
+        # 'consecutive_sub_negative_40_duration_PERIPHERY',
         'started_curve_count_CURVE',
         'complete_curve_count_CURVE',
         'total_duration_CURVE',
@@ -137,13 +137,14 @@ class skynDataset:
         'negative_duration_CURVE',
         'sub_negative_10_duration_CURVE',
         'sub_negative_10_percent_CURVE',
-        'consecutive_sub_negative_10_duration_CURVE',
-        'sub_negative_20_duration_CURVE',
-        'sub_negative_20_percent_CURVE',
-        'consecutive_sub_negative_20_duration_CURVE',
-        'sub_negative_40_duration_CURVE',
-        'sub_negative_40_percent_CURVE',
-        'consecutive_sub_negative_40_duration_CURVE',
+        'sub_negative_10_sum_CURVE',
+        # 'consecutive_sub_negative_10_duration_CURVE',
+        # 'sub_negative_20_duration_CURVE',
+        # 'sub_negative_20_percent_CURVE',
+        # 'consecutive_sub_negative_20_duration_CURVE',
+        # 'sub_negative_40_duration_CURVE',
+        # 'sub_negative_40_percent_CURVE',
+        # 'consecutive_sub_negative_40_duration_CURVE',
         'begin_CURVE',
         'end_CURVE',
         'duration_CURVE',
@@ -210,13 +211,12 @@ class skynDataset:
       self.log_error()
       self.save_as_sdp(valid=False)  
   
-  def smooth_and_impute(self, reset_tac = True, median_smooth = True, impute_gaps = True, impute_non_wear = True, impute_jumps = False, impute_plummets = False, savgol_smooth = False, export_excel = False):
+  def smooth_and_impute(self, median_smooth = True, impute_gaps = True, impute_non_wear = True, impute_jumps = False, impute_plummets = False, savgol_smooth = False, export_excel = False):
     print(f'Processing Skyn Dataset: {self.subid} - {self.dataset_identifier}')  
     try:
-      if reset_tac:
-        raw_dataset = configure_raw_data(self)
-        raw_dataset_gaps_filled = fill_device_off_gaps(raw_dataset)
-        self.dataset['TAC'] = raw_dataset_gaps_filled['TAC'].copy()
+      raw_dataset = configure_raw_data(self)
+      raw_dataset_gaps_filled = fill_device_off_gaps(raw_dataset)
+      self.dataset['TAC'] = raw_dataset_gaps_filled['TAC'].copy()
 
       #TAC_pre_smoothing keeps the original raw - TAC will be cleaned/smoothed and remain the highest quality set
       self.dataset['TAC_pre_smoothed'] = self.dataset['TAC'].copy()
@@ -232,9 +232,7 @@ class skynDataset:
       
       if savgol_smooth:
         self.dataset = smooth_savgol(self.dataset, window_length=41, polyorder=3)
-      
-      self.dataset = label_negative_values(self.dataset)
-      
+            
       if export_excel:
         self.dataset.to_excel(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
         if hasattr(self, 'imputation_info'):
@@ -290,7 +288,6 @@ class skynDataset:
       
       # Get flag selections from curve_attrs
       flag_selections = curve_attrs.get('flag_selections', {})
-      print("\nFlag selections being passed to Curve:", flag_selections)
       
       for curve_start, curve_end, curve_count in curve_start_and_end_indices_with_curve_count:
         curve = Curve(
@@ -302,8 +299,7 @@ class skynDataset:
           curve_end,
           curve_count, 
           self.curve_threshold, 
-          flag_selections,  # Pass the entire flag_selections dictionary
-          {},  # No need for separate periphery flags
+          flag_selections,
           curve_attrs.get('periphery_buffer_before', 0),
           curve_attrs.get('periphery_buffer_after', 0)
         )
@@ -336,6 +332,48 @@ class skynDataset:
       self.save_as_sdp(valid=False)
       raise ValueError(f"Failed to identify curves: {str(e)}")
   
+  def identify_curves_with_unimputed_tac(self, curve_attrs: Dict = {}):
+    """
+    Identifies curves using the TAC_pre_imputation column instead of the imputed TAC column.
+    This allows for analysis of curves before any imputation has been applied.
+    """
+    TAC_column = 'TAC_pre_imputation'
+    if not self.curve_threshold:
+      result = get_curve_threshold_from_method(self.dataset, self.curve_threshold_method)
+      self.curve_threshold, unadjusted_curve_threshold, baseline_mean, baseline_sd = result
+    
+    curve_start_and_end_indices = get_start_and_end_of_discrete_curves(self.dataset, self.curve_threshold, TAC_column) 
+    curve_start_and_end_indices_with_curve_count = merge_nearby_curves(curve_start_and_end_indices)
+    
+    curve_id = 0
+    rows = []
+    self.raw_curves = []
+    flag_selections = curve_attrs.get('flag_selections', {})
+
+    for curve_start, curve_end, curve_count in curve_start_and_end_indices_with_curve_count:
+      curve = Curve(
+        self.dataset, 
+        self.subid, 
+        self.dataset_identifier, 
+        curve_id, 
+        curve_start, 
+        curve_end, 
+        curve_count, 
+        self.curve_threshold,
+        flag_selections,
+        curve_attrs.get('periphery_buffer_before', 0),
+        curve_attrs.get('periphery_buffer_after', 0),
+        TAC_column=TAC_column
+      )
+      self.raw_curves.append(curve)
+      rows.append(curve.row)
+      curve_id += 1
+    
+    if rows:
+      self.raw_curve_features = pd.DataFrame(rows)
+    else:
+      self.raw_curve_features = pd.DataFrame()
+
   def configure_event_data(self, data: pd.DataFrame, subid_column, ema_id_column, drink_total_column, event_timestamp_columns, buffer_before=2, buffer_after=0, max_event_duration=12, export_excel=False):
     try:
       self.events = data[(data[subid_column] == str(self.subid)) | (data[subid_column] == int(self.subid))]
@@ -538,7 +576,7 @@ class skynDataset:
         signal_quality_feature_key.to_excel(writer, sheet_name='key', index=False)
 
       with pd.ExcelWriter(f'{self.data_out_folder}/dayLevel_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
-        self.day_level_data.set_index('DayNo').to_excel(writer, sheet_name='day-level-results')
+        self.day_level_data.set_index('day_no').to_excel(writer, sheet_name='day-level-results')
         signal_quality_aggregate_feature_key.to_excel(writer, sheet_name='key', index=False)
 
       self.save_as_sdp(valid=True)

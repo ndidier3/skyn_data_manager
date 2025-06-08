@@ -20,16 +20,16 @@ def create_histogram_day_level_device_non_wear(day_level_quality_metric_path, ou
 
   df = pd.read_excel(day_level_quality_metric_path)
 
-  df = df.sort_values(by=['SubID', 'DayNo'])
+  df = df.sort_values(by=['SubID', 'day_no'])
 
-  # Step 2: Group by 'SubID' and filter first and last 'DayNo' for each group
+  # Step 2: Group by 'SubID' and filter first and last 'day_no' for each group
   first_last_df = df.groupby('SubID').agg(
-      first_day=('DayNo', 'first'),
-      last_day=('DayNo', 'last')
+      first_day=('day_no', 'first'),
+      last_day=('day_no', 'last')
   ).reset_index()
 
-  # Step 3: Filter the original DataFrame to retain only rows corresponding to the first and last DayNo
-  filtered_df = df[df['DayNo'].isin(first_last_df['first_day']) | df['DayNo'].isin(first_last_df['last_day'])]
+  # Step 3: Filter the original DataFrame to retain only rows corresponding to the first and last day_no
+  filtered_df = df[df['day_no'].isin(first_last_df['first_day']) | df['day_no'].isin(first_last_df['last_day'])]
 
   filtered_df = filtered_df[filtered_df['SubID']!=1006]
 

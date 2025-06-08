@@ -61,6 +61,7 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
     (df['device_worn_model'] == 1) & 
     (df['gap_buffered']==0) & 
     (df['non_wear_buffered']==0) & 
+    (df['extreme_negative']==0) &
     (df['jump']==0) & 
     (df['plummet']==0) &
     (df['imputed']==0) &
@@ -70,6 +71,8 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
   gap_imputed = df.loc[df['gap_imputed'] == 1]
   non_wear = df.loc[(df['non_wear_buffered'] == 1)]
   non_wear_imputed = df.loc[(df['non_wear_imputed'] == 1)]
+  extreme_negative = df.loc[(df['extreme_negative'] == 1)]
+  extreme_negative_imputed = df.loc[(df['extreme_negative_imputed'] == 1)]
   jumps = df.loc[(df['jump'] == 1) & (df['non_wear_buffered'] == 0)]
   jump_imputed= df.loc[df['jump_imputed'] == 1]
   plummet = df.loc[(df['plummet'] == 1) & (df['jump'] == 0) & (df['non_wear_buffered'] == 0)]
@@ -90,6 +93,10 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
   if not non_wear.empty:
     ax.scatter(non_wear[time_variable], non_wear['TAC_pre_imputation'], label='Non-Wear', 
              color='lightpink', marker='x', alpha=0.7, s=12)
+  #Extreme Negative
+  if not extreme_negative.empty:
+    ax.scatter(extreme_negative[time_variable], extreme_negative['TAC_pre_imputation'], label='Extreme Negative', 
+             color='red', marker='*', alpha=0.7, s=12)
   #Jumps
   if not jumps.empty:
     ax.scatter(jumps[time_variable], jumps['TAC_pre_imputation'], label='Jump', 
@@ -103,13 +110,16 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
     ax.scatter(between_low_quality[time_variable], between_low_quality['TAC_pre_imputation'],
                label='Between Low Quality', color='lightgreen', marker='s', alpha=0.7, s=12)
     
-  #Imputations (for gaps, non wear, jumps, plumments)
+  #Imputations (for gaps, non wear, extreme negatives, jumps, plumments)
   if not gap_imputed.empty:
     ax.scatter(gap_imputed[time_variable], gap_imputed['TAC'], label='Imputed Gap', 
               marker='o', alpha=1.0, facecolor='gray', edgecolors="black")
   if not non_wear_imputed.empty:
     ax.scatter(non_wear_imputed[time_variable], non_wear_imputed['TAC'], 
                label='Imputed Non-Wear', facecolor='lightpink', edgecolors= "darkred", marker='o', alpha=1.0)
+  if not extreme_negative_imputed.empty:
+    ax.scatter(extreme_negative_imputed[time_variable], extreme_negative_imputed['TAC'], 
+               label='Imputed Extreme Negative', facecolor='red', edgecolors= "darkred", marker='o', alpha=1.0)
   if not jump_imputed.empty:
     ax.scatter(jump_imputed[time_variable], jump_imputed['TAC'], 
               label='Imputed Jump', facecolor='lightblue', edgecolors= "darkblue", marker='o', alpha=1.0)

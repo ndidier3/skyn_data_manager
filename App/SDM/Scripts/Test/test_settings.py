@@ -5,7 +5,6 @@ These settings are used by default_analysis.py and other test-related scripts.
 
 # Smooth and impute settings
 smooth_and_impute_attrs = {
-    'reset_tac': True,
     'median_smooth': True,
     'impute_gaps': True,
     'impute_non_wear': True,

@@ -6,11 +6,12 @@ from App.SDM.Analysis.featureFlagger import featureFlagger
 import pandas as pd
 
 class Curve:
-  def __init__(self, df: pd.DataFrame, subid, dataset_identifier, curve_id, curve_start, curve_end, curve_count, curve_threshold, flag_selections = {}, periphery_flags = {}, periphery_buffer_before = 2, periphery_buffer_after = 2):
+  def __init__(self, df: pd.DataFrame, subid, dataset_identifier, curve_id, curve_start, curve_end, curve_count, curve_threshold, flag_selections = {}, periphery_buffer_before = 2, periphery_buffer_after = 2, TAC_column = 'TAC'):
     
     self.df = df
     self.subid = subid
     self.dataset_identifier = dataset_identifier
+    self.TAC_column = TAC_column
 
     self.curve_id = curve_id
     self.curve_count = curve_count
@@ -50,27 +51,56 @@ class Curve:
       'device_turned_on_percent_PERIPHERY': (self.periphery['device_turned_on'].sum()) / len(self.periphery),
       'device_worn_duration_PERIPHERY': (self.periphery['device_worn_model'].sum()) / 60,
       'device_worn_percent_PERIPHERY': (self.periphery['device_worn_model'].sum()) / len(self.periphery),
-      'imputed_duration_PERIPHERY': self.periphery['imputed'].sum() / 60,
-      'imputed_percent_PERIPHERY': self.periphery['imputed'].sum() / len(self.periphery),
-      'low_quality_duration_PERIPHERY': get_low_quality_duration(self.periphery),
-      'low_quality_percent_PERIPHERY': get_low_quality_percent(self.periphery),
-      'unimputed_low_quality_duration_PERIPHERY': get_unimputed_low_quality_duration(self.periphery),
-      'unimputed_low_quality_percent_PERIPHERY': get_unimputed_low_quality_percent(self.periphery),
-      'negative_duration_PERIPHERY': (self.periphery['TAC'] <= 0).sum() / 60,
-      'sub_negative_10_duration_PERIPHERY': (self.periphery['TAC'] <= -10).sum() / 60,
-      'sub_negative_10_percent_PERIPHERY': (self.periphery['TAC'] <= -10).sum() / len(self.periphery),
-      'consecutive_sub_negative_10_duration_PERIPHERY': (count_longest_consecutive_below(self.periphery, X=-10) / 60),
-      'sub_negative_20_duration_PERIPHERY': (self.periphery['TAC'] <= -20).sum() / 60,
-      'sub_negative_20_percent_PERIPHERY': (self.periphery['TAC'] <= -20).sum() / len(self.periphery),
-      'consecutive_sub_negative_20_duration_PERIPHERY': (count_longest_consecutive_below(self.periphery, X=-20) / 60),
-      'sub_negative_40_duration_PERIPHERY': (self.periphery['TAC'] <= -40).sum() / 60,
-      'sub_negative_40_percent_PERIPHERY': (self.periphery['TAC'] <= -40).sum() / len(self.periphery),
+      'imputed_duration_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else self.periphery['imputed'].sum() / 60,
+      'imputed_percent_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else self.periphery['imputed'].sum() / len(self.periphery),
+      'imputed_low_quality_duration_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_low_quality_duration(self.periphery),
+      'imputed_low_quality_percent_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_low_quality_percent(self.periphery),
+      'unimputed_low_quality_duration_PERIPHERY': get_low_quality_duration(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_low_quality_duration(self.periphery),
+      'unimputed_low_quality_percent_PERIPHERY': get_low_quality_percent(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_low_quality_percent(self.periphery),
+      'total_low_quality_duration_PERIPHERY': get_low_quality_duration(self.periphery),
+      'total_low_quality_percent_PERIPHERY': get_low_quality_percent(self.periphery),
+      'negative_duration_PERIPHERY': (self.periphery[self.TAC_column] <= 0).sum() / 60,
+      'sub_negative_10_duration_PERIPHERY': (self.periphery['extreme_negative'] == 1).sum() / 60,
+      'sub_negative_10_percent_PERIPHERY': (self.periphery['extreme_negative'] == 1).sum() / len(self.periphery),
+      'sub_negative_10_sum_PERIPHERY': self.periphery.loc[self.periphery['extreme_negative'] == 1, self.TAC_column].sum(),
+      'sub_negative_20_duration_PERIPHERY': (self.periphery[self.TAC_column] <= -20).sum() / 60,
+      'sub_negative_20_percent_PERIPHERY': (self.periphery[self.TAC_column] <= -20).sum() / len(self.periphery),
       'consecutive_sub_negative_40_duration_PERIPHERY': (count_longest_consecutive_below(self.periphery, X=-40) / 60),
+      'jump_duration_PERIPHERY': (self.periphery['jump'].sum()) / 60,
+      'jump_percent_PERIPHERY': (self.periphery['jump'].sum()) / len(self.periphery),
+      'plummet_duration_PERIPHERY': (self.periphery['plummet'].sum()) / 60,
+      'plummet_percent_PERIPHERY': (self.periphery['plummet'].sum()) / len(self.periphery),
+      'imputed_jump_duration_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_jump_duration(self.periphery),
+      'imputed_jump_percent_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_jump_percent(self.periphery),
+      'unimputed_jump_duration_PERIPHERY': get_low_quality_duration(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_jump_duration(self.periphery),
+      'unimputed_jump_percent_PERIPHERY': get_low_quality_percent(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_jump_percent(self.periphery),
+      'imputed_plummet_duration_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_plummet_duration(self.periphery),
+      'imputed_plummet_percent_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_plummet_percent(self.periphery),
+      'unimputed_plummet_duration_PERIPHERY': get_low_quality_duration(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_plummet_duration(self.periphery),
+      'unimputed_plummet_percent_PERIPHERY': get_low_quality_percent(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_plummet_percent(self.periphery),
+      'imputed_extreme_negative_duration_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_extreme_negative_duration(self.periphery),
+      'imputed_extreme_negative_percent_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_extreme_negative_percent(self.periphery),
+      'unimputed_extreme_negative_duration_PERIPHERY': get_low_quality_duration(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_extreme_negative_duration(self.periphery),
+      'unimputed_extreme_negative_percent_PERIPHERY': get_low_quality_percent(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_extreme_negative_percent(self.periphery),
+      'imputed_gap_duration_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_gap_duration(self.periphery),
+      'imputed_gap_percent_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_gap_percent(self.periphery),
+      'unimputed_gap_duration_PERIPHERY': get_low_quality_duration(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_gap_duration(self.periphery),
+      'unimputed_gap_percent_PERIPHERY': get_low_quality_percent(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_gap_percent(self.periphery),
+      'imputed_non_wear_duration_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_non_wear_duration(self.periphery),
+      'imputed_non_wear_percent_PERIPHERY': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_non_wear_percent(self.periphery),
+      'unimputed_non_wear_duration_PERIPHERY': get_low_quality_duration(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_non_wear_duration(self.periphery),
+      'unimputed_non_wear_percent_PERIPHERY': get_low_quality_percent(self.periphery) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_non_wear_percent(self.periphery),
+      'jump_imputation_ratio_PERIPHERY': get_jump_imputation_ratio(self.periphery),
+      'plummet_imputation_ratio_PERIPHERY': get_plummet_imputation_ratio(self.periphery),
+      'extreme_negative_imputation_ratio_PERIPHERY': get_extreme_negative_imputation_ratio(self.periphery),
+      'gap_imputation_ratio_PERIPHERY': get_gap_imputation_ratio(self.periphery),
+      'non_wear_imputation_ratio_PERIPHERY': get_non_wear_imputation_ratio(self.periphery),
+      'low_quality_imputation_ratio_PERIPHERY': get_low_quality_imputation_ratio(self.periphery),
     }
 
     self.curve_quality_features = {
-      'started_curve_count_CURVE': count_started_curves(self.curve, 'TAC', threshold=self.curve_threshold, min_length=10),
-      'complete_curve_count_CURVE': count_complete_curves(self.curve, 'TAC', threshold=self.curve_threshold, min_length=10),      
+      'started_curve_count_CURVE': count_started_curves(self.curve, self.TAC_column, threshold=self.curve_threshold, min_length=10),
+      'complete_curve_count_CURVE': count_complete_curves(self.curve, self.TAC_column, threshold=self.curve_threshold, min_length=10),      
       'total_duration_CURVE': len(self.curve) / 60,
       'device_turned_on_duration_CURVE': (self.curve['device_turned_on'].sum()) / 60,
       'device_turned_on_percent_CURVE': (self.curve['device_turned_on'].sum()) / len(self.curve),
@@ -84,34 +114,118 @@ class Curve:
       'jump_percent_CURVE': (self.curve['jump'].sum()) / len(self.curve),
       'plummet_duration_CURVE': (self.curve['plummet'].sum()) / 60,
       'plummet_percent_CURVE': (self.curve['plummet'].sum()) / len(self.curve),
-      'imputed_duration_CURVE': self.curve['imputed'].sum() / 60,
-      'imputed_percent_CURVE': self.curve['imputed'].sum() / len(self.curve),
+      'imputed_duration_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else self.curve['imputed'].sum() / 60,
+      'imputed_percent_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else self.curve['imputed'].sum() / len(self.curve),
       'low_quality_duration_CURVE': get_low_quality_duration(self.curve),
-      'low_quality_percent_CURVE': get_low_quality_percent(self.curve),
-      'unimputed_low_quality_duration_CURVE': get_unimputed_low_quality_duration(self.curve),
-      'unimputed_low_quality_percent_CURVE': get_unimputed_low_quality_percent(self.curve),
-      'negative_duration_CURVE': (self.curve['TAC'] <= 0).sum() / 60,
-      'sub_negative_10_duration_CURVE': (self.curve['TAC'] <= -10).sum() / 60,
-      'sub_negative_10_percent_CURVE': (self.curve['TAC'] <= -10).sum() / len(self.curve),
-      'consecutive_sub_negative_10_duration_CURVE': (count_longest_consecutive_below(self.curve, X=-10) / 60),
-      'sub_negative_20_duration_CURVE': (self.curve['TAC'] <= -20).sum() / 60,
-      'sub_negative_20_percent_CURVE': (self.curve['TAC'] <= -20).sum() / len(self.curve),
-      'consecutive_sub_negative_20_duration_CURVE': (count_longest_consecutive_below(self.curve, X=-20) / 60),
-      'sub_negative_40_duration_CURVE': (self.curve['TAC'] <= -40).sum() / 60,
-      'sub_negative_40_percent_CURVE': (self.curve['TAC'] <= -40).sum() / len(self.curve),
-      'consecutive_sub_negative_40_duration_CURVE': (count_longest_consecutive_below(self.curve, X=-40) / 60),
+      'total_low_quality_percent_CURVE': get_low_quality_percent(self.curve),
+      'unimputed_low_quality_duration_CURVE': get_low_quality_duration(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_low_quality_duration(self.curve),
+      'unimputed_low_quality_percent_CURVE': get_low_quality_percent(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_low_quality_percent(self.curve),
+      'sub_negative_10_duration_CURVE': (self.curve['extreme_negative'] == 1).sum() / 60,
+      'sub_negative_10_percent_CURVE': (self.curve['extreme_negative'] == 1).sum() / len(self.curve),
+      'sub_negative_10_sum_CURVE': self.curve.loc[self.curve['extreme_negative'] == 1, self.TAC_column].sum(),
+      'imputed_jump_duration_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_jump_duration(self.curve),
+      'imputed_jump_percent_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_jump_percent(self.curve),
+      'unimputed_jump_duration_CURVE': get_low_quality_duration(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_jump_duration(self.curve),
+      'unimputed_jump_percent_CURVE': get_low_quality_percent(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_jump_percent(self.curve),
+      'imputed_plummet_duration_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_plummet_duration(self.curve),
+      'imputed_plummet_percent_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_plummet_percent(self.curve),
+      'unimputed_plummet_duration_CURVE': get_low_quality_duration(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_plummet_duration(self.curve),
+      'unimputed_plummet_percent_CURVE': get_low_quality_percent(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_plummet_percent(self.curve),
+      'imputed_extreme_negative_duration_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_extreme_negative_duration(self.curve),
+      'imputed_extreme_negative_percent_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_extreme_negative_percent(self.curve),
+      'unimputed_extreme_negative_duration_CURVE': get_low_quality_duration(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_extreme_negative_duration(self.curve),
+      'unimputed_extreme_negative_percent_CURVE': get_low_quality_percent(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_extreme_negative_percent(self.curve),
+      'imputed_gap_duration_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_gap_duration(self.curve),
+      'imputed_gap_percent_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_gap_percent(self.curve),
+      'unimputed_gap_duration_CURVE': get_low_quality_duration(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_gap_duration(self.curve),
+      'unimputed_gap_percent_CURVE': get_low_quality_percent(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_gap_percent(self.curve),
+      'imputed_non_wear_duration_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_non_wear_duration(self.curve),
+      'imputed_non_wear_percent_CURVE': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_non_wear_percent(self.curve),
+      'unimputed_non_wear_duration_CURVE': get_low_quality_duration(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_non_wear_duration(self.curve),
+      'unimputed_non_wear_percent_CURVE': get_low_quality_percent(self.curve) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_non_wear_percent(self.curve),
+      'jump_imputation_ratio_CURVE': get_jump_imputation_ratio(self.curve),
+      'plummet_imputation_ratio_CURVE': get_plummet_imputation_ratio(self.curve),
+      'extreme_negative_imputation_ratio_CURVE': get_extreme_negative_imputation_ratio(self.curve),
+      'gap_imputation_ratio_CURVE': get_gap_imputation_ratio(self.curve),
+      'non_wear_imputation_ratio_CURVE': get_non_wear_imputation_ratio(self.curve),
+      'low_quality_imputation_ratio_CURVE': get_low_quality_imputation_ratio(self.curve),
     }
 
-    peak_index = get_peak_index(self.curve, 'TAC')
+    self.region_quality_features = {
+      'started_curve_count_REGION': count_started_curves(self.region, self.TAC_column, threshold=self.curve_threshold, min_length=10),
+      'complete_curve_count_REGION': count_complete_curves(self.region, self.TAC_column, threshold=self.curve_threshold, min_length=10),      
+      'total_duration_REGION': len(self.region) / 60,
+      'device_turned_on_duration_REGION': (self.region['device_turned_on'].sum()) / 60,
+      'device_turned_on_percent_REGION': (self.region['device_turned_on'].sum()) / len(self.region),
+      'device_worn_duration_REGION': (self.region['device_worn_model'].sum()) / 60,
+      'device_worn_percent_REGION': (self.region['device_worn_model'].sum()) / len(self.region),
+      'consecutive_non_wear_duration_REGION': (count_longest_consecutive_non_wear(self.region) / 60),
+      'consecutive_non_wear_percent_REGION': (count_longest_consecutive_non_wear(self.region) / len(self.region)),
+      'flatline_max_REGION': count_longest_tac_flatline(self.region),
+      'flatlined_percent_REGION': (count_longest_tac_flatline(self.region) / len(self.region)),
+      'jump_duration_REGION': (self.region['jump'].sum()) / 60,
+      'jump_percent_REGION': (self.region['jump'].sum()) / len(self.region),
+      'plummet_duration_REGION': (self.region['plummet'].sum()) / 60,
+      'plummet_percent_REGION': (self.region['plummet'].sum()) / len(self.region),
+      'imputed_duration_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else self.region['imputed'].sum() / 60,
+      'imputed_percent_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else self.region['imputed'].sum() / len(self.region),
+      'imputed_low_quality_duration_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_low_quality_duration(self.region),
+      'imputed_low_quality_percent_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_low_quality_percent(self.region), 
+      'unimputed_low_quality_duration_REGION': get_low_quality_duration(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_low_quality_duration(self.region),
+      'unimputed_low_quality_percent_REGION': get_low_quality_percent(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_low_quality_percent(self.region),
+      'total_low_quality_duration_REGION': get_low_quality_duration(self.region),
+      'total_low_quality_percent_REGION': get_low_quality_percent(self.region),
+      'sub_negative_10_duration_REGION': (self.region['extreme_negative'] == 1).sum() / 60,
+      'sub_negative_10_percent_REGION': (self.region['extreme_negative'] == 1).sum() / len(self.region),
+      'sub_negative_10_sum_REGION': self.region.loc[self.region['extreme_negative'] == 1, self.TAC_column].sum(),
+      'imputed_jump_duration_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_jump_duration(self.region),
+      'imputed_jump_percent_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_jump_percent(self.region),
+      'unimputed_jump_duration_REGION': get_low_quality_duration(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_jump_duration(self.region),
+      'unimputed_jump_percent_REGION': get_low_quality_percent(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_jump_percent(self.region),
+      'total_jump_duration_REGION': (self.region['jump'].sum()) / 60,
+      'total_jump_percent_REGION': (self.region['jump'].sum()) / len(self.region),
+      'imputed_plummet_duration_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_plummet_duration(self.region),
+      'imputed_plummet_percent_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_plummet_percent(self.region),
+      'unimputed_plummet_duration_REGION': get_low_quality_duration(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_plummet_duration(self.region),
+      'unimputed_plummet_percent_REGION': get_low_quality_percent(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_plummet_percent(self.region),
+      'total_plummet_duration_REGION': (self.region['plummet'].sum()) / 60,
+      'total_plummet_percent_REGION': (self.region['plummet'].sum()) / len(self.region),
+      'imputed_extreme_negative_duration_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_extreme_negative_duration(self.region),
+      'imputed_extreme_negative_percent_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_extreme_negative_percent(self.region),
+      'unimputed_extreme_negative_duration_REGION': get_low_quality_duration(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_extreme_negative_duration(self.region),
+      'unimputed_extreme_negative_percent_REGION': get_low_quality_percent(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_extreme_negative_percent(self.region),
+      'total_extreme_negative_duration_REGION': (self.region['extreme_negative'] == 1).sum() / 60,
+      'total_extreme_negative_percent_REGION': (self.region['extreme_negative'] == 1).sum() / len(self.region),
+      'imputed_gap_duration_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_gap_duration(self.region),
+      'imputed_gap_percent_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_gap_percent(self.region),
+      'unimputed_gap_duration_REGION': get_low_quality_duration(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_gap_duration(self.region),
+      'unimputed_gap_percent_REGION': get_low_quality_percent(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_gap_percent(self.region),
+      'total_gap_duration_REGION': get_low_quality_duration(self.region),
+      'total_gap_percent_REGION': get_low_quality_percent(self.region),
+      'imputed_non_wear_duration_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_non_wear_duration(self.region),
+      'imputed_non_wear_percent_REGION': 0 if self.TAC_column == 'TAC_pre_imputation' else get_imputed_non_wear_percent(self.region),
+      'unimputed_non_wear_duration_REGION': get_low_quality_duration(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_non_wear_duration(self.region),
+      'unimputed_non_wear_percent_REGION': get_low_quality_percent(self.region) if self.TAC_column == 'TAC_pre_imputation' else get_unimputed_non_wear_percent(self.region),
+      'total_non_wear_duration_REGION': (count_longest_consecutive_non_wear(self.region) / 60),
+      'total_non_wear_percent_REGION': (count_longest_consecutive_non_wear(self.region) / len(self.region)),
+      'jump_imputation_ratio_REGION': get_jump_imputation_ratio(self.region),
+      'plummet_imputation_ratio_REGION': get_plummet_imputation_ratio(self.region),
+      'extreme_negative_imputation_ratio_REGION': get_extreme_negative_imputation_ratio(self.region),
+      'gap_imputation_ratio_REGION': get_gap_imputation_ratio(self.region),
+      'non_wear_imputation_ratio_REGION': get_non_wear_imputation_ratio(self.region),
+      'low_quality_imputation_ratio_REGION': get_low_quality_imputation_ratio(self.region),
+    }
+
+    peak_index = get_peak_index(self.curve, self.TAC_column)
     rise_duration = (self.curve.loc[peak_index, 'Duration_Hrs'] - self.curve.loc[0, 'Duration_Hrs']) + (1/60)
     fall_duration = (self.curve.loc[len(self.curve)-1, 'Duration_Hrs'] - self.curve.loc[peak_index, 'Duration_Hrs']) + (1/60)
-    peak_tac = self.curve.loc[peak_index, 'TAC']
-    first_tac = self.curve.iloc[0]['TAC']
-    last_tac = self.curve.iloc[-1]['TAC']
+    peak_tac = self.curve.loc[peak_index, self.TAC_column]
+    first_tac = self.curve.iloc[0][self.TAC_column]
+    last_tac = self.curve.iloc[-1][self.TAC_column]
     relative_peak = peak_tac - self.curve_threshold
     relative_rise = (peak_tac - first_tac)
     relative_fall = (peak_tac - last_tac)
-    mean_tac, sd_tac, sem_tac = get_mean_stdev_sem(self.curve, 'TAC')
+    mean_tac, sd_tac, sem_tac = get_mean_stdev_sem(self.curve, self.TAC_column)
 
     self.curve_tac_features = {
       'begin_CURVE': self.curve['datetime'].iloc[0],
@@ -123,8 +237,8 @@ class Curve:
       'sd_tac_CURVE': sd_tac,
       'sem_tac_CURVE': sem_tac,
       'peak_CURVE': peak_tac,
-      'auc_total_CURVE' : get_auc(self.curve, 'TAC'),
-      'auc_relative_CURVE' : get_curve_auc(self.curve, 'TAC', self.curve_threshold),
+      'auc_total_CURVE' : get_auc(self.curve, self.TAC_column),
+      'auc_relative_CURVE' : get_curve_auc(self.curve, self.TAC_column, self.curve_threshold),
       'rise_duration_CURVE' : rise_duration,
       'fall_duration_CURVE' : fall_duration,
       'relative_peak_CURVE' : relative_peak,
@@ -147,15 +261,13 @@ class Curve:
       **self.device_info,
       **self.periphery_quality_features,
       **self.curve_quality_features,
+      **self.region_quality_features,
       **self.curve_tac_features
     }
 
     self.features = pd.DataFrame([self.all_features])
-    print("\nFeatures before flagging:", self.features.columns.tolist())
-    print("\nFlag selections in Curve:", flag_selections)
     self.flagger = featureFlagger(self.features, flag_selections=flag_selections)
     flags = self.flagger.run_flags_and_validation()
-    print("\nFlags returned:", flags)
     self.periphery_flag_columns = flags['periphery_flags']
     self.curve_flag_columns = flags['curve_flags']
     self.features = self.flagger.ftrs
