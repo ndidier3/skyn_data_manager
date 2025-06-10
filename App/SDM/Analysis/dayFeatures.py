@@ -1,23 +1,35 @@
 from App.SDM.Analysis.statModel import statModel
 from App.SDM.Configuration.file_management import load, save_to_computer
 from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
-from App.SDM.Configuration.file_management import extract_subid
+from App.SDM.Configuration.file_management import extract_subid, extract_dataset_identifier
 import os
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image
 
 class dayFeatures():
-    def __init__(self, processed_data_folder, subid=None):
+    def __init__(self, processed_data_folder, subid=None, dataset_id=None):
         print(f"Looking for files in: {processed_data_folder}")
         files = [f for f in os.listdir(processed_data_folder) if 'processed' in f]
         
-        # Filter files by subid if specified
-        if subid is not None:
-            files = [file for file in files if extract_subid(file) == str(subid)]
+        # Filter files by subid and dataset_id if specified
+        if subid is not None or dataset_id is not None:
+            filtered_files = []
+            for file in files:
+                file_subid = extract_subid(file)
+                file_dataset_id = extract_dataset_identifier(file)
+                
+                # Check if file matches both subid and dataset_id criteria
+                subid_match = subid is None or file_subid == str(subid)
+                dataset_id_match = dataset_id is None or file_dataset_id == str(dataset_id)
+                
+                if subid_match and dataset_id_match:
+                    filtered_files.append(file)
+            
+            files = filtered_files
             if not files:
-                raise ValueError(f"No processed files found for subid {subid}")
-            print(f"Filtered to files for subid {subid}: {files}")
+                raise ValueError(f"No processed files found for subid {subid} and dataset_id {dataset_id}")
+            print(f"Filtered to files for subid {subid} and dataset_id {dataset_id}: {files}")
         else:
             print(f"Found files: {files}")
         

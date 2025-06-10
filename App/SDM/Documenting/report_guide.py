@@ -17,7 +17,7 @@ class ReportGuide:
         self._curve_feature_descriptions = {
             # Basic identifiers
             'subid': 'Subject identifier',
-            'dataset_id': 'Dataset identifier',
+            'dataset_identifier': 'Dataset identifier',
             'curve_id': 'Curve identifier',
             'curve_count': 'Number of curves for this subject',
             'curve_threshold': 'Threshold used for curve detection',

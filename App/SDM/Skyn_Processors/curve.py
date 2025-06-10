@@ -250,7 +250,7 @@ class Curve:
 
     self.all_features = {
       'subid': self.subid,
-      'dataset_id': self.dataset_identifier,
+      'dataset_identifier': self.dataset_identifier,
       'curve_id': self.curve_id,
       'curve_count': self.curve_count,
       'curve_threshold': self.curve_threshold,
