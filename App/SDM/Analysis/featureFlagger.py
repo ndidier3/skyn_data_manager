@@ -84,44 +84,44 @@ class featureFlagger():
       ((self.ftrs[column1] < below_cutoff) & (self.ftrs[column2] > above_cutoff)).astype(int)
     )
   """ Periphery Quality Assessment """
-  def flag_sub_negative_10_periphery(self, percent_cutoff, duration_cutoff = None):
-    if duration_cutoff:
-      flag_column_name = f'FLAG_sub_negative_10_PERIPHERY_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}hrs'
-      self.flag_data_above_one_of_two_cutoffs(
-        'sub_negative_10_percent_PERIPHERY', percent_cutoff, 'sub_negative_10_duration_PERIPHERY', duration_cutoff, flag_column_name
-      )
-    else:
-      flag_column_name = f'FLAG_sub_negative_10_PERIPHERY_>{int(round(percent_cutoff*100))}%'
-      self.flag_data_above_cutoff(
-        'sub_negative_10_percent_PERIPHERY', percent_cutoff, flag_column_name
-      )
-    return flag_column_name
+  # def flag_sub_negative_10_periphery(self, percent_cutoff, duration_cutoff = None):
+  #   if duration_cutoff:
+  #     flag_column_name = f'FLAG_sub_negative_10_PERIPHERY_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}hrs'
+  #     self.flag_data_above_one_of_two_cutoffs(
+  #       'sub_negative_10_percent_PERIPHERY', percent_cutoff, 'sub_negative_10_duration_PERIPHERY', duration_cutoff, flag_column_name
+  #     )
+  #   else:
+  #     flag_column_name = f'FLAG_sub_negative_10_PERIPHERY_>{int(round(percent_cutoff*100))}%'
+  #     self.flag_data_above_cutoff(
+  #       'sub_negative_10_percent_PERIPHERY', percent_cutoff, flag_column_name
+  #     )
+  #   return flag_column_name
 
-  def flag_sub_negative_20_periphery(self, percent_cutoff, duration_cutoff = None):
-    if duration_cutoff:
-      flag_column_name = f'FLAG_sub_negative_20_PERIPHERY_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}hrs'
-      self.flag_data_above_one_of_two_cutoffs(
-        'sub_negative_20_percent_PERIPHERY', percent_cutoff, 'sub_negative_20_duration_PERIPHERY', duration_cutoff, flag_column_name
-      )
-    else:
-      flag_column_name = f'FLAG_sub_negative_20_PERIPHERY_>{int(round(percent_cutoff*100))}%'
-      self.flag_data_above_cutoff(
-        'sub_negative_20_percent_PERIPHERY', percent_cutoff, flag_column_name
-      )
-    return flag_column_name
+  # def flag_sub_negative_20_periphery(self, percent_cutoff, duration_cutoff = None):
+  #   if duration_cutoff:
+  #     flag_column_name = f'FLAG_sub_negative_20_PERIPHERY_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}hrs'
+  #     self.flag_data_above_one_of_two_cutoffs(
+  #       'sub_negative_20_percent_PERIPHERY', percent_cutoff, 'sub_negative_20_duration_PERIPHERY', duration_cutoff, flag_column_name
+  #     )
+  #   else:
+  #     flag_column_name = f'FLAG_sub_negative_20_PERIPHERY_>{int(round(percent_cutoff*100))}%'
+  #     self.flag_data_above_cutoff(
+  #       'sub_negative_20_percent_PERIPHERY', percent_cutoff, flag_column_name
+  #     )
+  #   return flag_column_name
 
-  def flag_sub_negative_40_periphery(self, percent_cutoff, duration_cutoff = None):
-    if duration_cutoff:
-      flag_column_name = f'FLAG_sub_negative_40_PERIPHERY_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}hrs'
-      self.flag_data_above_one_of_two_cutoffs(
-        'sub_negative_40_percent_PERIPHERY', percent_cutoff, 'sub_negative_40_duration_PERIPHERY', duration_cutoff, flag_column_name
-      )
-    else:
-      flag_column_name = f'FLAG_sub_negative_40_PERIPHERY_>{int(round(percent_cutoff*100))}%'
-      self.flag_data_above_cutoff(
-        'sub_negative_40_percent_PERIPHERY', percent_cutoff, flag_column_name
-      )
-    return flag_column_name
+  # def flag_sub_negative_40_periphery(self, percent_cutoff, duration_cutoff = None):
+  #   if duration_cutoff:
+  #     flag_column_name = f'FLAG_sub_negative_40_PERIPHERY_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}hrs'
+  #     self.flag_data_above_one_of_two_cutoffs(
+  #       'sub_negative_40_percent_PERIPHERY', percent_cutoff, 'sub_negative_40_duration_PERIPHERY', duration_cutoff, flag_column_name
+  #     )
+  #   else:
+  #     flag_column_name = f'FLAG_sub_negative_40_PERIPHERY_>{int(round(percent_cutoff*100))}%'
+  #     self.flag_data_above_cutoff(
+  #       'sub_negative_40_percent_PERIPHERY', percent_cutoff, flag_column_name
+  #     )
+  #   return flag_column_name
 
   def flag_non_wear_periphery(self, percent_cutoff):
     flag_column_name = f'FLAG_non_wear_PERIPHERY_>{int(round(percent_cutoff*100))}%'
@@ -180,12 +180,12 @@ class featureFlagger():
     )
     return flag_column_name
   
-  def flag_sub_negative_10_curve(self, percent_cutoff, duration_cutoff):
-    flag_column_name = f'FLAG_sub_negative_10_CURVE_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}'
-    self.flag_data_above_one_of_two_cutoffs(
-      'sub_negative_10_percent_CURVE', percent_cutoff, 'sub_negative_10_duration_CURVE', duration_cutoff, flag_column_name
-    )
-    return flag_column_name
+  # def flag_sub_negative_10_curve(self, percent_cutoff, duration_cutoff):
+  #   flag_column_name = f'FLAG_sub_negative_10_CURVE_>{int(round(percent_cutoff*100))}%_>{duration_cutoff}'
+  #   self.flag_data_above_one_of_two_cutoffs(
+  #     'sub_negative_10_percent_CURVE', percent_cutoff, 'sub_negative_10_duration_CURVE', duration_cutoff, flag_column_name
+  #   )
+  #   return flag_column_name
 
   def flag_device_turned_on_percent_curve(self, percent_cutoff = 0.60):
     flag_column_name = f'FLAG_device_turned_on_CURVE_<{int(round(percent_cutoff*100))}%'

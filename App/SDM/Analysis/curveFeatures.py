@@ -76,6 +76,8 @@ class curveFeatures():
     # Initialize quality visualizer
     self.quality_visualizer = QualityVisualizer()
 
+    self.curve_features.to_excel('Results/ARC_auto_threshold/curve_features.xlsx')
+
   def compile_imputation_info(self):
     """Compile imputation information from all processors"""
     imputation_dfs = []
@@ -485,8 +487,7 @@ class curveFeatures():
     
     # Set perfect to 1 where both periphery and curve have no low quality data
     perfect_mask = (
-      (self.curve_features['low_quality_percent_PERIPHERY'] == 0) & 
-      (self.curve_features['low_quality_percent_CURVE'] == 0)
+      (self.curve_features['total_low_quality_duration_REGION'] == 0)
     )
     self.curve_features.loc[perfect_mask, 'perfect'] = 1
     

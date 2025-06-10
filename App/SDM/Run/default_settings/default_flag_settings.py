@@ -19,8 +19,8 @@ DEFAULT_FLAG_SELECTIONS = {
         'peak_above': 350
     },
     'flag_sub_negative_10_curve': {
-        'percent_cutoff': 0.20,
-        'duration_cutoff': 1.0,
+        # 'percent_cutoff': 0.20,
+        # 'duration_cutoff': 1.0,
     },
     'flag_unimputed_low_quality_percent_curve': {
         'percent_cutoff': 0.20
@@ -40,9 +40,9 @@ DEFAULT_FLAG_SELECTIONS = {
     'flag_short_curve_duration_curve': {'duration_cutoff': 0.25},  # 15 minutes
     
     # Periphery flags
-    'flag_sub_negative_10_periphery': {'percent_cutoff': 0.80, 'duration_cutoff': 2},
-    'flag_sub_negative_20_periphery': {'percent_cutoff': 0.40, 'duration_cutoff': 1.5},
-    # 'flag_sub_negative_40_periphery': {'percent_cutoff': 0.20, 'duration_cutoff': 0.5},
+    # 'flag_sub_negative_10_periphery': {'percent_cutoff': 0.80, 'duration_cutoff': 2},
+    'flag_sub_negative_10_periphery': {},
+    'flag_sub_negative_20_periphery': {},
     'flag_sub_negative_40_periphery': {},
     'flag_non_wear_periphery': {'percent_cutoff': 0.40}
 } 
