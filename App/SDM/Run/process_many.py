@@ -19,7 +19,7 @@ def process_and_analyze_data(
   analyze_days = False,
   analyze_events = False,
   identify_curves = False,
-  identify_raw_curves = False,
+  include_raw_curves = False,
   match_events_to_curves = False,
   gaps_and_non_wear_attrs = {},
   smooth_and_impute_attrs = {},
@@ -99,17 +99,14 @@ def process_and_analyze_data(
         
       if identify_curves:
         print(f"Identifying curves for {subid}_{dataset_identifier}")
-        sdm_processor.identify_curves(curve_attrs=curve_attrs)
+        sdm_processor.identify_curves(curve_attrs=curve_attrs, include_raw_curves=include_raw_curves)
         if not match_events_to_curves:
           print(f"Making curve graphs for {subid}_{dataset_identifier}")
           sdm_processor.make_curve_graphs()
           curve_features.append(sdm_processor.curve_features)
+          if include_raw_curves:
+            raw_curve_features.append(sdm_processor.raw_curve_features)
       
-      if identify_raw_curves:
-        print(f"Identifying raw curves for {subid}_{dataset_identifier}")
-        sdm_processor.identify_curves_with_unimputed_tac(curve_attrs=curve_attrs)
-        raw_curve_features.append(sdm_processor.raw_curve_features)
-
       if analyze_days:
         print(f"Running day analysis for {subid}_{dataset_identifier}")
         sdm_processor.run_day_level_analysis(**day_attrs)
@@ -128,6 +125,9 @@ def process_and_analyze_data(
         sdm_processor.set_ema_regions()
         curve_features.append(sdm_processor.curve_features)
         event_datasets.append(sdm_processor.events)
+        if include_raw_curves:
+          raw_curve_features.append(sdm_processor.raw_curve_features)
+      
         
       if analyze_events:
         subids_found = event_data[event_subid_column].unique().tolist()

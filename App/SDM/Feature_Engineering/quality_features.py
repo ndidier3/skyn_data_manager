@@ -367,7 +367,7 @@ def get_jump_imputation_ratio(df):
   """
   total_jumps = (df['jump'] == 1).sum()
   if total_jumps == 0:
-    return 0
+    return None
   return ((df['jump'] == 1) & (df['imputed'] == 1)).sum() / total_jumps
 
 def get_plummet_imputation_ratio(df):
@@ -381,7 +381,7 @@ def get_plummet_imputation_ratio(df):
   """
   total_plummets = (df['plummet'] == 1).sum()
   if total_plummets == 0:
-    return 0
+    return None
   return ((df['plummet'] == 1) & (df['imputed'] == 1)).sum() / total_plummets
 
 def get_extreme_negative_imputation_ratio(df):
@@ -395,7 +395,7 @@ def get_extreme_negative_imputation_ratio(df):
   """
   total_extreme_negatives = (df['extreme_negative'] == 1).sum()
   if total_extreme_negatives == 0:
-    return 0
+    return None
   return ((df['extreme_negative'] == 1) & (df['imputed'] == 1)).sum() / total_extreme_negatives
 
 def get_gap_imputation_ratio(df):
@@ -409,7 +409,7 @@ def get_gap_imputation_ratio(df):
   """
   total_gaps = (df['gap_buffered'] == 1).sum()
   if total_gaps == 0:
-    return 0
+    return None
   return ((df['gap_buffered'] == 1) & (df['imputed'] == 1)).sum() / total_gaps
 
 def get_non_wear_imputation_ratio(df):
@@ -423,7 +423,7 @@ def get_non_wear_imputation_ratio(df):
   """
   total_non_wear = (df['non_wear_buffered'] == 1).sum()
   if total_non_wear == 0:
-    return 0
+    return None
   return ((df['non_wear_buffered'] == 1) & (df['imputed'] == 1)).sum() / total_non_wear
 
 def get_low_quality_imputation_ratio(df):
@@ -439,5 +439,20 @@ def get_low_quality_imputation_ratio(df):
                      (df['non_wear_buffered']==1) | (df['gap_buffered'] == 1))
   total_low_quality = low_quality_mask.sum()
   if total_low_quality == 0:
-    return 0
+    return None
   return (low_quality_mask & (df['imputed'] == 1)).sum() / total_low_quality
+
+def start_to_peak_interval(df, tac_variable='TAC'):
+    """
+    Returns the number of TAC values between the first TAC and the first occurrence of the peak TAC value.
+    Args:
+        df: DataFrame containing the data
+        tac_variable: Column name for TAC values (default: 'TAC')
+    Returns:
+        int: Number of values between the first and the first peak (exclusive)
+    """
+    if len(df) == 0:
+        return 0
+    # Since curve is reset_index(drop=True), index is positional
+    start_to_peak_count = df.index[df[tac_variable] == df[tac_variable].max()].tolist()[0] if df[tac_variable].max() is not None else 0
+    return start_to_peak_count

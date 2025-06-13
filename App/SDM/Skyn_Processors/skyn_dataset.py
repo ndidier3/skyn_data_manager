@@ -10,7 +10,7 @@ from ..Signal_Processing.impute import impute_low_quality_data
 from ..Signal_Processing.fill_device_off_gaps import fill_device_off_gaps
 from ..Signal_Processing.label_device_non_wear import label_device_non_wear_using_cutoff, label_device_non_wear_using_model, compare_non_wear_methods
 from ..Signal_Processing.label_signal_stability import *
-from ..Signal_Processing.curve_demarcation import get_curve_threshold_from_method, get_start_and_end_of_discrete_curves, merge_nearby_curves
+from ..Signal_Processing.curve_demarcation import *
 from ..Skyn_Processors.skyn_day import skynDay
 from ..Skyn_Processors.alcohol_event import alcoholEvent
 from ..Skyn_Processors.curve import Curve
@@ -161,7 +161,7 @@ class skynDataset:
       self.log_error()
       self.save_as_sdp(valid=False)  
   
-  def identify_curves(self, curve_attrs: Dict = {}):
+  def identify_curves(self, curve_attrs: Dict = {}, include_raw_curves = False):
     """
     Identify curves in the dataset using either an automatic or manual threshold.
     
@@ -172,6 +172,7 @@ class skynDataset:
         - flag_selections (dict): Dictionary containing both curve and periphery flags
         - periphery_buffer_before (int): Buffer before curve in hours
         - periphery_buffer_after (int): Buffer after curve in hours
+      include_raw_curves (bool): Whether to process curves using raw (unimputed) TAC values
       
     Returns:
       None
@@ -180,6 +181,7 @@ class skynDataset:
       ValueError: If curve_threshold is invalid or automatic threshold determination fails
     """
     self.curve_features = pd.DataFrame()
+    self.raw_curve_features = pd.DataFrame()
     self.curve_threshold_method = curve_attrs.get('curve_threshold', 'auto')
     
     try:
@@ -222,7 +224,7 @@ class skynDataset:
         self.curves.append(curve)
         rows.append(curve.row)
         curve_id += 1
-
+      
       # Create curve features DataFrame
       if len(self.curves) > 0:
         self.curve_features = pd.DataFrame(rows, columns=curve.features.columns)
@@ -239,7 +241,50 @@ class skynDataset:
         f'{self.data_out_folder}/curve_features_{self.subid}_{self.dataset_identifier}.xlsx', 
         index=False
       )
-      
+
+      if include_raw_curves:
+        curve_start_and_end_indices_raw = adjust_curve_demarcation_for_raw_tac(
+          self.dataset, 
+          curve_start_and_end_indices_with_curve_count, 
+          self.curve_threshold, 
+          curve_attrs['merge_curves_within_duration']*60
+        )
+        assert len(curve_start_and_end_indices_raw) == len(curve_start_and_end_indices_with_curve_count), \
+          f"Length mismatch between raw and processed curve indices: {len(curve_start_and_end_indices_raw)} vs {len(curve_start_and_end_indices_with_curve_count)}"
+        
+        #process each curve using raw (unimputed) TAC
+        curve_id = 0
+        raw_rows = []
+        self.raw_curves = []
+        for curve_start, curve_end, curve_count in curve_start_and_end_indices_raw:
+          curve = Curve(
+            self.dataset, 
+            self.subid, 
+            self.dataset_identifier, 
+            curve_id, 
+            curve_start, 
+            curve_end, 
+            curve_count, 
+            self.curve_threshold, 
+            flag_selections,
+            curve_attrs.get('periphery_buffer_before', 0),
+            curve_attrs.get('periphery_buffer_after', 0),
+            TAC_column='TAC_pre_imputation'
+          )
+          self.raw_curves.append(curve)
+          raw_rows.append(curve.row)
+          curve_id += 1
+
+        if len(self.raw_curves) > 0:
+          self.raw_curve_features = pd.DataFrame(raw_rows, columns=curve.features.columns)
+        else:
+          self.raw_curve_features = pd.DataFrame(columns=self.curve_columns)
+
+        self.raw_curve_features.to_excel(
+          f'{self.data_out_folder}/raw_curve_features_{self.subid}_{self.dataset_identifier}.xlsx', 
+          index=False
+        )
+
       self.save_as_sdp(valid=True)
 
     except Exception as e:
@@ -248,48 +293,6 @@ class skynDataset:
       self.save_as_sdp(valid=False)
       raise ValueError(f"Failed to identify curves: {str(e)}")
   
-  def identify_curves_with_unimputed_tac(self, curve_attrs: Dict = {}):
-    """
-    Identifies curves using the TAC_pre_imputation column instead of the imputed TAC column.
-    This allows for analysis of curves before any imputation has been applied.
-    """
-    TAC_column = 'TAC_pre_imputation'
-    if not self.curve_threshold:
-      result = get_curve_threshold_from_method(self.dataset, self.curve_threshold_method)
-      self.curve_threshold, unadjusted_curve_threshold, baseline_mean, baseline_sd = result
-    
-    curve_start_and_end_indices = get_start_and_end_of_discrete_curves(self.dataset, self.curve_threshold, TAC_column) 
-    curve_start_and_end_indices_with_curve_count = merge_nearby_curves(curve_start_and_end_indices)
-    
-    curve_id = 0
-    rows = []
-    self.raw_curves = []
-    flag_selections = curve_attrs.get('flag_selections', {})
-
-    for curve_start, curve_end, curve_count in curve_start_and_end_indices_with_curve_count:
-      curve = Curve(
-        self.dataset, 
-        self.subid, 
-        self.dataset_identifier, 
-        curve_id, 
-        curve_start, 
-        curve_end, 
-        curve_count, 
-        self.curve_threshold,
-        flag_selections,
-        curve_attrs.get('periphery_buffer_before', 0),
-        curve_attrs.get('periphery_buffer_after', 0),
-        TAC_column=TAC_column
-      )
-      self.raw_curves.append(curve)
-      rows.append(curve.row)
-      curve_id += 1
-    
-    if rows:
-      self.raw_curve_features = pd.DataFrame(rows)
-    else:
-      self.raw_curve_features = pd.DataFrame()
-
   def configure_event_data(self, data: pd.DataFrame, subid_column, ema_id_column, drink_total_column, event_timestamp_columns, buffer_before=2, buffer_after=0, max_event_duration=12, export_excel=False):
     try:
       self.events = data[(data[subid_column] == str(self.subid)) | (data[subid_column] == int(self.subid))]
@@ -400,7 +403,7 @@ class skynDataset:
       self.log_error()
       self.save_as_sdp(valid=False)
 
-  def make_curve_graphs(self, export_excel = True):
+  def make_curve_graphs(self, include_raw_curves = False, export_excel = True):
     try:
       rows = []
       for curve in self.curves:
@@ -413,6 +416,18 @@ class skynDataset:
         updated_curve_features = pd.DataFrame(rows, columns=curve.features.columns)
         self.curve_features.update(updated_curve_features[[col for col in updated_curve_features.columns if '_plot' in col]])
       
+      if include_raw_curves:
+        raw_rows = []
+        for curve in self.raw_curves:
+          if len(self.event_labels):
+            curve.update_plot_annotations(self.event_labels)
+          curve.create_graphs(self.plot_folder)
+          raw_rows.append(curve.row)
+
+      if len(self.raw_curves) > 0:
+        updated_raw_curve_features = pd.DataFrame(rows, columns=curve.features.columns)
+        self.raw_curve_features.update(updated_raw_curve_features[[col for col in updated_raw_curve_features.columns if '_plot' in col]])
+
       if export_excel:
         self.curve_features.to_excel(f'{self.data_out_folder}/curve_features_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
       

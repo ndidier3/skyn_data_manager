@@ -140,7 +140,10 @@ def get_start_and_end_of_discrete_curves(df, curve_threshold, TAC_column = 'TAC'
   split_points = np.where(gaps > 1)[0]
   consecutive_sequences = np.split(above_threshold, split_points + 1)
   curve_start_and_end_indices = [[seq[0], seq[-1]] for seq in consecutive_sequences if len(seq) > 0]
-  curve_start_and_end_indices = [sublist for sublist in curve_start_and_end_indices if (sublist[1] - sublist[0]) >= 3]
+  #filtering out curves that are less than 15 minutes long
+  curve_start_and_end_indices = [
+    sublist for sublist in curve_start_and_end_indices if (sublist[1] - sublist[0]) > 15
+  ]
   return curve_start_and_end_indices
 
 def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separation_minutes = 60, curve_minutes_limit = (60*24)):
@@ -193,3 +196,89 @@ def get_curve_threshold_from_method(df: pd.DataFrame, curve_threshold_method: Un
     except Exception as e:
         print(f"Error determining curve threshold: {str(e)}")
         return default_threshold, default_threshold, None, None
+    
+def adjust_curve_demarcation_for_raw_tac(
+    dataset, 
+    curve_start_and_end_indices, 
+    curve_threshold,
+    max_curve_separation_minutes,
+):
+    adjusted_indices = []
+    TAC_column = 'TAC_pre_imputation'
+    
+    for curve_start, curve_end, curve_count in curve_start_and_end_indices:
+        # Find the peak TAC within the original segment
+        segment_data = dataset.loc[curve_start:curve_end, TAC_column]
+        peak_idx = segment_data.idxmax()
+        
+        # Initialize new boundaries at the peak
+        new_start = peak_idx
+        new_end = peak_idx
+        
+        # First find the threshold crossing points
+        # Extend left (earlier in time) until we find the first point above threshold
+        while new_start > dataset.index[0]:
+            prev_idx = dataset.index[dataset.index.get_loc(new_start) - 1]
+            prev_tac = dataset.loc[prev_idx, TAC_column]
+            if pd.isna(prev_tac):
+                break
+            if prev_tac <= curve_threshold:
+                # Found the threshold crossing point
+                break
+            new_start = prev_idx
+            
+        # Extend right (later in time) until we find the first point below threshold
+        while new_end < dataset.index[-1]:
+            next_idx = dataset.index[dataset.index.get_loc(new_end) + 1]
+            next_tac = dataset.loc[next_idx, TAC_column]
+            if pd.isna(next_tac):
+                break
+            if next_tac <= curve_threshold:
+                # Found the threshold crossing point
+                break
+            new_end = next_idx
+            
+        # Now look for any TAC>threshold within max_curve_separation_minutes of the boundaries
+        # Keep looking left until we don't find any more points above threshold
+        if max_curve_separation_minutes > 0:
+            while True:
+                lookback_start = max(0, dataset.index.get_loc(new_start) - max_curve_separation_minutes)
+                lookback_indices = dataset.index[lookback_start:dataset.index.get_loc(new_start)]
+                lookback_tac = dataset.loc[lookback_indices, TAC_column]
+                if lookback_tac.empty:
+                    break
+                    
+                above_threshold = lookback_tac[lookback_tac > curve_threshold]
+                if above_threshold.empty:
+                    break
+                    
+                new_start = above_threshold.index[0]  # Take the earliest point above threshold
+                
+        # Keep looking right until we don't find any more points above threshold
+            while True:
+                lookahead_end = min(len(dataset), dataset.index.get_loc(new_end) + max_curve_separation_minutes + 1)
+                lookahead_indices = dataset.index[dataset.index.get_loc(new_end) + 1:lookahead_end]
+                lookahead_tac = dataset.loc[lookahead_indices, TAC_column]
+                if lookahead_tac.empty:
+                    break
+                    
+                above_threshold = lookahead_tac[lookahead_tac > curve_threshold]
+                if above_threshold.empty:
+                    break
+                    
+                new_end = above_threshold.index[-1]  # Take the latest point above threshold
+            
+        # Count discrete intervals above threshold within the final boundaries
+        curve_data = dataset.loc[new_start:new_end, TAC_column]
+        above_threshold = curve_data > curve_threshold
+        # Find where the signal crosses the threshold
+        threshold_crossings = above_threshold.astype(int).diff().fillna(0)
+        # Count the number of times we cross from below to above threshold
+        new_curve_count = (threshold_crossings == 1).sum()
+            
+        # Add the adjusted curve with the new curve count
+        adjusted_indices.append([new_start, new_end, new_curve_count])
+    
+    return adjusted_indices
+
+    

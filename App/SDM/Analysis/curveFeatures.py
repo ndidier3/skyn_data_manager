@@ -44,6 +44,15 @@ class curveFeatures():
     
     # Concatenate with consistent columns
     self.curve_features = pd.concat(dfs, ignore_index=True)
+
+    raw_dfs = []
+    for i, processor in enumerate(self.processors):
+
+      raw_df = processor.raw_curve_features.copy()
+      raw_dfs.append(raw_df)
+    
+    # Concatenate with consistent columns
+    self.raw_curve_features = pd.concat(raw_dfs, ignore_index=True)
     
     # Convert subid and curve_id to int
     self.curve_features[['subid', 'curve_id']] = self.curve_features[['subid', 'curve_id']].astype(int)
@@ -75,8 +84,6 @@ class curveFeatures():
 
     # Initialize quality visualizer
     self.quality_visualizer = QualityVisualizer()
-
-    self.curve_features.to_excel('Results/ARC_auto_threshold/curve_features.xlsx')
 
   def compile_imputation_info(self):
     """Compile imputation information from all processors"""
@@ -237,7 +244,15 @@ class curveFeatures():
     self.compute_person_level_stats()
     self.compute_person_level_stats_valid()
 
-  def export_workbook_curves(self, file_name, include_plots=True, export_imputations=False):
+  def export_workbook_curves(self, file_name, include_plots=True, export_imputations=False, first_subid=None, last_subid=None):
+    # Filter data by subid range if specified
+    filtered_features = self.curve_features
+    if first_subid is not None and last_subid is not None:
+      filtered_features = self.curve_features[
+        (self.curve_features['subid'] >= first_subid) & 
+        (self.curve_features['subid'] <= last_subid)
+      ]
+    
     with pd.ExcelWriter(file_name, engine = 'xlsxwriter', mode = 'w') as writer:
       # Add tab descriptions
       report_guide.get_tab_descriptions_dataframe(include_events=False).to_excel(writer, sheet_name='Tab Descriptions', index=False)
@@ -255,37 +270,58 @@ class curveFeatures():
         frame.to_excel(writer, sheet_name='Stats', startrow=row_index)
         row_index += len(frame) + 4
       
-      # Add features
-      self.curve_features.to_excel(writer, sheet_name='Features', index=False)
+      # Add features (filtered if subid range specified)
+      filtered_features.to_excel(writer, sheet_name='Features', index=False)
       
       # Add person level stats
-      self.person_level_stats.to_excel(writer, sheet_name='Person Level Stats', index=True)
-      self.person_level_stats_valid.to_excel(writer, sheet_name='Person Level Stats (Valid)', index=True)
+      if hasattr(self, 'person_level_stats'):
+        self.person_level_stats.to_excel(writer, sheet_name='Person Level Stats', index=True)
+      if hasattr(self, 'person_level_stats_valid'):
+        self.person_level_stats_valid.to_excel(writer, sheet_name='Person Level Stats (Valid)', index=True)
+      
       # Add visualization tabs
       if include_plots:
-        embed_graphs_into_workbook_tab(
-          writer.book,
-          [
-            self.curve_invalid['device_removal_plot'].tolist(),
-            self.curve_invalid['signal_processing_plot'].tolist(),
-            self.curve_invalid['signal_processing_plot_wide'].tolist()
-          ],
-          worksheet_name = 'Invalid Curves',
-          plot_header_text = '',
-          missing_plot_path_text = 'No Plot Available'
-        )
+        # Filter invalid curves by subid range if specified
+        filtered_invalid = self.curve_invalid
+        if first_subid is not None and last_subid is not None:
+          filtered_invalid = self.curve_invalid[
+            (self.curve_invalid['subid'] >= first_subid) & 
+            (self.curve_invalid['subid'] <= last_subid)
+          ]
+        
+        if not filtered_invalid.empty:
+          embed_graphs_into_workbook_tab(
+            writer.book,
+            [
+              filtered_invalid['device_removal_plot'].tolist(),
+              filtered_invalid['signal_processing_plot'].tolist(),
+              filtered_invalid['signal_processing_plot_wide'].tolist()
+            ],
+            worksheet_name = 'Invalid Curves',
+            plot_header_text = '',
+            missing_plot_path_text = 'No Plot Available'
+          )
 
-        embed_graphs_into_workbook_tab(
-          writer.book,
-          [
-            self.curve_valid['device_removal_plot'].tolist(),
-            self.curve_valid['signal_processing_plot'].tolist(),
-            self.curve_valid['signal_processing_plot_wide'].tolist()
-          ],
-          worksheet_name = 'Valid Curves',
-          plot_header_text = '',
-          missing_plot_path_text = 'No Plot Available'
-        )
+        # Filter valid curves by subid range if specified
+        filtered_valid = self.curve_valid
+        if first_subid is not None and last_subid is not None:
+          filtered_valid = self.curve_valid[
+            (self.curve_valid['subid'] >= first_subid) & 
+            (self.curve_valid['subid'] <= last_subid)
+          ]
+        
+        if not filtered_valid.empty:
+          embed_graphs_into_workbook_tab(
+            writer.book,
+            [
+              filtered_valid['device_removal_plot'].tolist(),
+              filtered_valid['signal_processing_plot'].tolist(),
+              filtered_valid['signal_processing_plot_wide'].tolist()
+            ],
+            worksheet_name = 'Valid Curves',
+            plot_header_text = '',
+            missing_plot_path_text = 'No Plot Available'
+          )
       
       # Add imputations
       if export_imputations:
@@ -437,44 +473,6 @@ class curveFeatures():
       if run_settings_df is not None:
         run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
 
-  def create_quality_correlation_plots(self, output_dir=None):
-    """
-    Create correlation scatterplots between quality features and TAC features.
-    Creates separate plots for each quality feature, with all TAC features shown in each plot.
-    Uses matplotlib for plotting.
-    Plots are saved in the output_dir if provided, otherwise in the current directory.
-    """
-    self.quality_visualizer.create_quality_correlation_plots(self.curve_features, output_dir)
-
-  def create_quality_boxplots(self, output_dir=None):
-    """
-    Create box and whisker plots for every 5% increase in quality features.
-    Uses the same arrangement of quality and TAC features as in create_quality_correlation_plots.
-    Plots are saved in the output_dir if provided, otherwise in the current directory.
-    
-    The plots are split vertically by imputation ratio to show how imputation affects the quality metrics.
-    Groups are split into [0], (0,100), [100] for imputation ratios.
-    """
-    self.quality_visualizer.create_quality_boxplots(self.curve_features, output_dir)
-
-  def create_quality_mean_plots(self, output_dir=None, use_three_imputation_ratio_groups=False):
-    """
-    Create plots showing mean ± standard error for TAC features across quality feature bins.
-    Uses the same arrangement of quality and TAC features as in create_quality_boxplots.
-    Plots are saved in the output_dir if provided, otherwise in the current directory.
-    
-    The plots are split vertically by imputation ratio to show how imputation affects the quality metrics.
-    Can use either two groups ([0,100) and [100]) or three groups ([0], (0,100), [100]).
-    
-    Args:
-        output_dir (str, optional): Directory to save plots. If None, saves in current directory.
-        use_three_imputation_ratio_groups (bool, optional): If True, uses three imputation ratio groups ([0], (0,100), [100]).
-            If False, uses two groups ([0,100), [100]). Default is False.
-    """
-    # Create a new visualizer with the specified grouping scheme
-    visualizer = QualityVisualizer(use_three_imputation_ratio_groups=use_three_imputation_ratio_groups)
-    visualizer.create_quality_mean_plots(self.curve_features, output_dir)
-
   def identify_perfect_curves(self):
     """
     Identify curves that have no low quality data in either periphery or curve regions.
@@ -485,27 +483,42 @@ class curveFeatures():
     # Initialize perfect column to 0
     self.curve_features['perfect'] = 0
     
+    # Calculate combined non-wear and gap features for each region type
+    region_types = ['CURVE', 'PERIPHERY', 'REGION']
+    for region in region_types:
+        # Calculate combined percent features
+        self.curve_features[f'total_non_wear_gap_percent_{region}'] = (
+            self.curve_features[f'total_gap_percent_{region}'] + 
+            self.curve_features[f'total_non_wear_percent_{region}']
+        )
+        
+        # Calculate combined duration features
+        self.curve_features[f'total_non_wear_gap_duration_{region}'] = (
+            self.curve_features[f'total_gap_duration_{region}'] + 
+            self.curve_features[f'total_non_wear_duration_{region}']
+        )
+        
+        if self.raw_curve_features is not None:
+          # Calculate same features for raw data
+          self.raw_curve_features[f'total_non_wear_gap_percent_{region}'] = (
+              self.raw_curve_features[f'total_gap_percent_{region}'] + 
+              self.raw_curve_features[f'total_non_wear_percent_{region}']
+          )
+          
+          self.raw_curve_features[f'total_non_wear_gap_duration_{region}'] = (
+              self.raw_curve_features[f'total_gap_duration_{region}'] + 
+              self.raw_curve_features[f'total_non_wear_duration_{region}']
+          )
+    
     # Set perfect to 1 where both periphery and curve have no low quality data
     perfect_mask = (
       (self.curve_features['total_low_quality_duration_REGION'] == 0)
     )
     self.curve_features.loc[perfect_mask, 'perfect'] = 1
-    
+
+    self.curve_features.to_excel('Results/ARC_auto_threshold/curve_features.xlsx', index=False)
+    self.raw_curve_features.to_excel('Results/ARC_auto_threshold/raw_curve_features.xlsx', index=False)
     # Print summary
     total_curves = len(self.curve_features)
     perfect_curves = perfect_mask.sum()
     print(f"Found {perfect_curves} perfect curves out of {total_curves} total curves ({perfect_curves/total_curves*100:.1f}%)")
-
-def calculate_curve_features(tac_curve, time_points, baseline_value=None):
-  """
-  Calculate features from a TAC curve.
-  
-  Args:
-    tac_curve (np.ndarray): Array of TAC values
-    time_points (np.ndarray): Array of time points in hours
-    baseline_value (float, optional): Baseline TAC value. If None, will be calculated.
-    
-  Returns:
-    dict: Dictionary of curve features
-  """
-  # ... rest of the function ...

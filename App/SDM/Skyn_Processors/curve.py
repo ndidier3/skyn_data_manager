@@ -100,6 +100,7 @@ class Curve:
       'sub_negative_10_sum_CURVE': self.curve.loc[self.curve['extreme_negative'] == 1, self.TAC_column].sum(),
       'extreme_negative_imputation_ratio_CURVE': get_extreme_negative_imputation_ratio(self.curve),
       'low_quality_imputation_ratio_CURVE': get_low_quality_imputation_ratio(self.curve),
+      'start_to_peak_interval_CURVE': start_to_peak_interval(self.curve, self.TAC_column),
     }
 
     self.periphery_quality_features = {
@@ -306,9 +307,10 @@ class Curve:
 
     self.smoothed_curve_plot = plot_smoothed_curve(
       plot_df, plot_folder, self.subid, self.dataset_identifier, self.curve_id, 
-      self.curve_tac_features['peak_CURVE'], self.curve_threshold, 
+      self.curve_tac_features['peak_CURVE'], self.curve_threshold,
       df_version = 'CURVE', event_timestamps = self.curve_plot_annotations,
-      subtitle_text = subtitle_text
+      subtitle_text = subtitle_text,
+      tac_column = self.TAC_column
     )
 
     self.device_removal_plot = plot_device_removal(
@@ -323,14 +325,16 @@ class Curve:
       plot_df, plot_folder, self.subid, self.curve_id, self.dataset_identifier, 'CURVE',
       self.curve_threshold, time_variable='datetime', title = f'Signal Processing',
       event_timestamps = self.curve_plot_annotations,
-      subtitle_text = subtitle_text
+      subtitle_text = subtitle_text,
+      show_imputations = self.TAC_column != 'TAC_pre_imputation'
     )
 
     self.signal_processing_plot_wide = plot_signal_processing(
       self.day_region, plot_folder, self.subid, self.curve_id, self.dataset_identifier, 'CURVE_WIDE',
       self.curve_threshold, time_variable='datetime', title = f'Signal Processing',
       event_timestamps = self.day_plot_annotations,
-      subtitle_text = subtitle_text
+      subtitle_text = subtitle_text,
+      show_imputations = self.TAC_column != 'TAC_pre_imputation'
     )
 
     self.features['smoothed_curve_plot'] = self.smoothed_curve_plot
