@@ -80,7 +80,7 @@ def get_jump_indices(df, rolling_n=5, rise_rate_threshold=40, projected_tac_chan
       consecutive_diffs = np.diff(recent_values)
       tac_change = np.max(consecutive_diffs)  # Only consider positive changes for jumps
 
-      if (slope > rise_rate_threshold) or (tac_change > (rise_rate_threshold*3)):
+      if (slope > rise_rate_threshold) or (tac_change > (rise_rate_threshold*2.25)):
         #jump i forward         
         #add indices in the future until TAC returns to a realistically lower TAC
         indices_to_add = set(df_indices[i:i + rolling_n])
@@ -130,7 +130,7 @@ def get_plummet_indices(df, jump_indices_candidates = (), rolling_n = 5, fall_ra
       consecutive_diffs = np.diff(recent_values)
       tac_change = np.min(consecutive_diffs)  # Only consider negative changes for plummets
 
-      if (slope < fall_rate_threshold) or (tac_change < (fall_rate_threshold*3)):
+      if (slope < fall_rate_threshold) or (tac_change < (fall_rate_threshold*2.25)):
         print(f'PLUMMET: {slope} per minute / {tac_change}')
         
         projected_tac = recent_values[0]

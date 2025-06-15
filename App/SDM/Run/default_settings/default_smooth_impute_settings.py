@@ -9,6 +9,6 @@ DEFAULT_SMOOTH_AND_IMPUTE_ATTRS = {
     'impute_non_wear': True,
     'impute_jumps': True,
     'impute_plummets': True,
-    'savgol_smooth': True,
+    'savgol_smooth': False,
     'export_excel': False
 } 
