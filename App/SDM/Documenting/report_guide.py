@@ -291,11 +291,9 @@ class ReportGuide:
             'jump_imputation_ratio_CURVE': 'Ratio of jump data that has been imputed (0-1)',
             'imputed_duration_CURVE': 'Duration of imputed data (hours)',
             'imputed_percent_CURVE': 'Percentage of imputed data',
-            'low_quality_duration_CURVE': 'Duration of low quality data (hours)',
-            'low_quality_percent_CURVE': 'Percentage of low quality data',
-            'unimputed_low_quality_duration_CURVE': 'Duration of low quality data not imputed (hours)',
-            'unimputed_low_quality_percent_CURVE': 'Percentage of low quality data not imputed',
-            
+            'total_low_quality_duration_CURVE': 'Duration of low quality data (hours)',
+            'total_low_quality_percent_CURVE': 'Percentage of low quality data',
+
             # Imputation ratio features
             'jump_imputation_ratio_CURVE': 'Ratio of jump data that has been imputed (0-1)',
             'plummet_imputation_ratio_CURVE': 'Ratio of plummet data that has been imputed (0-1)',
@@ -334,11 +332,9 @@ class ReportGuide:
             'imputed_jump_percent_CURVE': 'numeric',
             'imputed_duration_CURVE': 'numeric',
             'imputed_percent_CURVE': 'numeric',
-            'low_quality_duration_CURVE': 'numeric',
-            'low_quality_percent_CURVE': 'numeric',
-            'unimputed_low_quality_duration_CURVE': 'numeric',
-            'unimputed_low_quality_percent_CURVE': 'numeric',
-            
+            'total_low_quality_duration_CURVE': 'numeric',
+            'total_low_quality_percent_CURVE': 'numeric',
+
             # Imputation ratio features
             'jump_imputation_ratio_CURVE': 'numeric',
             'plummet_imputation_ratio_CURVE': 'numeric',
@@ -348,9 +344,7 @@ class ReportGuide:
             'low_quality_imputation_ratio_CURVE': 'numeric',
             
             # Negative value features
-            'sub_negative_10_duration_CURVE': 'numeric',
-            'sub_negative_10_percent_CURVE': 'numeric',
-            # 'sub_negative_10_sum_CURVE': 'numeric',
+            'sub_negative_10_sum_CURVE': 'numeric',
             
             # Categorical features
             'CURVE_VALID': 'categorical',
@@ -481,15 +475,11 @@ class ReportGuide:
             'imputed_jump_percent_CURVE',
             'imputed_duration_CURVE',
             'imputed_percent_CURVE',
-            'low_quality_duration_CURVE',
-            'low_quality_percent_CURVE',
-            'unimputed_low_quality_duration_CURVE',
-            'unimputed_low_quality_percent_CURVE',
-            
+            'total_low_quality_duration_CURVE',
+            'total_low_quality_percent_CURVE',
+
             # Negative value features
-            'sub_negative_10_duration_CURVE',
-            'sub_negative_10_percent_CURVE',
-            # 'sub_negative_10_sum_CURVE'
+            'sub_negative_10_sum_CURVE'
         ]
 
         # Region quality features

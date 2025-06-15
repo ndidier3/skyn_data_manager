@@ -8,9 +8,6 @@ from App.SDM.Visualization.quality import QualityVisualizer
 import os
 import pandas as pd
 import numpy as np
-from scipy import stats
-from scipy.signal import find_peaks
-import matplotlib.pyplot as plt
 
 class curveFeatures():
   def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, subid=None, additional_processed_data_folders=[]):
@@ -28,13 +25,13 @@ class curveFeatures():
     # Load only the filtered processors
     self.processors = [load(file[:-4], processed_data_folder) for file in processed_files]
     self.processors = [processor for processor in self.processors if hasattr(processor, 'curve_features')]
-    
+    self.processors = [processor for processor in self.processors if len(processor.curve_features) > 0]
+    self.no_curve_subids = [processor.subid for processor in self.processors if len(processor.curve_features) == 0]
     print(f"\nFound {len(self.processors)} processors with curve_features")
     
     # Create a list of DataFrames with consistent columns
     dfs = []
     for i, processor in enumerate(self.processors):
-
       df = processor.curve_features.copy()
       # Only keep rows that have plot paths
       plot_cols = ['smoothed_curve_plot', 'signal_processing_plot', 'device_removal_plot', 'signal_processing_plot_wide']
@@ -94,7 +91,34 @@ class curveFeatures():
         df['subid'] = processor.subid
         df['dataset_identifier'] = processor.dataset_identifier
         imputation_dfs.append(df)
-    return pd.concat(imputation_dfs, ignore_index=True) if imputation_dfs else pd.DataFrame()
+    self.imputations = pd.concat(imputation_dfs, ignore_index=True) if imputation_dfs else pd.DataFrame()
+
+  def compute_imputation_stats(self):
+    """
+    Compute statistics on low-quality intervals from the imputation info DataFrame and store as a single dict:
+    - Number of intervals (rows)
+    - Average length of intervals (region_length)
+    - Percentage of intervals that were imputed (was_imputed)
+    - For each reason_not_imputed (for was_imputed == False), add a key 'Not Imputed: <reason>' with its count
+    Appends this dict to self.curve_stat_frames.
+    """
+    if not hasattr(self, 'imputations') or self.imputations is None or self.imputations.empty:
+      self.compile_imputation_info()
+    imputation_df = self.imputations
+    stats = {
+      'Number of Low-Quality Intervals': 0,
+      'Average Interval Length (min)': float('nan'),
+      'Percent Intervals Imputed': float('nan')
+    }
+    if not imputation_df.empty:
+      stats['Number of Low-Quality Intervals'] = len(imputation_df)
+      stats['Average Interval Length (min)'] = imputation_df['region_length'].mean()
+      stats['Percent Intervals Imputed'] = imputation_df['was_imputed'].mean() * 100
+      not_imputed = imputation_df[imputation_df['was_imputed'] == False]
+      reason_counts = not_imputed['reason_not_imputed'].value_counts(dropna=False).to_dict()
+      for reason, count in reason_counts.items():
+        stats[f'Not Imputed: {reason}'] = count
+    self.curve_stat_frames.append(pd.DataFrame(stats))
 
   def compute_tac_feature_stats(self):
     valid = statModel(self.curve_valid)
@@ -243,6 +267,7 @@ class curveFeatures():
     self.count_curve_flags()
     self.compute_person_level_stats()
     self.compute_person_level_stats_valid()
+    self.compute_imputation_stats()
 
   def export_workbook_curves(self, file_name, include_plots=True, export_imputations=False, first_subid=None, last_subid=None):
     # Filter data by subid range if specified
@@ -325,7 +350,9 @@ class curveFeatures():
       
       # Add imputations
       if export_imputations:
-        self.compile_imputation_info().to_excel(writer, sheet_name='Imputations', index=False)
+        if not hasattr(self, 'imputations'):
+          self.compile_imputation_info()
+        self.imputations.to_excel(writer, sheet_name='Imputations', index=False)
       
       # Add run settings
       run_settings_df = report_guide.get_run_settings_dataframe(

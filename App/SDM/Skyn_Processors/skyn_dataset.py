@@ -146,8 +146,9 @@ class skynDataset:
       if any([impute_gaps, impute_non_wear, impute_jumps, impute_plummets]):
         self.dataset, self.imputation_info = impute_low_quality_data(self.dataset, impute_gaps=impute_gaps, impute_non_wear=impute_non_wear, impute_jumps=impute_jumps, impute_plummets=impute_plummets)
       
+      self.dataset['TAC_pre_savgol'] = self.dataset['TAC'].copy()
       if savgol_smooth:
-        self.dataset = smooth_savgol(self.dataset, window_length=41, polyorder=3)
+        self.dataset = smooth_savgol(self.dataset, window_length=11, polyorder=3)
             
       if export_excel:
         self.dataset.to_excel(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
@@ -346,52 +347,52 @@ class skynDataset:
             'latest_timestamp': latest_timestamp,
             'matching_end_timestamp': matching_end_timestamp
           })
+      if len(self.curve_features) > 0:
+        self.curve_features['CURVE_event_match_before_buffer'] = buffer_before
+        self.curve_features['CURVE_event_match_after_buffer'] = buffer_after
+        self.curve_features['CURVE_MATCH_START'] = pd.to_datetime(self.curve_features['begin_CURVE']) - pd.Timedelta(hours=buffer_before)
+        self.curve_features['CURVE_MATCH_END'] = pd.to_datetime(self.curve_features['end_CURVE']) + pd.Timedelta(hours=buffer_after)
+        
+        # Filter curve features to only include current subject
+        subject_curves = self.curve_features[
+            (self.curve_features['subid'] == str(self.subid)) | 
+            (self.curve_features['subid'] == int(self.subid))
+        ].copy()
 
-      self.curve_features['CURVE_event_match_before_buffer'] = buffer_before
-      self.curve_features['CURVE_event_match_after_buffer'] = buffer_after
-      self.curve_features['CURVE_MATCH_START'] = pd.to_datetime(self.curve_features['begin_CURVE']) - pd.Timedelta(hours=buffer_before)
-      self.curve_features['CURVE_MATCH_END'] = pd.to_datetime(self.curve_features['end_CURVE']) + pd.Timedelta(hours=buffer_after)
-      
-      # Filter curve features to only include current subject
-      subject_curves = self.curve_features[
-          (self.curve_features['subid'] == str(self.subid)) | 
-          (self.curve_features['subid'] == int(self.subid))
-      ].copy()
-
-      # Process event ranges to match curves
-      for event_range in event_ranges:
-          # Find curves that overlap with this event's time range using matching_end_timestamp
-          overlapping_curves = subject_curves[
-            ~(
-              (subject_curves['CURVE_MATCH_END'] < event_range['earliest_timestamp']) |  
-              (subject_curves['CURVE_MATCH_START'] > event_range['matching_end_timestamp'])
-            )
-          ].sort_values('CURVE_MATCH_START')  # Sort by start time to get earliest first
-          
-          matching_curve_ids = overlapping_curves['curve_id'].tolist()
-          self.events.loc[self.events['ema_id'] == event_range['ema_id'], 'num_curves_matched'] = len(matching_curve_ids)
-          
-          # Calculate overlap proportions for each matching curve
-          for j in range(1, 6):
-            match_key = f'curve_match_{j}'
-            overlap_key = f'curve_match_{j}_overlap'
+        # Process event ranges to match curves
+        for event_range in event_ranges:
+            # Find curves that overlap with this event's time range using matching_end_timestamp
+            overlapping_curves = subject_curves[
+              ~(
+                (subject_curves['CURVE_MATCH_END'] < event_range['earliest_timestamp']) |  
+                (subject_curves['CURVE_MATCH_START'] > event_range['matching_end_timestamp'])
+              )
+            ].sort_values('CURVE_MATCH_START')  # Sort by start time to get earliest first
             
-            if j <= len(matching_curve_ids):
-              curve = overlapping_curves.iloc[j-1]
-              curve_id = matching_curve_ids[j-1]
+            matching_curve_ids = overlapping_curves['curve_id'].tolist()
+            self.events.loc[self.events['ema_id'] == event_range['ema_id'], 'num_curves_matched'] = len(matching_curve_ids)
+            
+            # Calculate overlap proportions for each matching curve
+            for j in range(1, 6):
+              match_key = f'curve_match_{j}'
+              overlap_key = f'curve_match_{j}_overlap'
               
-              # Calculate overlap
-              overlap_start = max(event_range['earliest_timestamp'], curve['CURVE_MATCH_START'])
-              overlap_end = min(event_range['matching_end_timestamp'], curve['CURVE_MATCH_END'])
-              overlap_duration = (overlap_end - overlap_start).total_seconds()
-              curve_duration = (curve['CURVE_MATCH_END'] - curve['CURVE_MATCH_START']).total_seconds()
-              overlap_proportion = overlap_duration / curve_duration
-              
-              self.events.loc[self.events['ema_id'] == event_range['ema_id'], match_key] = curve_id
-              self.events.loc[self.events['ema_id'] == event_range['ema_id'], overlap_key] = overlap_proportion
-            else:
-              self.events.loc[self.events['ema_id'] == event_range['ema_id'], match_key] = None
-              self.events.loc[self.events['ema_id'] == event_range['ema_id'], overlap_key] = None
+              if j <= len(matching_curve_ids):
+                curve = overlapping_curves.iloc[j-1]
+                curve_id = matching_curve_ids[j-1]
+                
+                # Calculate overlap
+                overlap_start = max(event_range['earliest_timestamp'], curve['CURVE_MATCH_START'])
+                overlap_end = min(event_range['matching_end_timestamp'], curve['CURVE_MATCH_END'])
+                overlap_duration = (overlap_end - overlap_start).total_seconds() if (overlap_end - overlap_start).total_seconds() > 0 else 0
+                curve_duration = (curve['CURVE_MATCH_END'] - curve['CURVE_MATCH_START']).total_seconds()
+                overlap_proportion = overlap_duration / curve_duration if curve_duration > 0 else None
+                
+                self.events.loc[self.events['ema_id'] == event_range['ema_id'], match_key] = curve_id
+                self.events.loc[self.events['ema_id'] == event_range['ema_id'], overlap_key] = overlap_proportion
+              else:
+                self.events.loc[self.events['ema_id'] == event_range['ema_id'], match_key] = None
+                self.events.loc[self.events['ema_id'] == event_range['ema_id'], overlap_key] = None
 
       if export_excel:
         self.event_labels.to_excel(f'{self.data_out_folder}/event_labels_{self.subid}_{self.dataset_identifier}.xlsx', index=False)

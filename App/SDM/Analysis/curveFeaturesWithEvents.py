@@ -269,6 +269,16 @@ class curveFeaturesWithEvents(curveFeatures):
 
     self.event_stat_frames.insert(0, pd.DataFrame(self.counts))
 
+    self.participant_info = {
+      'N Participants': [len(self.curve_features['subid'].unique())],
+      'N Participants (with valid curves)': [len(self.curve_valid['subid'].unique())],
+      'Average Curves Per Person': [len(self.curve_features) / len(self.curve_features['subid'].unique())],
+      'Average Valid Curves Per Person': [len(self.curve_valid) / len(self.curve_valid['subid'].unique())],
+      'Average Invalid Curves Per Person': [len(self.curve_invalid) / len(self.curve_invalid['subid'].unique())],
+      'N Participants (with valid curves and event match)': [len(self.curve_valid_with_event['subid'].unique())],
+    }
+    self.event_stat_frames.insert(1, pd.DataFrame(self.participant_info))
+
   def count_flags_for_curves_with_events(self):
     stats = statModel(self.curve_with_event)
     flag_cols = [col for col in self.curve_with_event.columns if 'FLAG' in col]
@@ -493,7 +503,9 @@ class curveFeaturesWithEvents(curveFeatures):
         )
       
       # Add imputations
-      self.compile_imputation_info().to_excel(writer, sheet_name='Imputations', index=False)
+      if not hasattr(self, 'imputations') or self.imputations is None or self.imputations.empty:
+          self.compile_imputation_info()
+      self.imputations.to_excel(writer, sheet_name='Imputations', index=False)
       
       # Add run settings
       run_settings_df = report_guide.get_run_settings_dataframe(
@@ -670,7 +682,9 @@ class curveFeaturesWithEvents(curveFeatures):
               )
       
       # Add imputations
-      self.compile_imputation_info().to_excel(writer, sheet_name='Imputations', index=False)
+      if not hasattr(self, 'imputations') or self.imputations is None or self.imputations.empty:
+          self.compile_imputation_info()
+      self.imputations.to_excel(writer, sheet_name='Imputations', index=False)
       
       # Add run settings
       run_settings_df = report_guide.get_run_settings_dataframe(

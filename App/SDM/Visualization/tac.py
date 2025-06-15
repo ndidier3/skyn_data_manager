@@ -79,7 +79,7 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
   fig, ax = plt.subplots(figsize=(16, 7))
   
   #Smoothed Final TAC
-  ax.plot(df[time_variable], df['TAC' if not show_imputations else 'TAC_pre_imputation'], label="TAC (Processed)", alpha=0.5, color="black", linewidth = 2.5)
+  ax.plot(df[time_variable], df['TAC' if not show_imputations else 'TAC_pre_imputation'], label="TAC (Processed)", alpha=0.5, color="black", linewidth = 2)
   
   #Passed (high quality values)
   ax.scatter(passed[time_variable], passed['TAC_pre_imputation'], label='Passed', 
@@ -87,23 +87,23 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
   #Non Wear
   if not non_wear.empty:
     ax.scatter(non_wear[time_variable], non_wear['TAC_pre_imputation'], label='Non-Wear', 
-             color='lightpink', marker='x', alpha=0.7, s=12)
+             color='lightpink', marker='x', alpha=0.7, s=20)
   #Extreme Negative
   if not extreme_negative.empty:
     ax.scatter(extreme_negative[time_variable], extreme_negative['TAC_pre_imputation'], label='Extreme Negative', 
-             color='lightsteelblue', marker='*', alpha=0.7, s=12)
+             color='lightsteelblue', marker='*', alpha=0.7, s=20)
   #Jumps
   if not jumps.empty:
     ax.scatter(jumps[time_variable], jumps['TAC_pre_imputation'], label='Jump', 
-              color='lightblue', marker='^', alpha=0.7, s=12)
+              color='lightblue', marker='^', alpha=0.7, s=20)
   #Plummet
   if not plummet.empty:
     ax.scatter(plummet[time_variable], plummet['TAC_pre_imputation'], label='Plummet', 
-              color='thistle', marker='v', alpha=0.7, s=12)
+              color='thistle', marker='v', alpha=0.7, s=20)
   # Between low quality
   if not between_low_quality.empty:
     ax.scatter(between_low_quality[time_variable], between_low_quality['TAC_pre_imputation'],
-               label='Between Low Quality', color='gray', marker='s', alpha=0.7, s=12)
+               label='Between Low Quality', color='gray', marker='s', alpha=0.7, s=20)
     
   # Imputed data
   if show_imputations:
@@ -114,22 +114,22 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
     plummet_imputed = df.loc[df['plummet_imputed'] == 1]
     between_low_quality_imputed = df.loc[df['between_low_quality_imputed'] == 1]
     if not gap_imputed.empty:
-      ax.scatter(gap_imputed[time_variable], gap_imputed['TAC'], label='Imputed Gap', 
+      ax.scatter(gap_imputed[time_variable], gap_imputed['TAC_pre_savgol'], label='Imputed Gap', 
                 marker='o', alpha=1.0, facecolor='gray', edgecolors="black")
     if not non_wear_imputed.empty:
-      ax.scatter(non_wear_imputed[time_variable], non_wear_imputed['TAC'], 
+      ax.scatter(non_wear_imputed[time_variable], non_wear_imputed['TAC_pre_savgol'], 
                 label='Imputed Non-Wear', facecolor='lightpink', edgecolors= "darkred", marker='o', alpha=1.0)
     if not extreme_negative_imputed.empty:
-      ax.scatter(extreme_negative_imputed[time_variable], extreme_negative_imputed['TAC'], 
+      ax.scatter(extreme_negative_imputed[time_variable], extreme_negative_imputed['TAC_pre_savgol'], 
                 label='Imputed Extreme Negative', facecolor='lightsteelblue', edgecolors= "purple", marker='o', alpha=1.0)
     if not jump_imputed.empty:
-      ax.scatter(jump_imputed[time_variable], jump_imputed['TAC'], 
+      ax.scatter(jump_imputed[time_variable], jump_imputed['TAC_pre_savgol'], 
                 label='Imputed Jump', facecolor='lightblue', edgecolors= "darkblue", marker='o', alpha=1.0)
     if not plummet_imputed.empty:
-      ax.scatter(plummet_imputed[time_variable], plummet_imputed['TAC'], 
+      ax.scatter(plummet_imputed[time_variable], plummet_imputed['TAC_pre_savgol'], 
                 label='Imputed Plummet', facecolor='thistle', edgecolors= "purple", marker='o', alpha=1.0)
     if not between_low_quality_imputed.empty:
-      ax.scatter(between_low_quality_imputed[time_variable], between_low_quality_imputed['TAC'],
+      ax.scatter(between_low_quality_imputed[time_variable], between_low_quality_imputed['TAC_pre_savgol'],
                 label='Imputed Between Low Quality', facecolor='gray', edgecolors="darkgreen", marker='o', alpha=1.0)
   
   # Plot threshold line

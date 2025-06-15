@@ -26,61 +26,61 @@ class QualityVisualizer:
         
         # Default quality features grouped by feature type, then region type, then metric type
         self.quality_features = quality_features or [
-            # # Low Quality Features
-            # # 'total_low_quality_percent_REGION',
-            # 'total_low_quality_percent_CURVE',
-            # 'total_low_quality_percent_PERIPHERY',
-            # # 'total_low_quality_duration_REGION',
-            # 'total_low_quality_duration_CURVE',
-            # 'total_low_quality_duration_PERIPHERY',
+            # Low Quality Features
+            # 'total_low_quality_percent_REGION',
+            'total_low_quality_percent_CURVE',
+            'total_low_quality_percent_PERIPHERY',
+            # 'total_low_quality_duration_REGION',
+            'total_low_quality_duration_CURVE',
+            'total_low_quality_duration_PERIPHERY',
             
-            # # Gap Features
-            # # 'total_gap_percent_REGION',
-            # 'total_gap_percent_CURVE',
-            # 'total_gap_percent_PERIPHERY',
-            # # 'total_gap_duration_REGION',
-            # 'total_gap_duration_CURVE',
-            # # 'total_gap_duration_PERIPHERY',
+            # Gap Features
+            # 'total_gap_percent_REGION',
+            'total_gap_percent_CURVE',
+            'total_gap_percent_PERIPHERY',
+            # 'total_gap_duration_REGION',
+            'total_gap_duration_CURVE',
+            # 'total_gap_duration_PERIPHERY',
 
-            # #Non-wear + Gap Features
-            # # 'total_non_wear_gap_percent_REGION',
-            # 'total_non_wear_gap_percent_CURVE',
-            # 'total_non_wear_gap_percent_PERIPHERY',
-            # # 'total_non_wear_gap_duration_REGION',
-            # 'total_non_wear_gap_duration_CURVE',
-            # # 'total_non_wear_gap_duration_PERIPHERY',
+            #Non-wear + Gap Features
+            # 'total_non_wear_gap_percent_REGION',
+            'total_non_wear_gap_percent_CURVE',
+            'total_non_wear_gap_percent_PERIPHERY',
+            # 'total_non_wear_gap_duration_REGION',
+            'total_non_wear_gap_duration_CURVE',
+            # 'total_non_wear_gap_duration_PERIPHERY',
             
-            # # Non-wear Features
-            # # 'total_non_wear_percent_REGION',
-            # 'total_non_wear_percent_CURVE',
-            # 'total_non_wear_percent_PERIPHERY',
-            # # 'total_non_wear_duration_REGION',
-            # 'total_non_wear_duration_CURVE',
-            # # 'total_non_wear_duration_PERIPHERY',
+            # Non-wear Features
+            # 'total_non_wear_percent_REGION',
+            'total_non_wear_percent_CURVE',
+            'total_non_wear_percent_PERIPHERY',
+            # 'total_non_wear_duration_REGION',
+            'total_non_wear_duration_CURVE',
+            # 'total_non_wear_duration_PERIPHERY',
             
-            # # Jump Features
-            # # 'total_jump_percent_REGION',
-            # 'total_jump_percent_CURVE',
-            # # 'total_jump_percent_PERIPHERY',
-            # # 'total_jump_duration_REGION',
-            # 'total_jump_duration_CURVE',
-            # # 'total_jump_duration_PERIPHERY',
+            # Jump Features
+            # 'total_jump_percent_REGION',
+            'total_jump_percent_CURVE',
+            # 'total_jump_percent_PERIPHERY',
+            # 'total_jump_duration_REGION',
+            'total_jump_duration_CURVE',
+            # 'total_jump_duration_PERIPHERY',
             
-            # # Plummet Features
-            # # 'total_plummet_percent_REGION',
-            # 'total_plummet_percent_CURVE',
-            # # 'total_plummet_percent_PERIPHERY',
-            # # 'total_plummet_duration_REGION',
-            # 'total_plummet_duration_CURVE',
-            # # 'total_plummet_duration_PERIPHERY',
+            # Plummet Features
+            # 'total_plummet_percent_REGION',
+            'total_plummet_percent_CURVE',
+            # 'total_plummet_percent_PERIPHERY',
+            # 'total_plummet_duration_REGION',
+            'total_plummet_duration_CURVE',
+            # 'total_plummet_duration_PERIPHERY',
             
-            # # Extreme Negative Features
-            # # 'total_extreme_negative_percent_REGION',
-            # 'total_extreme_negative_percent_CURVE',
-            # 'total_extreme_negative_percent_PERIPHERY',
-            # # 'total_extreme_negative_duration_REGION',
-            # 'total_extreme_negative_duration_CURVE',
-            # 'total_extreme_negative_duration_PERIPHERY',
+            # Extreme Negative Features
+            # 'total_extreme_negative_percent_REGION',
+            'total_extreme_negative_percent_CURVE',
+            'total_extreme_negative_percent_PERIPHERY',
+            # 'total_extreme_negative_duration_REGION',
+            'total_extreme_negative_duration_CURVE',
+            'total_extreme_negative_duration_PERIPHERY',
 
             #completion features
             'rise_complete_perc_CURVE',

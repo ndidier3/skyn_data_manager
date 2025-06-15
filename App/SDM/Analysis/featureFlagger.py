@@ -24,7 +24,7 @@ class featureFlagger():
       'flag_imputed_plummet_curve': {},
       'flag_unimputed_extreme_negative_curve': {},
       'flag_imputed_extreme_negative_curve': {},
-      'flag_imputed_low_quality_curve': {},
+      'flag_low_quality_curve': {},
       # Rise/fall completion flags
       'flag_incomplete_curve_start_curve': {},
       'flag_incomplete_curve_end_curve': {},
@@ -251,7 +251,7 @@ class featureFlagger():
     )
 
   # Low quality flag methods
-  def flag_imputed_low_quality_curve(self, percent_cutoff, duration_cutoff):
+  def flag_low_quality_curve(self, percent_cutoff, duration_cutoff):
     """
     Flag a curve if either the total percent or duration cutoff is exceeded.
     This is an OR rule - if either condition is met, the flag is set.
@@ -260,7 +260,7 @@ class featureFlagger():
     self.flag_data_above_one_of_two_cutoffs(
       'total_low_quality_percent_CURVE', percent_cutoff,
       'total_low_quality_duration_CURVE', duration_cutoff,
-      'FLAG_imputed_low_quality_curve'
+      'FLAG_low_quality_curve'
     )
 
   # Rise/fall completion flag methods
@@ -339,31 +339,24 @@ class featureFlagger():
 
   def run_flags_and_validation(self):
     """Run all flags and validation in the correct order"""
-    print("\nDEBUG: Flag selections:", self.flag_selections)
-    print("DEBUG: DataFrame columns:", self.ftrs.columns.tolist())
-    
     # First run periphery flags
     periphery_flags = []
     if 'flag_gaps_and_non_wear_periphery' in self.flag_selections and self.flag_selections['flag_gaps_and_non_wear_periphery']:
-      print("DEBUG: Running flag_gaps_and_non_wear_periphery")
       self.flag_gaps_and_non_wear_periphery(
         self.flag_selections['flag_gaps_and_non_wear_periphery']['percent_cutoff']
       )
       periphery_flags.append('FLAG_gaps_and_non_wear_periphery')
     if 'flag_extreme_negative_periphery' in self.flag_selections and self.flag_selections['flag_extreme_negative_periphery']:
-      print("DEBUG: Running flag_extreme_negative_periphery")
       self.flag_extreme_negative_periphery(
         self.flag_selections['flag_extreme_negative_periphery']['percent_cutoff']
       )
       periphery_flags.append('FLAG_extreme_negative_periphery')
     if 'flag_low_quality_periphery' in self.flag_selections and self.flag_selections['flag_low_quality_periphery']:
-      print("DEBUG: Running flag_low_quality_periphery")
       self.flag_low_quality_periphery(
         self.flag_selections['flag_low_quality_periphery']['percent_cutoff']
       )
       periphery_flags.append('FLAG_low_quality_periphery')
 
-    print("DEBUG: Periphery flags to validate:", periphery_flags)
     # Validate periphery based on all periphery flags
     if periphery_flags:
       self.validate_periphery('PERIPHERY_VALID', periphery_flags)
@@ -373,7 +366,6 @@ class featureFlagger():
     # Run curve flags
     curve_flags = []
     if 'flag_unimputed_gaps_and_non_wear_region' in self.flag_selections and self.flag_selections['flag_unimputed_gaps_and_non_wear_region']:
-      print("DEBUG: Running flag_unimputed_gaps_and_non_wear_region")
       self.flag_unimputed_gaps_and_non_wear_region(
         self.flag_selections['flag_unimputed_gaps_and_non_wear_region']['percent_cutoff'],
         self.flag_selections['flag_unimputed_gaps_and_non_wear_region']['duration_cutoff']
@@ -382,7 +374,6 @@ class featureFlagger():
 
     # Run jump curve flags
     if 'flag_unimputed_jump_curve' in self.flag_selections and self.flag_selections['flag_unimputed_jump_curve']:
-      print("DEBUG: Running flag_unimputed_jump_curve")
       self.flag_unimputed_jump_curve(
         self.flag_selections['flag_unimputed_jump_curve']['percent_cutoff'],
         self.flag_selections['flag_unimputed_jump_curve']['duration_cutoff']
@@ -391,7 +382,6 @@ class featureFlagger():
 
     # Run plummet curve flags
     if 'flag_unimputed_plummet_curve' in self.flag_selections and self.flag_selections['flag_unimputed_plummet_curve']:
-      print("DEBUG: Running flag_unimputed_plummet_curve")
       self.flag_unimputed_plummet_curve(
         self.flag_selections['flag_unimputed_plummet_curve']['percent_cutoff'],
         self.flag_selections['flag_unimputed_plummet_curve']['duration_cutoff']
@@ -400,7 +390,6 @@ class featureFlagger():
 
     # Run extreme negative curve flags
     if 'flag_unimputed_extreme_negative_curve' in self.flag_selections and self.flag_selections['flag_unimputed_extreme_negative_curve']:
-      print("DEBUG: Running flag_unimputed_extreme_negative_curve")
       self.flag_unimputed_extreme_negative_curve(
         self.flag_selections['flag_unimputed_extreme_negative_curve']['percent_cutoff'],
         self.flag_selections['flag_unimputed_extreme_negative_curve']['duration_cutoff']
@@ -408,31 +397,25 @@ class featureFlagger():
       curve_flags.append('FLAG_unimputed_extreme_negative_curve')
 
     # Run low quality curve flag
-    if 'flag_imputed_low_quality_curve' in self.flag_selections and self.flag_selections['flag_imputed_low_quality_curve']:
-      print("DEBUG: Running flag_imputed_low_quality_curve")
-      self.flag_imputed_low_quality_curve(
-        self.flag_selections['flag_imputed_low_quality_curve']['percent_cutoff'],
-        self.flag_selections['flag_imputed_low_quality_curve']['duration_cutoff']
+    if 'flag_low_quality_curve' in self.flag_selections and self.flag_selections['flag_low_quality_curve']:
+      self.flag_low_quality_curve(
+        self.flag_selections['flag_low_quality_curve']['percent_cutoff'],
+        self.flag_selections['flag_low_quality_curve']['duration_cutoff']
       )
-      curve_flags.append('FLAG_imputed_low_quality_curve')
+      curve_flags.append('FLAG_low_quality_curve')
 
     # Run incomplete curve flags
     if 'flag_incomplete_curve_start_curve' in self.flag_selections and self.flag_selections['flag_incomplete_curve_start_curve']:
-      print("DEBUG: Running flag_incomplete_curve_start_curve")
       self.flag_incomplete_curve_start_curve(
         self.flag_selections['flag_incomplete_curve_start_curve']['percent_cutoff']
       )
       curve_flags.append('FLAG_incomplete_curve_start_curve')
     if 'flag_incomplete_curve_end_curve' in self.flag_selections and self.flag_selections['flag_incomplete_curve_end_curve']:
-      print("DEBUG: Running flag_incomplete_curve_end_curve")
       self.flag_incomplete_curve_end_curve(
         self.flag_selections['flag_incomplete_curve_end_curve']['percent_cutoff']
       )
       curve_flags.append('FLAG_incomplete_curve_end_curve')
 
-    print("DEBUG: Curve flags to validate:", curve_flags)
-    print("DEBUG: DataFrame columns after running flags:", self.ftrs.columns.tolist())
-    
     # Validate all flags that were actually run
     if curve_flags:
       self.validate_feature('CURVE_VALID', curve_flags)

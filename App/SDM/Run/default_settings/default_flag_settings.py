@@ -22,7 +22,7 @@ DEFAULT_FLAG_SELECTIONS = {
         'percent_cutoff': 0.10,
         'duration_cutoff': 1.0
     },
-    'flag_imputed_low_quality_curve': {
+    'flag_low_quality_curve': {
       'percent_cutoff': 0.40,
       'duration_cutoff': 3.0
     },
