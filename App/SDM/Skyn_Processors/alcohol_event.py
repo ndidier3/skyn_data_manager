@@ -346,8 +346,8 @@ class alcoholEvent:
       'relative_peak_CURVE': None, 
       'rise_rate_CURVE': None,
       'fall_rate_CURVE': None, 
-      'fall_complete_perc_CURVE': None,
-      'rise_complete_perc_CURVE': None,
+      'fall_complete_percent_CURVE': None,
+      'rise_complete_percent_CURVE': None,
       'rise_auc_CURVE': get_auc(self.curve_rise_dataset, 'TAC') if self.alcohol_event_found else None,
       'fall_auc_CURVE': get_auc(self.curve_fall_dataset, 'TAC') if self.alcohol_event_found else None
     }
@@ -499,8 +499,8 @@ class alcoholEvent:
         'relative_peak_CURVE' : relative_peak,
         'rise_rate_CURVE' : get_rise_rate(rise_duration, relative_rise),
         'fall_rate_CURVE' : get_fall_rate(fall_duration, relative_fall),
-        'rise_complete_perc_CURVE' : 1 if tac_features['first_tac_CURVE'] <= self.curve_threshold else (tac_features['peak_CURVE'] - tac_features['first_tac_CURVE']) / relative_peak,
-        'fall_complete_perc_CURVE' : 1 if tac_features['last_tac_CURVE'] <= self.curve_threshold else (tac_features['peak_CURVE'] - tac_features['last_tac_CURVE']) / relative_peak
+        'rise_complete_percent_CURVE' : 1 if tac_features['first_tac_CURVE'] <= self.curve_threshold else (tac_features['peak_CURVE'] - tac_features['first_tac_CURVE']) / relative_peak,
+        'fall_complete_percent_CURVE' : 1 if tac_features['last_tac_CURVE'] <= self.curve_threshold else (tac_features['peak_CURVE'] - tac_features['last_tac_CURVE']) / relative_peak
       }
       self.curve_specific_features.update(curve_specific_features)
     except Exception:

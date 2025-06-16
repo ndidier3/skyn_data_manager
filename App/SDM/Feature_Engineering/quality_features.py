@@ -442,7 +442,7 @@ def get_low_quality_imputation_ratio(df):
     return None
   return (low_quality_mask & (df['imputed'] == 1)).sum() / total_low_quality
 
-def start_to_peak_interval(df, tac_variable='TAC'):
+def get_start_to_peak_interval(df, tac_variable='TAC'):
     """
     Returns the number of TAC values between the first TAC and the first occurrence of the peak TAC value.
     Args:
@@ -456,3 +456,94 @@ def start_to_peak_interval(df, tac_variable='TAC'):
     # Since curve is reset_index(drop=True), index is positional
     start_to_peak_count = df.index[df[tac_variable] == df[tac_variable].max()].tolist()[0] if df[tac_variable].max() is not None else 0
     return start_to_peak_count
+def get_rise_low_quality_percent(df, tac_variable='TAC'):
+    """Calculate percentage of low quality data in the rise portion of a curve.
+    
+    Low quality includes: jumps, plummets, extreme negatives, non-wear periods, and gaps.
+    Only considers data from start to peak.
+    
+    Args:
+        df: DataFrame containing the data
+        tac_variable: Column name for TAC values (default: 'TAC')
+    
+    Returns:
+        float: Percentage of low quality data in rise portion (0-1)
+    """
+    peak_index = df[tac_variable].idxmax()
+    rise_portion = df.loc[:peak_index]
+    
+    if len(rise_portion) == 0:
+        return 0.0
+        
+    low_quality_mask = (
+        (rise_portion['jump']) | 
+        (rise_portion['plummet']) | 
+        (rise_portion['extreme_negative']) | 
+        (rise_portion['non_wear_buffered']==1) | 
+        (rise_portion['gap_buffered'] == 1)
+    )
+    
+    return low_quality_mask.sum() / len(rise_portion)
+
+def get_fall_low_quality_percent(df, tac_variable='TAC'):
+    """Calculate percentage of low quality data in the fall portion of a curve.
+    
+    Low quality includes: jumps, plummets, extreme negatives, non-wear periods, and gaps.
+    Only considers data from peak to end.
+    
+    Args:
+        df: DataFrame containing the data
+        tac_variable: Column name for TAC values (default: 'TAC')
+    
+    Returns:
+        float: Percentage of low quality data in fall portion (0-1)
+    """
+    peak_index = df[tac_variable].idxmax()
+    fall_portion = df.loc[peak_index:]
+    
+    if len(fall_portion) == 0:
+        return 0.0
+        
+    low_quality_mask = (
+        (fall_portion['jump']) | 
+        (fall_portion['plummet']) | 
+        (fall_portion['extreme_negative']) | 
+        (fall_portion['non_wear_buffered']==1) | 
+        (fall_portion['gap_buffered'] == 1)
+    )
+    
+    return low_quality_mask.sum() / len(fall_portion)
+
+def get_total_gaps_and_non_wear_percent(df: pd.DataFrame) -> float:
+    """Calculate the total percentage of data that is either a gap or non-wear period.
+    
+    Args:
+        df: DataFrame containing the data
+        
+    Returns:
+        float: Percentage of data that is either a gap or non-wear period (0-1)
+    """
+    if len(df) == 0:
+        return 0.0
+        
+    # Combine gap and non-wear masks
+    total_low_quality = (df['gap_buffered'] == 1) | (df['non_wear_buffered'] == 1)
+    
+    return total_low_quality.sum() / len(df)
+
+
+def get_below_threshold_percent(df: pd.DataFrame, tac_variable: str = 'TAC', threshold: float = 0) -> float:
+    """Calculate percentage of TAC values that are below a given threshold.
+    
+    Args:
+        df: DataFrame containing the data
+        tac_variable: Column name for TAC values (default: 'TAC')
+        threshold: Threshold value to compare against (default: 0)
+        
+    Returns:
+        float: Percentage of values below threshold (0-1)
+    """
+    if len(df) == 0:
+        return 0.0
+        
+    return (df[tac_variable] <= threshold).sum() / len(df)

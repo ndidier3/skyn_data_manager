@@ -1,0 +1,28 @@
+Flag Descriptions
+================
+
+Region Flags (using both percent and duration)
+-------------------------------------------
+1. Unimputed Gaps/Non-wear: >20% OR >2hrs
+
+Curve Flags (using both percent and duration)
+------------------------------------------
+1. Unimputed Low Quality: >5% OR >30min
+2. Imputed Low Quality: >30% OR >3hrs
+3. Below Threshold: >50%
+
+Periphery Flags (using only percent)
+---------------------------------
+1. Gaps/Non-wear: >40%
+2. Extreme Negative: >40%
+3. Low Quality: >50%
+4. Unimputed Low Quality: >20%
+
+Rise/Fall Flags (using only percent)
+--------------------------------
+1. Incomplete Start or Fall: <50%
+2. Low Quality Rise: >50%
+3. Incomplete End: <50%
+4. Low Quality Fall: >50%
+
+Note: All percentages are decimals (0.50 = 50%) 

@@ -61,101 +61,105 @@ def get_non_wear_indices(df):
   
   return sorted(non_wear_indices_with_buffer)
 
-def get_jump_indices(df, rolling_n=5, rise_rate_threshold=40, projected_tac_change_rate=1.2, max_jump_labeling_length = (60*6)):
-  """ rise is based on change in tac per minute """
-  jump_indices_candidates = set()
-  jump_indices = set()
-  tac_values = df["TAC"].values
-  df_indices = df.index
-  
-  slopes = []
-  for i in range(len(tac_values) - rolling_n + 1):
-    recent_values = tac_values[i:i + rolling_n]
-    #only assess if at least 3 of the values are descending
-    if np.sum(np.diff(recent_values) > 0) >= 3:
-      slope = (recent_values[-1] - recent_values[0]) / rolling_n
-      slopes.append(slope)
-
-      # Calculate max positive difference between consecutive values for jumps
-      consecutive_diffs = np.diff(recent_values)
-      tac_change = np.max(consecutive_diffs)  # Only consider positive changes for jumps
-
-      if (slope > rise_rate_threshold) or (tac_change > (rise_rate_threshold*2.25)):
-        #jump i forward         
-        #add indices in the future until TAC returns to a realistically lower TAC
-        indices_to_add = set(df_indices[i:i + rolling_n])
-        jump_indices.update(indices_to_add)
-        #projection will start at value before jump occured
-        projected_tac_upward = recent_values[0]
-        count = 0  
-        
-        for count in range(max_jump_labeling_length):
-          idx = i + rolling_n + count
-          if idx >= len(tac_values):  # Prevent out-of-bounds error
-            break
-          if idx >= len(tac_values) or (tac_values[idx] < projected_tac_upward):
-            break
-          projected_tac_upward += projected_tac_change_rate
-
-          indices_to_add.add(df_indices[idx])
-          #for jumps but not plummets
-          jump_indices_candidates.update(indices_to_add)
-          jump_indices.update(indices_to_add)
-        
-  if len(slopes):
-    print('Max SLOPE:')
-    print(max(slopes))
-  jump_indices_candidates = sorted(jump_indices_candidates, key=lambda idx: df.index.get_loc(idx))
-  jump_indices = sorted(jump_indices, key=lambda idx: df.index.get_loc(idx))
-
-  return  jump_indices_candidates, jump_indices
-
-#review return to valid TAC
-def get_plummet_indices(df, jump_indices_candidates = (), rolling_n = 5, fall_rate_threshold = -40, projected_tac_change_rate = 3, max_plummet_labeling_length = (60*6)):
-  plummet_indices_candidates = set()
-  plummet_indices = set()
-  tac_values = df["TAC"].values
-  df_indices = df.index
-  
-  slopes = []
-  for i in range(len(tac_values) - rolling_n + 1):
-    recent_values = tac_values[i:i + rolling_n]
-    recent_indices = df_indices[i:i + rolling_n]
-    #only assess if at least 3 values are descending AND no values are associated with a TAC jump [such values should be taken care of by jump cleaning]
-    if np.sum(np.diff(recent_values) < 0) >= 3 and not any([idx in jump_indices_candidates for idx in recent_indices]):
-      slope = (recent_values[-1] - recent_values[0]) / rolling_n
-      slopes.append(slope)
-      
-      # Calculate max negative difference between consecutive values for plummets
-      consecutive_diffs = np.diff(recent_values)
-      tac_change = np.min(consecutive_diffs)  # Only consider negative changes for plummets
-
-      if (slope < fall_rate_threshold) or (tac_change < (fall_rate_threshold*2.25)):
-        print(f'PLUMMET: {slope} per minute / {tac_change}')
-        
-        projected_tac = recent_values[0]
-        count = 0  
-
-        #add slope indices and indices in the future until TAC returns to a realistically lower TAC
-        indices_to_add = set(df_indices[i:i + rolling_n])
-        plummet_indices.update(indices_to_add) #capture the plumetting slope even if slope wont be candidate for imputation
-        for count in range(max_plummet_labeling_length):  # Limit flagging up to 90 indices
-          idx = i + rolling_n + count
-          if idx >= len(tac_values) or tac_values[idx] >= projected_tac:
-            plummet_indices_candidates.update(indices_to_add)
-            plummet_indices.update(indices_to_add)
-            break
-          #projected_tac always trends downward, because if tac plummeted, we arent expecting any values above
-          projected_tac -= projected_tac_change_rate
-          indices_to_add.add(df_indices[idx])
-  
-  if len(slopes):
-    print('MIN SLOPE:')
-    print(min(slopes)) 
+def get_signal_anomaly_indices(df, max_labeling_length=(60*6)):
+    """
+    Detect both jumps (sudden increases) and plummets (sudden decreases) in TAC values
+    based on consecutive value differences and max TAC within an hour.
     
-  plummet_indices_candidates = sorted(plummet_indices_candidates, key=lambda idx: df.index.get_loc(idx))   
-  plummet_indices = sorted(plummet_indices, key=lambda idx: df.index.get_loc(idx))
-  return plummet_indices_candidates, plummet_indices
+    Args:
+        df: DataFrame containing TAC values
+        max_labeling_length: Maximum number of indices to label after the anomaly
+    
+    Returns:
+        Tuple of (jump_indices_candidates, jump_indices, plummet_indices_candidates, plummet_indices)
+    """
+    jump_indices_candidates = set()
+    jump_indices = set()
+    plummet_indices_candidates = set()
+    plummet_indices = set()
+    
+    # Compute max TAC within an hour window using pandas rolling
+    max_tac_in_hour = df['TAC'].rolling(window=60*2+1, center=True, min_periods=1).max()
+    
+    tac_values = df["TAC"].values
+    df_indices = df.index
+    
+    i = 0
+    while i < len(tac_values) - 1:
+        current_value = tac_values[i]
+        next_value = tac_values[i + 1]
+        
+        # Skip if either value is NaN
+        if np.isnan(current_value) or np.isnan(next_value):
+            i += 1
+            continue
+            
+        value_diff = next_value - current_value
+        current_max_tac = max_tac_in_hour.iloc[i]
+        
+        # Calculate actual max labeling length that won't exceed DataFrame boundaries
+        actual_max_labeling_length = min(max_labeling_length, len(tac_values) - (i + 2))
+        
+        # Check for jump (sudden increase)
+        if value_diff > 100 or (current_max_tac >= 40 and value_diff > 0.9 * current_max_tac):
+            # Add the current and next indices
+            indices_to_add = {df_indices[i], df_indices[i + 1]}
+            jump_indices.update(indices_to_add)
+            
+            # Project forward
+            projected_tac = current_value
+            last_processed_idx = i  # Track the last index we process
+            for count in range(actual_max_labeling_length):
+                idx = i + 2 + count  # Start from the value after next
+                if idx >= len(tac_values):
+                    break
+                    
+                if tac_values[idx] < projected_tac:
+                    jump_indices_candidates.update(indices_to_add)
+                    jump_indices.update(indices_to_add)
+                    break
+                    
+                projected_tac += 1.0  # Slightly increase acceptable TAC values
+                indices_to_add.add(df_indices[idx])
+                last_processed_idx = idx
+            
+            i = last_processed_idx  # Skip to the last processed index
+                
+        # Check for plummet (sudden decrease) - only if neither value is part of a jump
+        elif (value_diff < -100 or (current_max_tac >= 40 and value_diff < -0.9 * current_max_tac)) and \
+             df_indices[i] not in jump_indices and df_indices[i + 1] not in jump_indices:
+            # Add the current and next indices
+            indices_to_add = {df_indices[i], df_indices[i + 1]}
+            plummet_indices.update(indices_to_add)
+            
+            # Project forward
+            projected_tac = current_value
+            last_processed_idx = i + 1  # Track the last index we process
+            for count in range(actual_max_labeling_length):
+                idx = i + 2 + count  # Start from the value after next
+                if idx >= len(tac_values):
+                    break
+                    
+                if tac_values[idx] >= projected_tac:
+                    plummet_indices_candidates.update(indices_to_add)
+                    plummet_indices.update(indices_to_add)
+                    break
+                    
+                projected_tac -= 1.0  # Slightly decrease acceptable TAC values
+                indices_to_add.add(df_indices[idx])
+                last_processed_idx = idx
+            
+            i = last_processed_idx  # Skip to the last processed index
+        else:
+            i += 1  # Move to next value if no jump/plummet detected
+    
+    # Sort all index sets
+    jump_indices_candidates = sorted(jump_indices_candidates, key=lambda idx: df.index.get_loc(idx))
+    jump_indices = sorted(jump_indices, key=lambda idx: df.index.get_loc(idx))
+    plummet_indices_candidates = sorted(plummet_indices_candidates, key=lambda idx: df.index.get_loc(idx))
+    plummet_indices = sorted(plummet_indices, key=lambda idx: df.index.get_loc(idx))
+    
+    return jump_indices_candidates, jump_indices, plummet_indices_candidates, plummet_indices
 
 def get_extreme_negative_indices(df, negative_threshold = -10):
   """
@@ -217,9 +221,9 @@ def label_imputation_reason(df, low_quality_region_start, low_quality_region_end
     imputation_dict = {
       'gap_imputed': [],
       'non_wear_imputed': [],
-      'extreme_negative_imputed': [],
       'jump_imputed': [],
       'plummet_imputed': [],
+      'extreme_negative_imputed': [],
       'between_low_quality_imputed': []
     }
 
@@ -228,12 +232,12 @@ def label_imputation_reason(df, low_quality_region_start, low_quality_region_end
         imputation_dict['gap_imputed'].append(idx)
       elif idx in non_wear_indices:
         imputation_dict['non_wear_imputed'].append(idx)
-      elif idx in extreme_negative_indices_candidates:
-        imputation_dict['extreme_negative_imputed'].append(idx)
       elif idx in jump_indices_candidates:
         imputation_dict['jump_imputed'].append(idx)
       elif idx in plummet_indices_candidates:
         imputation_dict['plummet_imputed'].append(idx)
+      elif idx in extreme_negative_indices_candidates:
+        imputation_dict['extreme_negative_imputed'].append(idx)
       else:
         imputation_dict['between_low_quality_imputed'].append(idx)
 
@@ -279,21 +283,23 @@ def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wea
   non_wear_indices = get_non_wear_indices(df) if impute_non_wear else ()
   df.loc[non_wear_indices, 'non_wear_buffered'] = 1
 
+  df['jump'] = 0
+  df['jump_imputed'] = 0
+  df['plummet'] = 0
+  df['plummet_imputed'] = 0
+  
+  if impute_jumps or impute_plummets:
+    jump_indices_candidates, jump_indices, plummet_indices_candidates, plummet_indices = get_signal_anomaly_indices(df)
+    if impute_jumps:
+      df.loc[jump_indices, 'jump'] = 1
+    if impute_plummets:
+      df.loc[plummet_indices, 'plummet'] = 1
+
   # Add extreme negative values detection
   df['extreme_negative'] = 0
   df['extreme_negative_imputed'] = 0
-  extreme_negative_indices_candidates, extreme_negative_indices = get_extreme_negative_indices(df) if impute_extreme_negative else ()
+  extreme_negative_indices_candidates, extreme_negative_indices = get_extreme_negative_indices(df) if impute_extreme_negative else ((), ())
   df.loc[extreme_negative_indices, 'extreme_negative'] = 1
-
-  df['jump'] = 0
-  df['jump_imputed'] = 0
-  jump_indices_candidates, jump_indices = get_jump_indices(df) if impute_jumps else ()
-  df.loc[jump_indices, 'jump'] = 1
-
-  df['plummet'] = 0
-  df['plummet_imputed'] = 0
-  plummet_indices_candidates, plummet_indices = get_plummet_indices(df, jump_indices_candidates=jump_indices_candidates) if impute_plummets else ()
-  df.loc[plummet_indices, 'plummet'] = 1
 
   low_quality_regions, between_low_quality_indices = convert_index_sets_to_index_region_pairs(
     gap_indices, 

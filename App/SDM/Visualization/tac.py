@@ -422,7 +422,7 @@ def create_simple_histogram_of_feature(feature, save_folder, feature_name):
   #         'device_worn_duration_CURVE', 'device_worn_percent_CURVE', 'device_worn_percent_of_device_on_CURVE',
   #         'negative_duration_CURVE', 'sub_negative_10_duration_CURVE', 'duration_CURVE', 'first_tac_CURVE', 'last_tac_CURVE',
   #         'mean_tac_CURVE', 'peak_CURVE', 'auc_total_CURVE', 'rise_duration_CURVE', 'fall_duration_CURVE', 'rise_rate_CURVE', 
-  #         'fall_rate_CURVE', 'fall_complete_perc_CURVE', ''
+  #         'fall_rate_CURVE', 'fall_complete_percent_CURVE', ''
   #       ]
   #       for feature in feature_names:
   #         save_feature

@@ -83,8 +83,8 @@ class QualityVisualizer:
             'total_extreme_negative_duration_PERIPHERY',
 
             #completion features
-            'rise_complete_perc_CURVE',
-            'fall_complete_perc_CURVE'
+            'rise_complete_percent_CURVE',
+            'fall_complete_percent_CURVE'
         ]
         
         # Default TAC features
@@ -200,7 +200,7 @@ class QualityVisualizer:
             for quality_feat in self.quality_features:
                 try:
                     # Reverse completion values if needed
-                    if quality_feat in ['rise_complete_perc_CURVE', 'fall_complete_perc_CURVE']:
+                    if quality_feat in ['rise_complete_percent_CURVE', 'fall_complete_percent_CURVE']:
                         self.curve_features[quality_feat] = self.curve_features[quality_feat].apply(self._reverse_value)
                     
                     # Get appropriate bins for this feature

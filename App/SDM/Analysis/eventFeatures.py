@@ -36,7 +36,7 @@ class eventFeatures():
       'negative_duration_CURVE', 'sub_negative_10_duration_CURVE', 'sub_negative_10_duration_SEARCH'
       'duration_CURVE', 'first_tac_CURVE', 'last_tac_CURVE',
       'mean_tac_CURVE', 'peak_CURVE', 'auc_total_CURVE', 'rise_duration_CURVE', 'fall_duration_CURVE', 'rise_rate_CURVE', 
-      'fall_rate_CURVE', 'fall_complete_perc_CURVE', ''
+      'fall_rate_CURVE', 'fall_complete_percent_CURVE', ''
     ]
     self.default_tac_features = [
       'duration_CURVE', 'auc_total_CURVE', 'peak_CURVE',
@@ -218,7 +218,7 @@ class eventFeatures():
     stats = statModel(self.curve_found_features)
     # stats.filter_out('SEARCH_VALID', 0)
     self.rise_completion_counts = stats.groupby_counts_within_bins(
-      'rise_complete_perc_CURVE',
+      'rise_complete_percent_CURVE',
       start_value = 0,
       increment = 0.1,
       end_value = 1,
@@ -233,7 +233,7 @@ class eventFeatures():
     """
     stats = statModel(self.curve_found_features)
     self.fall_completion_counts = stats.groupby_counts_within_bins(
-      'fall_complete_perc_CURVE',
+      'fall_complete_percent_CURVE',
       start_value = 0,
       increment = 0.1,
       end_value = 1,
@@ -808,4 +808,4 @@ class eventFeatures():
     # first_tac_CURVE	last_tac_CURVE	mean_tac_CURVE	sd_tac_CURVE	
     # sem_tac_CURVE	peak_CURVE	auc_total_CURVE	rise_duration_CURVE	
     # fall_duration_CURVE	relative_peak_CURVE	rise_rate_CURVE	
-    # fall_rate_CURVE	fall_complete_perc_CURVE
+    # fall_rate_CURVE	fall_complete_percent_CURVE

@@ -108,17 +108,20 @@ class curveFeatures():
     stats = {
       'Number of Low-Quality Intervals': 0,
       'Average Interval Length (min)': float('nan'),
+      'Median Interval Length (min)': float('nan'),
       'Percent Intervals Imputed': float('nan')
     }
     if not imputation_df.empty:
       stats['Number of Low-Quality Intervals'] = len(imputation_df)
       stats['Average Interval Length (min)'] = imputation_df['region_length'].mean()
+      stats['Median Interval Length (min)'] = imputation_df['region_length'].median()
       stats['Percent Intervals Imputed'] = imputation_df['was_imputed'].mean() * 100
       not_imputed = imputation_df[imputation_df['was_imputed'] == False]
       reason_counts = not_imputed['reason_not_imputed'].value_counts(dropna=False).to_dict()
       for reason, count in reason_counts.items():
         stats[f'Not Imputed: {reason}'] = count
-    self.curve_stat_frames.append(pd.DataFrame(stats))
+    # Create DataFrame with index
+    self.curve_stat_frames.append(pd.DataFrame.from_dict(stats, orient='index', columns=['Value']))
 
   def compute_tac_feature_stats(self):
     valid = statModel(self.curve_valid)

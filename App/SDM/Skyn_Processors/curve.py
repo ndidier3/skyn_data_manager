@@ -45,6 +45,21 @@ class Curve:
       'device_count_REGION': len(self.device_ids),
     }
 
+    peak_index = get_peak_index(self.curve, self.TAC_column)
+    rise_duration = (self.curve.loc[peak_index, 'Duration_Hrs'] - self.curve.loc[0, 'Duration_Hrs']) + (1/60)
+    fall_duration = (self.curve.loc[len(self.curve)-1, 'Duration_Hrs'] - self.curve.loc[peak_index, 'Duration_Hrs']) + (1/60)
+    peak_tac = self.curve.loc[peak_index, self.TAC_column]
+    first_tac = self.curve.iloc[0][self.TAC_column]
+    last_tac = self.curve.iloc[-1][self.TAC_column]
+    relative_peak = peak_tac - self.curve_threshold
+    relative_rise = (peak_tac - first_tac)
+    relative_fall = (peak_tac - last_tac)
+    mean_tac, sd_tac, sem_tac = get_mean_stdev_sem(self.curve, self.TAC_column)
+
+    # Calculate rise and fall portions
+    rise_portion = self.curve.loc[:peak_index]
+    fall_portion = self.curve.loc[peak_index:]
+
     self.curve_quality_features = {
       'started_curve_count_CURVE': count_started_curves(self.curve, self.TAC_column, threshold=self.curve_threshold, min_length=10),
       'complete_curve_count_CURVE': count_complete_curves(self.curve, self.TAC_column, threshold=self.curve_threshold, min_length=10),      
@@ -100,7 +115,13 @@ class Curve:
       'sub_negative_10_sum_CURVE': self.curve.loc[self.curve['extreme_negative'] == 1, self.TAC_column].sum(),
       'extreme_negative_imputation_ratio_CURVE': get_extreme_negative_imputation_ratio(self.curve),
       'low_quality_imputation_ratio_CURVE': get_low_quality_imputation_ratio(self.curve),
-      'start_to_peak_interval_CURVE': start_to_peak_interval(self.curve, self.TAC_column),
+      'get_start_to_peak_interval_CURVE': get_start_to_peak_interval(self.curve, self.TAC_column),
+      'total_gaps_and_non_wear_percent_CURVE': get_total_gaps_and_non_wear_percent(self.curve),
+      'below_threshold_percent_CURVE' : get_below_threshold_percent(self.curve, self.TAC_column, self.curve_threshold),
+      'rise_complete_percent_CURVE' : 1 if first_tac <= self.curve_threshold else (peak_tac - first_tac) / relative_peak,
+      'rise_low_quality_percent_CURVE': get_rise_low_quality_percent(rise_portion, self.TAC_column),
+      'fall_complete_percent_CURVE' : 1 if last_tac <= self.curve_threshold else (peak_tac - last_tac) / relative_peak,
+      'fall_low_quality_percent_CURVE': get_fall_low_quality_percent(fall_portion, self.TAC_column),
     }
 
     self.periphery_quality_features = {
@@ -154,6 +175,7 @@ class Curve:
       'sub_negative_10_sum_PERIPHERY': self.periphery.loc[self.periphery['extreme_negative'] == 1, self.TAC_column].sum(),
       'extreme_negative_imputation_ratio_PERIPHERY': get_extreme_negative_imputation_ratio(self.periphery),
       'low_quality_imputation_ratio_PERIPHERY': get_low_quality_imputation_ratio(self.periphery),
+      'total_gaps_and_non_wear_percent_PERIPHERY': get_total_gaps_and_non_wear_percent(self.periphery),
     }
 
     self.region_quality_features = {
@@ -211,18 +233,8 @@ class Curve:
       'sub_negative_10_sum_REGION': self.region.loc[self.region['extreme_negative'] == 1, self.TAC_column].sum(),
       'extreme_negative_imputation_ratio_REGION': get_extreme_negative_imputation_ratio(self.region),
       'low_quality_imputation_ratio_REGION': get_low_quality_imputation_ratio(self.region),
+      'total_gaps_and_non_wear_percent_REGION': get_total_gaps_and_non_wear_percent(self.region),
     }
-
-    peak_index = get_peak_index(self.curve, self.TAC_column)
-    rise_duration = (self.curve.loc[peak_index, 'Duration_Hrs'] - self.curve.loc[0, 'Duration_Hrs']) + (1/60)
-    fall_duration = (self.curve.loc[len(self.curve)-1, 'Duration_Hrs'] - self.curve.loc[peak_index, 'Duration_Hrs']) + (1/60)
-    peak_tac = self.curve.loc[peak_index, self.TAC_column]
-    first_tac = self.curve.iloc[0][self.TAC_column]
-    last_tac = self.curve.iloc[-1][self.TAC_column]
-    relative_peak = peak_tac - self.curve_threshold
-    relative_rise = (peak_tac - first_tac)
-    relative_fall = (peak_tac - last_tac)
-    mean_tac, sd_tac, sem_tac = get_mean_stdev_sem(self.curve, self.TAC_column)
 
     self.curve_tac_features = {
       'begin_CURVE': self.curve['datetime'].iloc[0],
@@ -241,8 +253,6 @@ class Curve:
       'relative_peak_CURVE' : relative_peak,
       'rise_rate_CURVE' : get_rise_rate(rise_duration, relative_rise),
       'fall_rate_CURVE' : get_fall_rate(fall_duration, relative_fall),
-      'rise_complete_perc_CURVE' : 1 if first_tac <= self.curve_threshold else (peak_tac - first_tac) / relative_peak,
-      'fall_complete_perc_CURVE' : 1 if last_tac <= self.curve_threshold else (peak_tac - last_tac) / relative_peak,
       'smoothed_curve_plot': None,
       'signal_processing_plot': None,
       'device_removal_plot': None,
