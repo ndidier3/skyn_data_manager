@@ -5,10 +5,7 @@ These settings are used by ACE, ARC, and LINC analysis scripts.
 
 DEFAULT_SMOOTH_AND_IMPUTE_ATTRS = {
     'median_smooth': False,
-    'impute_gaps': True,
-    'impute_non_wear': True,
-    'impute_jumps': True,
-    'impute_plummets': True,
+    'impute_low_quality': True,
     'savgol_smooth': False,
     'export_excel': False
 } 

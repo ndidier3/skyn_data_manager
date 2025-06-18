@@ -1,9 +1,4 @@
-from App.SDM.Feature_Engineering.quality_features import (
-    get_low_quality_duration,
-    get_low_quality_percent,
-    get_unimputed_low_quality_duration,
-    get_unimputed_low_quality_percent
-)
+from App.SDM.Feature_Engineering.quality_features import *
 
 class skynDay:
   def __init__(self, dataset, start_index, end_index, non_wear_self_report_column = '', compare_non_wear_methods = False):
@@ -44,6 +39,44 @@ class skynDay:
     self.low_quality_percent = get_low_quality_percent(self.day_dataset)
     self.unimputed_low_quality_duration = get_unimputed_low_quality_duration(self.day_dataset)
     self.unimputed_low_quality_percent = get_unimputed_low_quality_percent(self.day_dataset)
+    self.imputed_low_quality_duration = get_imputed_low_quality_duration(self.day_dataset)
+    self.imputed_low_quality_percent = get_imputed_low_quality_percent(self.day_dataset)
+    
+    # Gap metrics
+    self.gap_duration = (self.day_dataset['gap'] == 1).sum() / 60
+    self.gap_percent = (self.day_dataset['gap'] == 1).sum() / len(self.day_dataset)
+    self.imputed_gap_duration = get_imputed_gap_duration(self.day_dataset)
+    self.imputed_gap_percent = get_imputed_gap_percent(self.day_dataset)
+    self.unimputed_gap_duration = get_unimputed_gap_duration(self.day_dataset)
+    self.unimputed_gap_percent = get_unimputed_gap_percent(self.day_dataset)
+    self.gap_imputation_ratio = get_gap_imputation_ratio(self.day_dataset)
+    
+    # Non-wear metrics
+    self.non_wear_duration = (self.day_dataset['non_wear'] == 1).sum() / 60
+    self.non_wear_percent = (self.day_dataset['non_wear'] == 1).sum() / len(self.day_dataset)
+    self.imputed_non_wear_duration = get_imputed_non_wear_duration(self.day_dataset)
+    self.imputed_non_wear_percent = get_imputed_non_wear_percent(self.day_dataset)
+    self.unimputed_non_wear_duration = get_unimputed_non_wear_duration(self.day_dataset)
+    self.unimputed_non_wear_percent = get_unimputed_non_wear_percent(self.day_dataset)
+    self.non_wear_imputation_ratio = get_non_wear_imputation_ratio(self.day_dataset)
+    
+    # Jump metrics
+    self.jump_duration = (self.day_dataset['jump'] == 1).sum() / 60
+    self.jump_percent = (self.day_dataset['jump'] == 1).sum() / len(self.day_dataset)
+    self.imputed_jump_duration = get_imputed_jump_duration(self.day_dataset)
+    self.imputed_jump_percent = get_imputed_jump_percent(self.day_dataset)
+    self.unimputed_jump_duration = get_unimputed_jump_duration(self.day_dataset)
+    self.unimputed_jump_percent = get_unimputed_jump_percent(self.day_dataset)
+    self.jump_imputation_ratio = get_jump_imputation_ratio(self.day_dataset)
+    
+    # Plummet metrics
+    self.plummet_duration = (self.day_dataset['plummet'] == 1).sum() / 60
+    self.plummet_percent = (self.day_dataset['plummet'] == 1).sum() / len(self.day_dataset)
+    self.imputed_plummet_duration = get_imputed_plummet_duration(self.day_dataset)
+    self.imputed_plummet_percent = get_imputed_plummet_percent(self.day_dataset)
+    self.unimputed_plummet_duration = get_unimputed_plummet_duration(self.day_dataset)
+    self.unimputed_plummet_percent = get_unimputed_plummet_percent(self.day_dataset)
+    self.plummet_imputation_ratio = get_plummet_imputation_ratio(self.day_dataset)
     
     # Negative value metrics
     self.negative_duration = (self.day_dataset['TAC'] <= 0).sum() / 60
@@ -53,12 +86,18 @@ class skynDay:
     self.extreme_negative_duration = (self.day_dataset['extreme_negative'] == 1).sum() / 60
     self.extreme_negative_percent = (self.day_dataset['extreme_negative'] == 1).sum() / len(self.day_dataset)
     self.extreme_negative_sum = self.day_dataset.loc[self.day_dataset['extreme_negative'] == 1, 'TAC'].sum()
+    self.imputed_extreme_negative_duration = get_imputed_extreme_negative_duration(self.day_dataset)
+    self.imputed_extreme_negative_percent = get_imputed_extreme_negative_percent(self.day_dataset)
+    self.unimputed_extreme_negative_duration = get_unimputed_extreme_negative_duration(self.day_dataset)
+    self.unimputed_extreme_negative_percent = get_unimputed_extreme_negative_percent(self.day_dataset)
+    self.extreme_negative_imputation_ratio = get_extreme_negative_imputation_ratio(self.day_dataset)
     
-    # Jump and plummet metrics
-    self.jump_duration = (self.day_dataset['jump'] == 1).sum() / 60
-    self.jump_percent = (self.day_dataset['jump'] == 1).sum() / len(self.day_dataset)
-    self.plummet_duration = (self.day_dataset['plummet'] == 1).sum() / 60
-    self.plummet_percent = (self.day_dataset['plummet'] == 1).sum() / len(self.day_dataset)
+    # Additional quality metrics
+    self.low_quality_imputation_ratio = get_low_quality_imputation_ratio(self.day_dataset)
+    self.total_gaps_and_non_wear_percent = get_total_gaps_and_non_wear_percent(self.day_dataset)
+    self.below_threshold_percent = get_below_threshold_percent(self.day_dataset, 'TAC', 0)
+    self.flatline_max = count_longest_tac_flatline(self.day_dataset)
+    self.flatlined_percent = count_longest_tac_flatline(self.day_dataset) / len(self.day_dataset) if len(self.day_dataset) > 0 else 0
 
     if compare_non_wear_methods:
       self.FP_cutoff_vs_model_duration = self.day_dataset['FP_cutoff_vs_model'].sum() / 60

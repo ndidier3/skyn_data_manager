@@ -57,23 +57,16 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
                            curve_threshold, time_variable='datetime', title='Signal Processing', 
                            event_timestamps={}, subtitle_text='', show_imputations = True):
   passed = df.loc[
-    (df['device_worn_model'] == 1) & 
-    (df['gap_buffered']==0) & 
-    (df['non_wear_buffered']==0) & 
-    (df['extreme_negative']==0) &
-    (df['jump']==0) & 
-    (df['plummet']==0) &
-    (df['imputed']==0) &
-    (df['between_low_quality']==0)
+    (df['imp_cand']==0)
   ]
 
-  # Non-imputed data
-  gap = df.loc[df['gap_buffered'] == 1]
-  non_wear = df.loc[(df['non_wear_buffered'] == 1)]
-  extreme_negative = df.loc[(df['extreme_negative'] == 1)]
-  jumps = df.loc[(df['jump'] == 1) & (df['non_wear_buffered'] == 0)]
-  plummet = df.loc[(df['plummet'] == 1) & (df['jump'] == 0) & (df['non_wear_buffered'] == 0)]
-  between_low_quality = df.loc[df['between_low_quality'] == 1]
+  # For showing non-imputed data
+  gap = df.loc[df['gap'] == 1]
+  non_wear = df.loc[(df['non_wear'] == 1)]
+  jumps = df.loc[(df['jump_imp_cand'] == 1)]
+  plummet = df.loc[(df['plummet_imp_cand'] == 1)]
+  extreme_negative = df.loc[(df['extreme_negative_imp_cand'] == 1)]
+  between_low_quality = df.loc[(df['between_low_quality_imp_cand'] == 1)]
 
   # Create a figure and axis
   fig, ax = plt.subplots(figsize=(16, 7))

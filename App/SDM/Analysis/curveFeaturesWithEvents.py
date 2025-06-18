@@ -4,14 +4,15 @@ from App.SDM.Skyn_Processors.ema_region import emaRegion
 from App.SDM.Configuration.file_management import load, save_to_computer
 from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 from App.SDM.Documenting.report_guide import report_guide
+from App.SDM.Visualization.quality import QualityVisualizer
 
 import pandas as pd
 import os
 import numpy as np
 
 class curveFeaturesWithEvents(curveFeatures):
-  def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, subid=None):
-    super().__init__(processed_data_folder, smooth_and_impute_attrs, curve_attrs, subid)
+  def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, subids=None):
+    super().__init__(processed_data_folder, smooth_and_impute_attrs, curve_attrs, subids)
     self.processors = [processor for processor in self.processors if hasattr(processor, 'event_labels')]
     self.event_data = pd.concat([processor.events for processor in self.processors if isinstance(processor.events, pd.DataFrame)], ignore_index=True)
     self.event_stat_frames = []
@@ -695,6 +696,21 @@ class curveFeaturesWithEvents(curveFeatures):
       )
       if run_settings_df is not None:
           run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
+
+  def run_quality_plots_for_matched_curves(self, output_dir=None, use_three_imputation_ratio_groups=False):
+    """
+    Generate TAC feature quality plots for matched curves using QualityVisualizer.
+    Args:
+        output_dir (str): Directory to save plots.
+        use_three_imputation_ratio_groups (bool): Whether to use three imputation ratio groups.
+    """
+    print(f"Generating quality plots for matched curves. Output dir: {output_dir}")
+    visualizer = QualityVisualizer(use_three_imputation_ratio_groups=use_three_imputation_ratio_groups)
+    raw_curve_features = getattr(self, 'raw_curve_features', None)
+    visualizer.create_tac_boxplots(self.curve_with_event, output_dir=output_dir)
+    visualizer.create_tac_density_plots(self.curve_with_event, output_dir=output_dir)
+    # Optionally, you can add more plot types here, e.g.:
+    # visualizer.create_quality_mean_plots(self.curve_with_event, raw_curve_features=raw_curve_features, output_dir=output_dir)
 
   """
   def clean_out_distant_events(self, distance_threshold=8):

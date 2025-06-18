@@ -109,8 +109,10 @@ class skynDataset:
         self.dataset = fill_device_off_gaps(self.dataset)
       self.dataset['Duration_Hrs'] = (self.dataset['datetime'] - self.dataset['datetime'].iloc[0]).dt.total_seconds() / 3600
       # assert (self.dataset['datetime'].diff().dt.total_seconds() == 60).all(), "Rows are not spaced by one minute"
+      print('generating row features')
       self.dataset = generate_row_features(self)
       
+      print('labeling non-wear')
       self.dataset = label_device_non_wear_using_cutoff(self.dataset)
       self.dataset = label_device_non_wear_using_model(self.dataset)
       # self.dataset = compare_non_wear_methods(self.dataset, 'device_worn_temp_cutoff', 'device_worn_model', comparison_name = 'cutoff_vs_model')
@@ -127,7 +129,7 @@ class skynDataset:
       self.log_error()
       self.save_as_sdp(valid=False)  
   
-  def smooth_and_impute(self, median_smooth = True, impute_gaps = True, impute_non_wear = True, impute_jumps = False, impute_plummets = False, savgol_smooth = False, export_excel = False):
+  def smooth_and_impute(self, median_smooth = True, impute_low_quality = True, savgol_smooth = False, export_excel = False):
     print(f'Processing Skyn Dataset: {self.subid} - {self.dataset_identifier}')  
     try:
       raw_dataset = configure_raw_data(self)
@@ -143,8 +145,8 @@ class skynDataset:
         self.dataset.loc[self.dataset['device_turned_on'] == 0, 'TAC'] = np.nan
 
       self.dataset['TAC_pre_imputation'] = self.dataset['TAC'].copy()  # Save original TAC values
-      if any([impute_gaps, impute_non_wear, impute_jumps, impute_plummets]):
-        self.dataset, self.imputation_info = impute_low_quality_data(self.dataset, impute_gaps=impute_gaps, impute_non_wear=impute_non_wear, impute_jumps=impute_jumps, impute_plummets=impute_plummets)
+      if impute_low_quality:
+        self.dataset, self.imputation_info = impute_low_quality_data(self.dataset)
       
       self.dataset['TAC_pre_savgol'] = self.dataset['TAC'].copy()
       if savgol_smooth:

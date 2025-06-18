@@ -10,7 +10,6 @@ class featureFlagger:
     self.ftrs: pd.DataFrame = features
     self.flag_selections: Dict = {
       # Curve flags (using both percent and duration)
-      'flag_unimputed_gaps_and_non_wear_region': {},
       'flag_unimputed_low_quality_curve': {},
       'flag_imputed_low_quality_curve': {},
       
@@ -144,25 +143,7 @@ class featureFlagger:
     )
 
   # Non-wear and gap flag methods
-  def flag_unimputed_gaps_and_non_wear_region(self, percent_cutoff: float, duration_cutoff: float) -> None:
-    """
-    Flag a curve if either the total unimputed percent or duration cutoff is exceeded.
-    This is an OR rule - if either condition is met, the flag is set.
-    Combines both gap and non-wear percentages and durations.
-    """
-    # Calculate total percentages and durations
-    total_percent = self.ftrs['unimputed_gap_percent_CURVE'] + self.ftrs['unimputed_non_wear_percent_CURVE']
-    total_duration = self.ftrs['unimputed_gap_duration_CURVE'] + self.ftrs['unimputed_non_wear_duration_CURVE']
-    
-    # Store the totals in temporary columns
-    self.ftrs['total_unimputed_gaps_and_non_wear_percent_CURVE'] = total_percent
-    self.ftrs['total_unimputed_gaps_and_non_wear_duration_CURVE'] = total_duration
-    
-    self.flag_data_above_one_of_two_cutoffs(
-      'total_unimputed_gaps_and_non_wear_percent_CURVE', percent_cutoff,
-      'total_unimputed_gaps_and_non_wear_duration_CURVE', duration_cutoff,
-      'FLAG_unimputed_gaps_and_non_wear_region'
-    )
+  # Remove the flag_unimputed_gaps_and_non_wear_region method entirely
 
   # Low quality flag methods
   def flag_unimputed_low_quality_curve(self, percent_cutoff: float, duration_cutoff: float) -> None:
@@ -300,14 +281,7 @@ class featureFlagger:
 
     # Run curve flags
     curve_flags = []
-    if 'flag_unimputed_gaps_and_non_wear_region' in self.flag_selections and self.flag_selections['flag_unimputed_gaps_and_non_wear_region']:
-      self.flag_unimputed_gaps_and_non_wear_region(
-        self.flag_selections['flag_unimputed_gaps_and_non_wear_region']['percent_cutoff'],
-        self.flag_selections['flag_unimputed_gaps_and_non_wear_region']['duration_cutoff']
-      )
-      curve_flags.append('FLAG_unimputed_gaps_and_non_wear_region')
-
-    # Run low quality flags
+    # Remove the block that checks and runs flag_unimputed_gaps_and_non_wear_region
     if 'flag_unimputed_low_quality_curve' in self.flag_selections and self.flag_selections['flag_unimputed_low_quality_curve']:
       self.flag_unimputed_low_quality_curve(
         self.flag_selections['flag_unimputed_low_quality_curve']['percent_cutoff'],

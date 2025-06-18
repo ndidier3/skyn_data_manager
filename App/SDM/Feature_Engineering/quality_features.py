@@ -65,7 +65,7 @@ def get_low_quality_duration(df):
   Returns:
       float: Duration of low quality data in hours
   """
-  return ((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear_buffered']==1) | (df['gap_buffered'] == 1)).sum() / 60
+  return ((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear']==1) | (df['gap'] == 1)).sum() / 60
 
 def get_low_quality_percent(df):
   """Calculate percentage of low quality data.
@@ -78,7 +78,7 @@ def get_low_quality_percent(df):
   Returns:
       float: Percentage of low quality data (0-1)
   """
-  return ((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear_buffered']==1) | (df['gap_buffered'] == 1)).sum() / len(df)
+  return ((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear']==1) | (df['gap'] == 1)).sum() / len(df)
 
 def get_unimputed_low_quality_duration(df):
   """Calculate total duration of unimputed low quality data in hours.
@@ -92,7 +92,7 @@ def get_unimputed_low_quality_duration(df):
   Returns:
       float: Duration of unimputed low quality data in hours
   """
-  return (((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear_buffered']==1) | (df['gap_buffered'] == 1)) & (~df['imputed'])).sum() / 60
+  return (((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear']==1) | (df['gap'] == 1)) & (~df['imputed'])).sum() / 60
 
 def get_unimputed_low_quality_percent(df):
   """Calculate percentage of unimputed low quality data.
@@ -106,7 +106,7 @@ def get_unimputed_low_quality_percent(df):
   Returns:
       float: Percentage of unimputed low quality data (0-1)
   """
-  return (((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear_buffered']==1) | (df['gap_buffered'] == 1)) & (~df['imputed'])).sum() / len(df)
+  return (((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear']==1) | (df['gap'] == 1)) & (~df['imputed'])).sum() / len(df)
 
 def get_imputed_low_quality_duration(df):
   """Calculate total duration of imputed low quality data in hours.
@@ -120,7 +120,7 @@ def get_imputed_low_quality_duration(df):
   Returns:
       float: Duration of imputed low quality data in hours
   """
-  return (((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear_buffered']==1) | (df['gap_buffered'] == 1)) & (df['imputed'])).sum() / 60
+  return (((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear']==1) | (df['gap'] == 1)) & (df['imputed'])).sum() / 60
 
 def get_imputed_low_quality_percent(df):
   """Calculate percentage of imputed low quality data.
@@ -134,7 +134,7 @@ def get_imputed_low_quality_percent(df):
   Returns:
       float: Percentage of imputed low quality data (0-1)
   """
-  return (((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear_buffered']==1) | (df['gap_buffered'] == 1)) & (df['imputed'])).sum() / len(df)
+  return (((df['jump']) | (df['plummet']) | (df['extreme_negative']) | (df['non_wear']==1) | (df['gap'] == 1)) & (df['imputed'])).sum() / len(df)
 
 def get_imputed_jump_duration(df):
   """Calculate duration of imputed jump data in hours.
@@ -277,7 +277,7 @@ def get_imputed_gap_duration(df):
   Returns:
       float: Duration of imputed gap data in hours
   """
-  return ((df['gap_buffered'] == 1) & (df['imputed'] == 1)).sum() / 60
+  return ((df['gap'] == 1) & (df['imputed'] == 1)).sum() / 60
 
 def get_imputed_gap_percent(df):
   """Calculate percentage of imputed gap data.
@@ -288,7 +288,7 @@ def get_imputed_gap_percent(df):
   Returns:
       float: Percentage of imputed gap data (0-1)
   """
-  return ((df['gap_buffered'] == 1) & (df['imputed'] == 1)).sum() / len(df)
+  return ((df['gap'] == 1) & (df['imputed'] == 1)).sum() / len(df)
 
 def get_unimputed_gap_duration(df):
   """Calculate duration of unimputed gap data in hours.
@@ -299,7 +299,7 @@ def get_unimputed_gap_duration(df):
   Returns:
       float: Duration of unimputed gap data in hours
   """
-  return ((df['gap_buffered'] == 1) & (df['imputed'] == 0)).sum() / 60
+  return ((df['gap'] == 1) & (df['imputed'] == 0)).sum() / 60
 
 def get_unimputed_gap_percent(df):
   """Calculate percentage of unimputed gap data.
@@ -310,7 +310,7 @@ def get_unimputed_gap_percent(df):
   Returns:
       float: Percentage of unimputed gap data (0-1)
   """
-  return ((df['gap_buffered'] == 1) & (df['imputed'] == 0)).sum() / len(df)
+  return ((df['gap'] == 1) & (df['imputed'] == 0)).sum() / len(df)
 
 def get_imputed_non_wear_duration(df):
   """Calculate duration of imputed non-wear data in hours.
@@ -321,7 +321,7 @@ def get_imputed_non_wear_duration(df):
   Returns:
       float: Duration of imputed non-wear data in hours
   """
-  return ((df['non_wear_buffered'] == 1) & (df['imputed'] == 1)).sum() / 60
+  return ((df['non_wear'] == 1) & (df['imputed'] == 1)).sum() / 60
 
 def get_imputed_non_wear_percent(df):
   """Calculate percentage of imputed non-wear data.
@@ -332,7 +332,7 @@ def get_imputed_non_wear_percent(df):
   Returns:
       float: Percentage of imputed non-wear data (0-1)
   """
-  return ((df['non_wear_buffered'] == 1) & (df['imputed'] == 1)).sum() / len(df)
+  return ((df['non_wear'] == 1) & (df['imputed'] == 1)).sum() / len(df)
 
 def get_unimputed_non_wear_duration(df):
   """Calculate duration of unimputed non-wear data in hours.
@@ -343,7 +343,7 @@ def get_unimputed_non_wear_duration(df):
   Returns:
       float: Duration of unimputed non-wear data in hours
   """
-  return ((df['non_wear_buffered'] == 1) & (df['imputed'] == 0)).sum() / 60
+  return ((df['non_wear'] == 1) & (df['imputed'] == 0)).sum() / 60
 
 def get_unimputed_non_wear_percent(df):
   """Calculate percentage of unimputed non-wear data.
@@ -354,7 +354,7 @@ def get_unimputed_non_wear_percent(df):
   Returns:
       float: Percentage of unimputed non-wear data (0-1)
   """
-  return ((df['non_wear_buffered'] == 1) & (df['imputed'] == 0)).sum() / len(df)
+  return ((df['non_wear'] == 1) & (df['imputed'] == 0)).sum() / len(df)
 
 def get_jump_imputation_ratio(df):
   """Calculate ratio of imputed jump data.
@@ -407,10 +407,10 @@ def get_gap_imputation_ratio(df):
   Returns:
       float: Ratio of imputed gap data (0-1)
   """
-  total_gaps = (df['gap_buffered'] == 1).sum()
+  total_gaps = (df['gap'] == 1).sum()
   if total_gaps == 0:
     return None
-  return ((df['gap_buffered'] == 1) & (df['imputed'] == 1)).sum() / total_gaps
+  return ((df['gap'] == 1) & (df['imputed'] == 1)).sum() / total_gaps
 
 def get_non_wear_imputation_ratio(df):
   """Calculate ratio of imputed non-wear data.
@@ -421,10 +421,10 @@ def get_non_wear_imputation_ratio(df):
   Returns:
       float: Ratio of imputed non-wear data (0-1)
   """
-  total_non_wear = (df['non_wear_buffered'] == 1).sum()
+  total_non_wear = (df['non_wear'] == 1).sum()
   if total_non_wear == 0:
     return None
-  return ((df['non_wear_buffered'] == 1) & (df['imputed'] == 1)).sum() / total_non_wear
+  return ((df['non_wear'] == 1) & (df['imputed'] == 1)).sum() / total_non_wear
 
 def get_low_quality_imputation_ratio(df):
   """Calculate ratio of imputed low quality data.
@@ -436,7 +436,7 @@ def get_low_quality_imputation_ratio(df):
       float: Ratio of imputed low quality data (0-1)
   """
   low_quality_mask = ((df['jump']) | (df['plummet']) | (df['extreme_negative']) | 
-                     (df['non_wear_buffered']==1) | (df['gap_buffered'] == 1))
+                     (df['non_wear']==1) | (df['gap'] == 1))
   total_low_quality = low_quality_mask.sum()
   if total_low_quality == 0:
     return None
@@ -479,8 +479,8 @@ def get_rise_low_quality_percent(df, tac_variable='TAC'):
         (rise_portion['jump']) | 
         (rise_portion['plummet']) | 
         (rise_portion['extreme_negative']) | 
-        (rise_portion['non_wear_buffered']==1) | 
-        (rise_portion['gap_buffered'] == 1)
+        (rise_portion['non_wear']==1) | 
+        (rise_portion['gap'] == 1)
     )
     
     return low_quality_mask.sum() / len(rise_portion)
@@ -508,8 +508,8 @@ def get_fall_low_quality_percent(df, tac_variable='TAC'):
         (fall_portion['jump']) | 
         (fall_portion['plummet']) | 
         (fall_portion['extreme_negative']) | 
-        (fall_portion['non_wear_buffered']==1) | 
-        (fall_portion['gap_buffered'] == 1)
+        (fall_portion['non_wear']==1) | 
+        (fall_portion['gap'] == 1)
     )
     
     return low_quality_mask.sum() / len(fall_portion)
@@ -527,7 +527,7 @@ def get_total_gaps_and_non_wear_percent(df: pd.DataFrame) -> float:
         return 0.0
         
     # Combine gap and non-wear masks
-    total_low_quality = (df['gap_buffered'] == 1) | (df['non_wear_buffered'] == 1)
+    total_low_quality = (df['gap'] == 1) | (df['non_wear'] == 1)
     
     return total_low_quality.sum() / len(df)
 

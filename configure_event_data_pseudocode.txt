@@ -1,0 +1,79 @@
+Function configure_event_data:
+    Input:
+        - data: DataFrame containing event data
+        - subid_column: column name for subject ID
+        - ema_id_column: column name for EMA ID
+        - drink_total_column: column name for drink total
+        - event_timestamp_columns: list of column names containing timestamps
+        - buffer_before: hours to add before event (default=2)
+        - buffer_after: hours to add after event (default=0)
+        - max_event_duration: maximum event duration in hours (default=12)
+        - export_excel: boolean to export results (default=False)
+
+    Process:
+        1. Filter data for current subject
+            - Keep rows where subid matches (as string or integer)
+            - Add max_event_duration column (default=12 hours)
+
+        2. Initialize empty event_labels DataFrame
+            - Columns: timestamp, label
+
+        3. For each event in filtered data:
+            a. Get valid timestamps
+                - Filter timestamps that are not NA and are Timestamp objects
+            
+            b. If valid timestamps exist:
+                - Find earliest and latest timestamps
+                - Calculate matching_end_timestamp (min of latest timestamp or earliest + max_duration)
+                    * max_duration = 12 hours (default)
+                
+                c. Update events DataFrame with:
+                    - earliest_timestamp
+                    - latest_timestamp
+                    - matching_end_timestamp
+                    - drink_total
+                    - ema_id
+                
+                d. Create event labels
+                    - Generate drink suffix (e.g., "_5drks" or "_NAdrks")
+                    - Create labels for earliest and latest timestamps
+                    - Add labels to event_labels DataFrame
+                
+                e. Add event range to list:
+                    - ema_id
+                    - drink_total
+                    - earliest_timestamp
+                    - latest_timestamp
+                    - matching_end_timestamp
+
+        4. If curve_features exist:
+            a. Add buffer information to curve_features
+                - CURVE_event_match_before_buffer (default=2 hours)
+                - CURVE_event_match_after_buffer (default=0 hours)
+                - CURVE_MATCH_START (begin_CURVE - buffer_before)
+                - CURVE_MATCH_END (end_CURVE + buffer_after)
+            
+            b. Filter curves for current subject
+            
+            c. For each event range:
+                - Find overlapping curves
+                - Sort curves by start time
+                - Store number of matching curves
+                
+                d. For up to 5 matching curves:
+                    - Calculate overlap period between event and curve
+                    - Calculate overlap proportion (overlap_duration / curve_duration)
+                    - Store curve ID and overlap proportion
+                    - Set to None if no curve matches
+
+        5. If export_excel is True (default=False):
+            - Export event_labels to Excel file
+            - File path: {data_out_folder}/event_labels_{subid}_{dataset_identifier}.xlsx
+
+        6. Save dataset state
+            - Call save_as_sdp with valid=True
+
+    Error Handling:
+        - If any error occurs:
+            - Log error details
+            - Save dataset state as invalid 

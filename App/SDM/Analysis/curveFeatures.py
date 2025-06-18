@@ -10,15 +10,24 @@ import pandas as pd
 import numpy as np
 
 class curveFeatures():
-  def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, subid=None, additional_processed_data_folders=[]):
+  def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, subids=None, additional_processed_data_folders=[]):
+    """
+    Args:
+      processed_data_folder (str): Path to the folder containing processed files.
+      smooth_and_impute_attrs (dict, optional): Smoothing and imputation attributes.
+      curve_attrs (dict, optional): Curve attributes.
+      subids (list of str or int, optional): If provided, only load files for these subids.
+      additional_processed_data_folders (list, optional): Additional folders to search for processed files.
+    """
     # Get list of processed files
     processed_files = [file for file in os.listdir(processed_data_folder) if 'processed' in file]
     
-    # Filter files by subid if specified
-    if subid is not None:
-      processed_files = [file for file in processed_files if extract_subid(file) == str(subid)]
+    # Filter files by subids if specified
+    if subids is not None:
+      subids_str = set(str(s) for s in subids)
+      processed_files = [file for file in processed_files if extract_subid(file) in subids_str]
       if not processed_files:
-        raise ValueError(f"No processed files found for subid {subid}")
+        raise ValueError(f"No processed files found for subids {subids}")
     
     print(f"\nFound {len(processed_files)} processed files")
     
@@ -163,18 +172,7 @@ class curveFeatures():
     
     # Define the desired order of flags
     desired_flag_order = [
-      'FLAG_sub_negative_10_PERIPHERY_>80%_>2hrs',
-      'FLAG_sub_negative_20_PERIPHERY_>40%_>1.5hrs',
-      'FLAG_sub_negative_40_PERIPHERY_>20%_>0.5hrs',
-      'FLAG_non_wear_PERIPHERY_>40%',
-      'FLAG_flatlined_peak_CURVE_>20%flatline_peak>350',
-      # 'FLAG_sub_negative_10_CURVE_>20%_>1.0',
-      'FLAG_rise_completion_CURVE_<50%',
-      'FLAG_rise_rate_CURVE_>430',
-      'FLAG_fall_completion_CURVE_<50%',
-      'FLAG_short_curve_duration_CURVE_<0.25hrs',
-      'FLAG_imputed_CURVE_>40%_or_duration>3hrs',
-      'FLAG_unimputed_low_quality_CURVE_>20%'
+      col for col in self.curve_features.columns if 'FLAG' in col
     ]
     
     # Filter flag_cols to only include flags that exist in the data
@@ -503,7 +501,7 @@ class curveFeatures():
       if run_settings_df is not None:
         run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
 
-  def identify_perfect_curves(self):
+  def identify_perfect_curves(self, output_dir):
     """
     Identify curves that have no low quality data in either periphery or curve regions.
     Sets a 'perfect' column to 1 for curves that meet these criteria:
@@ -546,8 +544,8 @@ class curveFeatures():
     )
     self.curve_features.loc[perfect_mask, 'perfect'] = 1
 
-    self.curve_features.to_excel('Results/ARC_auto_threshold/curve_features.xlsx', index=False)
-    self.raw_curve_features.to_excel('Results/ARC_auto_threshold/raw_curve_features.xlsx', index=False)
+    self.curve_features.to_excel(f'{output_dir}/curve_features.xlsx', index=False)
+    self.raw_curve_features.to_excel(f'{output_dir}/raw_curve_features.xlsx', index=False)
     # Print summary
     total_curves = len(self.curve_features)
     perfect_curves = perfect_mask.sum()

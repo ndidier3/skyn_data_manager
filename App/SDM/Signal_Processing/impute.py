@@ -6,6 +6,7 @@ from sklearn.linear_model import LinearRegression
 import scipy.interpolate
 from sklearn.gaussian_process.kernels import DotProduct, Matern, ConstantKernel
 import math  
+import logging
 
 """
 Separate functions for retrieving indices of
@@ -19,49 +20,52 @@ then imputes if the training data has enough device worn
 
 """
 def get_gap_indices(df):
-  gap_indices = df[df['TAC'].isnull()].index.tolist()
-  gap_indices_with_buffer = set()
-  
-  i = 0
-  while i < len(gap_indices):
-    region_start = gap_indices[i]
-    region_end = region_start
-    while i + 1 < len(gap_indices) and gap_indices[i + 1] == gap_indices[i] + 1:
-      i += 1
-      region_end = gap_indices[i]
-    
-    start_idx = max(region_start - 1, gap_indices[0])
-    end_idx = min(region_end + 1, gap_indices[-1])
-    
-    gap_indices_with_buffer.update(range(start_idx, end_idx + 1))
-    i += 1
+    """
+    Returns:
+        Tuple of (set of gap indices, set of gap+buffer indices)
+    """
+    gap_indices = set(df[df['TAC'].isnull()].index.tolist())
+    gap_indices_with_buffer = set()
 
-  return sorted(gap_indices_with_buffer)
+    sorted_indices = sorted(gap_indices)
+    i = 0
+    while i < len(sorted_indices):
+        region_start = sorted_indices[i]
+        region_end = region_start
+        while i + 1 < len(sorted_indices) and sorted_indices[i + 1] == sorted_indices[i] + 1:
+            i += 1
+            region_end = sorted_indices[i]
+        start_idx = max(region_start - 1, sorted_indices[0])
+        end_idx = min(region_end + 1, sorted_indices[-1])
+        gap_indices_with_buffer.update(range(start_idx, end_idx + 1))
+        i += 1
+    return gap_indices, gap_indices_with_buffer
 
 def get_non_wear_indices(df):
-  non_wear_indices = df[df['device_worn_model'] == 0].index.tolist()
-  non_wear_indices_with_buffer = set()
+    """
+    Returns:
+        Tuple of (set of non-wear indices, set of non-wear+buffer indices)
+    """
+    non_wear_indices = set(df[df['device_worn_model'] == 0].index.tolist())
+    non_wear_indices_with_buffer = set()
 
-  i = 0
-  while i < len(non_wear_indices):
-    region_start = non_wear_indices[i]
-    region_end = region_start 
-    while i + 1 < len(non_wear_indices) and non_wear_indices[i + 1] == non_wear_indices[i] + 1:
-      i += 1
-      region_end = non_wear_indices[i]
-    
-    region_length = region_end - region_start + 1
-    buffer = min(region_length // 2, 10) if region_length >= 2 else 1
-    
-    start_idx = max(region_start - buffer, non_wear_indices[0])
-    end_idx = min(region_end + buffer, non_wear_indices[-1])
-    
-    non_wear_indices_with_buffer.update(range(start_idx, end_idx + 1))
-    i += 1
-  
-  return sorted(non_wear_indices_with_buffer)
+    sorted_indices = sorted(non_wear_indices)
+    i = 0
+    while i < len(sorted_indices):
+        region_start = sorted_indices[i]
+        region_end = region_start
+        while i + 1 < len(sorted_indices) and sorted_indices[i + 1] == sorted_indices[i] + 1:
+            i += 1
+            region_end = sorted_indices[i]
+        region_length = region_end - region_start + 1
+        buffer = min(region_length // 2, 10) if region_length >= 2 else 1
+        start_idx = max(region_start - buffer, sorted_indices[0])
+        end_idx = min(region_end + buffer, sorted_indices[-1])
+        non_wear_indices_with_buffer.update(range(start_idx, end_idx + 1))
+        i += 1
+    return non_wear_indices, non_wear_indices_with_buffer
 
-def get_signal_anomaly_indices(df, max_labeling_length=(60*6)):
+def get_artifact_indices(df, max_labeling_length=(60*6)):
     """
     Detect both jumps (sudden increases) and plummets (sudden decreases) in TAC values
     based on consecutive value differences and max TAC within an hour.
@@ -71,11 +75,10 @@ def get_signal_anomaly_indices(df, max_labeling_length=(60*6)):
         max_labeling_length: Maximum number of indices to label after the anomaly
     
     Returns:
-        Tuple of (jump_indices_candidates, jump_indices, plummet_indices_candidates, plummet_indices)
+        Tuple of (jump_indices, plummet_indices)
     """
-    jump_indices_candidates = set()
+
     jump_indices = set()
-    plummet_indices_candidates = set()
     plummet_indices = set()
     
     # Compute max TAC within an hour window using pandas rolling
@@ -85,7 +88,14 @@ def get_signal_anomaly_indices(df, max_labeling_length=(60*6)):
     df_indices = df.index
     
     i = 0
+    total_processed = 0
+    jumps_detected = 0
+    plummets_detected = 0
+    
+    
     while i < len(tac_values) - 1:
+        total_processed += 1
+        
         current_value = tac_values[i]
         next_value = tac_values[i + 1]
         
@@ -102,6 +112,8 @@ def get_signal_anomaly_indices(df, max_labeling_length=(60*6)):
         
         # Check for jump (sudden increase)
         if value_diff > 100 or (current_max_tac >= 40 and value_diff > 0.9 * current_max_tac):
+            jumps_detected += 1
+            
             # Add the current and next indices
             indices_to_add = {df_indices[i], df_indices[i + 1]}
             jump_indices.update(indices_to_add)
@@ -115,7 +127,6 @@ def get_signal_anomaly_indices(df, max_labeling_length=(60*6)):
                     break
                     
                 if tac_values[idx] < projected_tac:
-                    jump_indices_candidates.update(indices_to_add)
                     jump_indices.update(indices_to_add)
                     break
                     
@@ -123,11 +134,16 @@ def get_signal_anomaly_indices(df, max_labeling_length=(60*6)):
                 indices_to_add.add(df_indices[idx])
                 last_processed_idx = idx
             
+            # Safety check to ensure we always move forward
+            if last_processed_idx <= i:
+                last_processed_idx = i + 1
             i = last_processed_idx  # Skip to the last processed index
                 
         # Check for plummet (sudden decrease) - only if neither value is part of a jump
         elif (value_diff < -100 or (current_max_tac >= 40 and value_diff < -0.9 * current_max_tac)) and \
              df_indices[i] not in jump_indices and df_indices[i + 1] not in jump_indices:
+            plummets_detected += 1
+            
             # Add the current and next indices
             indices_to_add = {df_indices[i], df_indices[i + 1]}
             plummet_indices.update(indices_to_add)
@@ -141,7 +157,6 @@ def get_signal_anomaly_indices(df, max_labeling_length=(60*6)):
                     break
                     
                 if tac_values[idx] >= projected_tac:
-                    plummet_indices_candidates.update(indices_to_add)
                     plummet_indices.update(indices_to_add)
                     break
                     
@@ -149,17 +164,18 @@ def get_signal_anomaly_indices(df, max_labeling_length=(60*6)):
                 indices_to_add.add(df_indices[idx])
                 last_processed_idx = idx
             
+            # Safety check to ensure we always move forward
+            if last_processed_idx <= i:
+                last_processed_idx = i + 1
             i = last_processed_idx  # Skip to the last processed index
         else:
             i += 1  # Move to next value if no jump/plummet detected
     
     # Sort all index sets
-    jump_indices_candidates = sorted(jump_indices_candidates, key=lambda idx: df.index.get_loc(idx))
     jump_indices = sorted(jump_indices, key=lambda idx: df.index.get_loc(idx))
-    plummet_indices_candidates = sorted(plummet_indices_candidates, key=lambda idx: df.index.get_loc(idx))
     plummet_indices = sorted(plummet_indices, key=lambda idx: df.index.get_loc(idx))
     
-    return jump_indices_candidates, jump_indices, plummet_indices_candidates, plummet_indices
+    return jump_indices, plummet_indices
 
 def get_extreme_negative_indices(df, negative_threshold = -10):
   """
@@ -171,23 +187,18 @@ def get_extreme_negative_indices(df, negative_threshold = -10):
     negative_threshold: Threshold below which values are considered extreme negative (default: -10)
     
   Returns:
-    Tuple of (extreme_negative_indices_candidates, extreme_negative_indices)
-    - extreme_negative_indices_candidates: Indices that are candidates for imputation
-    - extreme_negative_indices: All indices with extreme negative values
+    List of indices with extreme negative values
   """
   extreme_negative_indices = set()
-  extreme_negative_indices_candidates = set()
   
   # Find all indices where TAC is below threshold
   negative_mask = df['TAC'] < negative_threshold
   extreme_negative_indices.update(df[negative_mask].index)
-  extreme_negative_indices_candidates.update(df[negative_mask].index)
   
   # Sort indices to maintain order
   extreme_negative_indices = sorted(extreme_negative_indices, key=lambda idx: df.index.get_loc(idx))
-  extreme_negative_indices_candidates = sorted(extreme_negative_indices_candidates, key=lambda idx: df.index.get_loc(idx))
   
-  return extreme_negative_indices_candidates, extreme_negative_indices
+  return extreme_negative_indices
 
 def convert_index_sets_to_index_region_pairs(*args, merge_distance = 20):
   combined_indices = sorted(set().union(*args))
@@ -217,7 +228,7 @@ def convert_index_sets_to_index_region_pairs(*args, merge_distance = 20):
 
   return merged_regions, sorted(between_low_quality_indices)  # Return both merged regions and between low quality indices
 
-def label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates, extreme_negative_indices_candidates):
+def label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices, jump_indices, plummet_indices, extreme_negative_indices_candidates):
     imputation_dict = {
       'gap_imputed': [],
       'non_wear_imputed': [],
@@ -232,9 +243,9 @@ def label_imputation_reason(df, low_quality_region_start, low_quality_region_end
         imputation_dict['gap_imputed'].append(idx)
       elif idx in non_wear_indices:
         imputation_dict['non_wear_imputed'].append(idx)
-      elif idx in jump_indices_candidates:
+      elif idx in jump_indices:
         imputation_dict['jump_imputed'].append(idx)
-      elif idx in plummet_indices_candidates:
+      elif idx in plummet_indices:
         imputation_dict['plummet_imputed'].append(idx)
       elif idx in extreme_negative_indices_candidates:
         imputation_dict['extreme_negative_imputed'].append(idx)
@@ -246,11 +257,9 @@ def label_imputation_reason(df, low_quality_region_start, low_quality_region_end
     
     return df
 
-def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wear = True, impute_jumps = True, impute_plummets = True, impute_extreme_negative = True):
+def impute_low_quality_data(df: pd.DataFrame):
   df['imputed'] = 0
-  df['between_low_quality_imputed'] = 0
-  df['between_low_quality'] = 0  # New column for between low quality indices
-
+  df['imp_cand'] = 0
   # Create DataFrame to store imputation information
   imputation_info = pd.DataFrame(columns=[
     'region_start',
@@ -271,45 +280,66 @@ def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wea
     'total_training_after'
   ])
 
-  # gap [unbuffered] is device_turned_on == 0
-  df['gap_buffered'] = 0
+  # gaps
+  df['gap'] = 0
+  df['gap_imp_cand'] = 0
   df['gap_imputed'] = 0
-  gap_indices = get_gap_indices(df) if impute_gaps else ()
-  df.loc[gap_indices, 'gap_buffered'] = 1
+  gap_indices, gap_indices_with_buffer = get_gap_indices(df)
+  #df already has 'gap' column
+  df.loc[gap_indices, 'gap'] = 1
+  df.loc[gap_indices_with_buffer, 'gap_imp_cand'] = 1
 
-  # non wear [unbuffered] is device_turned_on == 0
-  df['non_wear_buffered'] = 0
+  # non wear
+  df['non_wear'] = 0
+  df['non_wear_imp_cand'] = 0
   df['non_wear_imputed'] = 0
-  non_wear_indices = get_non_wear_indices(df) if impute_non_wear else ()
-  df.loc[non_wear_indices, 'non_wear_buffered'] = 1
+  non_wear_indices, non_wear_indices_with_buffer = get_non_wear_indices(df)
+  df.loc[non_wear_indices, 'non_wear'] = 1
+  non_wear_indices_with_buffer = [idx for idx in non_wear_indices_with_buffer if idx not in gap_indices_with_buffer]
+  df.loc[non_wear_indices_with_buffer, 'non_wear_imp_cand'] = 1
 
+  # jumps and plummets
   df['jump'] = 0
-  df['jump_imputed'] = 0
   df['plummet'] = 0
+  df['jump_imp_cand'] = 0
+  df['jump_imputed'] = 0
+  df['plummet_imp_cand'] = 0
   df['plummet_imputed'] = 0
+  jump_indices, plummet_indices = get_artifact_indices(df)
+  df.loc[jump_indices, 'jump'] = 1
+  df.loc[plummet_indices, 'plummet'] = 1
+  already_indexed = set(gap_indices_with_buffer) | set(non_wear_indices_with_buffer)
+  jump_indices_filtered = [idx for idx in jump_indices if idx not in already_indexed]
+  plummet_indices_filtered = [idx for idx in plummet_indices if idx not in already_indexed]
+  df.loc[jump_indices_filtered, 'jump_imp_cand'] = 1
+  df.loc[plummet_indices_filtered, 'plummet_imp_cand'] = 1
   
-  if impute_jumps or impute_plummets:
-    jump_indices_candidates, jump_indices, plummet_indices_candidates, plummet_indices = get_signal_anomaly_indices(df)
-    if impute_jumps:
-      df.loc[jump_indices, 'jump'] = 1
-    if impute_plummets:
-      df.loc[plummet_indices, 'plummet'] = 1
-
-  # Add extreme negative values detection
+  # extreme negative values detection
   df['extreme_negative'] = 0
+  df['extreme_negative_imp_cand'] = 0
   df['extreme_negative_imputed'] = 0
-  extreme_negative_indices_candidates, extreme_negative_indices = get_extreme_negative_indices(df) if impute_extreme_negative else ((), ())
+  extreme_negative_indices = get_extreme_negative_indices(df)
   df.loc[extreme_negative_indices, 'extreme_negative'] = 1
-
+  already_indexed = already_indexed | set(jump_indices_filtered) | set(plummet_indices_filtered)
+  extreme_negative_indices_filtered = [idx for idx in extreme_negative_indices if idx not in already_indexed]
+  df.loc[extreme_negative_indices_filtered, 'extreme_negative_imp_cand'] = 1
+  
+  #get low-quality regions as pairs of start/end indices, which includes indices between low-quality regions
   low_quality_regions, between_low_quality_indices = convert_index_sets_to_index_region_pairs(
-    gap_indices, 
-    non_wear_indices, 
-    jump_indices_candidates, 
-    plummet_indices_candidates,
-    extreme_negative_indices_candidates
-  )
-  df.loc[between_low_quality_indices, 'between_low_quality'] = 1  # Mark between low quality indices
+    gap_indices_with_buffer, 
+    non_wear_indices_with_buffer, 
+    jump_indices_filtered, 
+    plummet_indices_filtered,
+    extreme_negative_indices_filtered
+  )  
+  df['between_low_quality_imputed'] = 0
+  df['between_low_quality_imp_cand'] = 0
+  df.loc[between_low_quality_indices, 'between_low_quality_imp_cand'] = 1
 
+  all_candidate_indices = already_indexed | set(extreme_negative_indices_filtered) | set(between_low_quality_indices)
+  df.loc[all_candidate_indices, 'imp_cand'] = 1
+  
+  #impute low-quality regions
   for low_quality_region_start, low_quality_region_end in low_quality_regions:
     
     low_quality_region_length = low_quality_region_end - low_quality_region_start
@@ -374,7 +404,7 @@ def impute_low_quality_data(df: pd.DataFrame, impute_gaps = True, impute_non_wea
       predictions = predictions.flatten()  # Ensures it's always 1D
       df.iloc[x_non_wear.index, df.columns.get_loc('TAC')] = predictions
       df.iloc[x_non_wear.index, df.columns.get_loc('imputed')] = 1
-      df = label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices, jump_indices_candidates, plummet_indices_candidates, extreme_negative_indices_candidates)
+      df = label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices_with_buffer, non_wear_indices_with_buffer, jump_indices_filtered, plummet_indices_filtered, extreme_negative_indices_filtered)
       
       imputation_attempt['was_imputed'] = True
     else:

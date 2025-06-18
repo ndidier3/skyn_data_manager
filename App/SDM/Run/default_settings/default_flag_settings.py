@@ -4,11 +4,6 @@ These settings are used by ACE, ARC, and LINC analysis scripts.
 """
 
 DEFAULT_FLAG_SELECTIONS = {
-    # Region flags (using both percent and duration)
-    'flag_unimputed_gaps_and_non_wear_region': {
-        'percent_cutoff': 0.20,
-        'duration_cutoff': 2.0
-    },
     # Curve flags (using both percent and duration)
     'flag_unimputed_low_quality_curve': {
       'percent_cutoff': 0.05,
