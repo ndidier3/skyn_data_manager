@@ -164,7 +164,6 @@ class curveFeaturesWithEvents(curveFeatures):
     matched_pivot = matched_pivot.dropna(subset=['subid', 'curve_id'])
     matched_pivot['subid'] = matched_pivot['subid'].astype(int)
     matched_pivot['curve_id'] = matched_pivot['curve_id'].astype(int)
-    matched_pivot.to_excel('matched_pivot_2.xlsx')
     # Merge matched events back into curve_features
     self.curve_features = self.curve_features.merge(matched_pivot, on=['subid', 'curve_id'], how='left')
 
@@ -423,12 +422,106 @@ class curveFeaturesWithEvents(curveFeatures):
     # Store the person-level stats as an attribute
     self.valid_matched_person_stats = person_stats
 
+  def compute_tac_feature_drink_correlations(self):
+    """
+    Compute Pearson correlations between TAC features and drink total for valid vs invalid matched curves.
+    Creates a DataFrame comparing correlations across the two groups and adds it to event_stat_frames.
+    """
+    # Define the TAC features to analyze
+    tac_features = ['auc_total_CURVE', 'peak_CURVE', 'rise_rate_CURVE', 'fall_rate_CURVE']
+    
+    # Filter to only include features that exist in the data
+    available_features = [feat for feat in tac_features if feat in self.curve_features.columns]
+    
+    if not available_features:
+        print("No TAC features found in the data for correlation analysis")
+        return
+    
+    # Check if drink total column exists
+    drink_total_col = None
+    for col in self.curve_features.columns:
+        if 'drink_total' in col.lower() or 'drinks' in col.lower():
+            drink_total_col = col
+            break
+    
+    if drink_total_col is None:
+        print("No drink total column found in the data for correlation analysis")
+        return
+    
+    # Initialize results dictionary
+    correlation_results = {}
+    
+    # Compute correlations for valid curves with events
+    if not self.curve_valid_with_event.empty:
+        valid_data = self.curve_valid_with_event[available_features + [drink_total_col]].dropna()
+        if len(valid_data) > 1:  # Need at least 2 rows for correlation
+            valid_corr = valid_data[available_features].corrwith(valid_data[drink_total_col], method='pearson')
+            correlation_results['Valid Curves with Events'] = valid_corr
+        else:
+            print("Insufficient data for valid curves correlation analysis")
+            return
+    else:
+        print("No valid curves with events found for correlation analysis")
+        return
+    
+    # Compute correlations for invalid curves with events
+    if not self.curve_invalid_with_event.empty:
+        invalid_data = self.curve_invalid_with_event[available_features + [drink_total_col]].dropna()
+        if len(invalid_data) > 1:  # Need at least 2 rows for correlation
+            invalid_corr = invalid_data[available_features].corrwith(invalid_data[drink_total_col], method='pearson')
+            correlation_results['Invalid Curves with Events'] = invalid_corr
+        else:
+            print("Insufficient data for invalid curves correlation analysis")
+            return
+    else:
+        print("No invalid curves with events found for correlation analysis")
+        return
+    
+    # Create comparison DataFrame
+    comparison_data = []
+    
+    for feature in available_features:
+        valid_corr_val = correlation_results['Valid Curves with Events'][feature]
+        invalid_corr_val = correlation_results['Invalid Curves with Events'][feature]
+        
+        # Calculate difference
+        corr_diff = valid_corr_val - invalid_corr_val
+        
+        comparison_data.append({
+            'TAC Feature': feature,
+            'Valid Curves Correlation': valid_corr_val,
+            'Invalid Curves Correlation': invalid_corr_val,
+            'Correlation Difference (Valid - Invalid)': corr_diff
+        })
+    
+    # Create DataFrame and add sample sizes
+    correlation_df = pd.DataFrame(comparison_data)
+    
+    # Add sample size information
+    valid_n = len(self.curve_valid_with_event[available_features + [drink_total_col]].dropna())
+    invalid_n = len(self.curve_invalid_with_event[available_features + [drink_total_col]].dropna())
+    
+    sample_size_info = pd.DataFrame({
+        'Metric': ['Sample Size'],
+        'Valid Curves with Events': [valid_n],
+        'Invalid Curves with Events': [invalid_n]
+    })
+    
+    # Combine correlation results with sample size info
+    final_results = pd.concat([sample_size_info, correlation_df], ignore_index=True)
+    
+    print(final_results)
+
+    # Add to event_stat_frames
+    self.event_stat_frames.append(final_results)
+
   def run_event_stats(self):
     self.count_matches()
     self.count_flags_for_curves_with_events()
     self.compute_tac_feature_stats_for_matched_curves()
     self.assess_search_quality()
     self.compute_person_level_stats()
+    self.compute_tac_feature_drink_correlations()
 
   def export_workbook_events_and_curves(self, file_name, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, export_plots=False):
     with pd.ExcelWriter(file_name, engine = 'xlsxwriter', mode = 'w') as writer:

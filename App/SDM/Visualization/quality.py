@@ -664,10 +664,10 @@ class QualityVisualizer:
 
     def create_tac_boxplots(self, curve_features, output_dir=None, show_legend=False):
         """
-        Create histograms for all TAC features, split by valid vs invalid curves.
-        Uses specific thresholds for each feature type, with an overflow bin for values above threshold.
-        Overflow bins are only used for AUC, rise rate, and fall rate.
-        Peak uses its actual maximum value.
+        Create box and whisker plots for all TAC features, split by valid vs invalid curves.
+        Includes jittered points showing the full distribution alongside box plots.
+        Values beyond thresholds are marked with special markers at the threshold level.
+        
         Args:
             curve_features (pd.DataFrame): DataFrame containing curve features
             output_dir (str, optional): Directory to save plots. If None, saves in current directory.
@@ -679,171 +679,144 @@ class QualityVisualizer:
             if not available_tac_features:
                 print("No TAC features found in the DataFrame. Available columns:", curve_features.columns.tolist())
                 return
-                
-            print(f"Plotting TAC features: {available_tac_features}")
             
-            # Create figure with subplots in a 2x2 grid
-            fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+            print(f"Plotting TAC boxplot features: {available_tac_features}")
+            
+            # Create subplots (2x2 grid)
+            fig, axes = plt.subplots(2, 2, figsize=(16, 12))  # Changed to 2x2 grid with appropriate size
             axes = axes.flatten()
-            n_features = len(available_tac_features)
             
-            # Only plot as many features as available (in case fewer than 4)
+            # Turn off any unused subplots
+            n_features = len(available_tac_features)
             for ax in axes[n_features:]:
                 ax.axis('off')
             
-            # Define thresholds for each feature
+            # Define thresholds for outlier clipping
             thresholds = {
                 'auc_total_CURVE': 100000,
-                'rise_rate_CURVE': 250,
-                'fall_rate_CURVE': 250
+                'rise_rate_CURVE': 500,
+                'fall_rate_CURVE': 500
             }
             
-            # Define which features should use overflow bins
-            use_overflow = {
-                'auc_total_CURVE': True,
-                'rise_rate_CURVE': True,
-                'fall_rate_CURVE': True,
-                'peak_CURVE': False
-            }
+            # Define plot parameters
+            box_width = 0.35  # Decreased from 0.7
+            jitter_std = 0.15  # Increased from 0.05
+            point_size = 15  # Size for regular points
+            beyond_threshold_size = 40  # Size for beyond-threshold markers
             
-            # Define bin widths for each feature
-            bin_widths = {
-                'auc_total_CURVE': 100,
-                'rise_rate_CURVE': 10,
-                'fall_rate_CURVE': 10,
-                'peak_CURVE': 25
-            }
-            
-            # Process each TAC feature
+            # Create box plots for each feature
             for ax, tac_feat in zip(axes, available_tac_features):
-                # Prepare data for each category
-                valid_data = curve_features[
-                    (curve_features['CURVE_VALID'] == 1)
-                ][tac_feat]
+                # Split data into valid and invalid curves
+                valid_data = curve_features[(curve_features['CURVE_VALID'] == 1)][tac_feat].dropna()
+                invalid_data = curve_features[(curve_features['CURVE_VALID'] != 1)][tac_feat].dropna()
                 
-                invalid_data = curve_features[
-                    (curve_features['CURVE_VALID'] != 1)
-                ][tac_feat]
+                # Prepare data for plotting
+                data = [valid_data, invalid_data]
+                labels = ['High Quality', 'Low Quality']
+                colors = ['green', 'red']
                 
-                # Get threshold and bin width for this feature
-                if tac_feat == 'peak_CURVE':
-                    all_data = pd.concat([valid_data, invalid_data])
-                    threshold = all_data.max() * 1.05
-                else:
-                    threshold = thresholds.get(tac_feat, 2000)
-                bin_width = bin_widths.get(tac_feat, 10)
-                
-                # Create bins
+                # Handle special case for AUC (log scale)
                 if tac_feat == 'auc_total_CURVE':
-                    all_auc = pd.concat([valid_data, invalid_data])
-                    min_positive = all_auc[all_auc > 0].min() if (all_auc > 0).any() else 0.1
-                    min_bin = max(0.1, min_positive)
-                    threshold = 100000  # Explicitly set for AUC
-                    n_bins = 30  # Higher resolution: twice as many bins
-                    log_bins = np.logspace(np.log10(min_bin), np.log10(threshold), n_bins)
-                    bins = np.concatenate(([0, min_bin], log_bins, [np.inf]))  # Last bin is overflow
-                    # Plot outlined histograms for all features with proportions
-                    # Plot Low Quality first (so High Quality is on top)
-                    ax.hist(invalid_data[invalid_data > 0] if tac_feat == 'auc_total_CURVE' else invalid_data,
-                            bins=log_bins if tac_feat == 'auc_total_CURVE' else bins,
-                            histtype='step', linewidth=2, color='red', label='Low Quality', zorder=2,
-                            weights=np.ones_like(invalid_data[invalid_data > 0] if tac_feat == 'auc_total_CURVE' else invalid_data) / len(invalid_data))
-                    ax.hist(valid_data[valid_data > 0] if tac_feat == 'auc_total_CURVE' else valid_data,
-                            bins=log_bins if tac_feat == 'auc_total_CURVE' else bins,
-                            histtype='step', linewidth=2, color='green', label='High Quality', zorder=3,
-                            weights=np.ones_like(valid_data[valid_data > 0] if tac_feat == 'auc_total_CURVE' else valid_data) / len(valid_data))
-                    # Plot zeros as a bar at left (for AUC only)
-                    if tac_feat == 'auc_total_CURVE':
-                        if (invalid_data == 0).any():
-                            ax.bar(0.5 * min_bin, (invalid_data == 0).sum() / len(invalid_data), width=0.9 * min_bin, color='red', alpha=0.4, label='Low Quality (AUC=0)',
-                                   edgecolor='darkred', linewidth=2, zorder=2)
-                        if (valid_data == 0).any():
-                            ax.bar(0.5 * min_bin, (valid_data == 0).sum() / len(valid_data), width=0.9 * min_bin, color='green', alpha=0.4, label='High Quality (AUC=0)',
-                                   edgecolor='darkgreen', linewidth=2, zorder=3)
-                    ax.set_xscale('log')
-                    ax.set_xlim(left=10, right=100000)
-                    tick_locations = 10 ** np.arange(1, 6)  # 10, 100, 1000, 10000, 100000
+                    # Filter out non-positive values for log scale
+                    data = [d[d > 0] for d in data]
+                    ax.set_yscale('log')
+                    threshold = thresholds.get(tac_feat, 100000)
+                    ax.set_ylim(bottom=10, top=threshold * 1.1)  # Add 10% space for threshold markers
+                    # Set custom y-axis ticks for log scale
+                    tick_locations = 10 ** np.arange(1, 6)
                     tick_labels = [f'{int(tick)}' if tick < 100000 else '100000+' for tick in tick_locations]
-                    ax.set_xticks(tick_locations)
-                    ax.set_xticklabels(tick_labels)
-
-                    # Debug: print sum of histogram heights for each group
-                    valid_hist, _ = np.histogram(valid_data[valid_data > 0] if tac_feat == 'auc_total_CURVE' else valid_data,
-                                               bins=log_bins if tac_feat == 'auc_total_CURVE' else bins,
-                                               weights=np.ones_like(valid_data[valid_data > 0] if tac_feat == 'auc_total_CURVE' else valid_data) / len(valid_data) if len(valid_data) > 0 else None)
-                    invalid_hist, _ = np.histogram(invalid_data[invalid_data > 0] if tac_feat == 'auc_total_CURVE' else invalid_data,
-                                                 bins=log_bins if tac_feat == 'auc_total_CURVE' else bins,
-                                                 weights=np.ones_like(invalid_data[invalid_data > 0] if tac_feat == 'auc_total_CURVE' else invalid_data) / len(invalid_data) if len(invalid_data) > 0 else None)
-                    print(f"{tac_feat} - High Quality sum: {valid_hist.sum()} | Low Quality sum: {invalid_hist.sum()}")
+                    ax.set_yticks(tick_locations)
+                    ax.set_yticklabels(tick_labels)
                 else:
-                    bins = np.arange(0, threshold + bin_width, bin_width)
-                    if use_overflow.get(tac_feat, False):
-                        bins = np.append(bins, threshold * 1.1)
-                    # Plot outlined histograms for all features with proportions
-                    # Plot Low Quality first (so High Quality is on top)
-                    ax.hist(invalid_data[invalid_data > 0] if tac_feat == 'auc_total_CURVE' else invalid_data,
-                            bins=log_bins if tac_feat == 'auc_total_CURVE' else bins,
-                            histtype='step', linewidth=2, color='red', label='Low Quality', zorder=2,
-                            weights=np.ones_like(invalid_data[invalid_data > 0] if tac_feat == 'auc_total_CURVE' else invalid_data) / len(invalid_data))
-                    ax.hist(valid_data[valid_data > 0] if tac_feat == 'auc_total_CURVE' else valid_data,
-                            bins=log_bins if tac_feat == 'auc_total_CURVE' else bins,
-                            histtype='step', linewidth=2, color='green', label='High Quality', zorder=3,
-                            weights=np.ones_like(valid_data[valid_data > 0] if tac_feat == 'auc_total_CURVE' else valid_data) / len(valid_data))
+                    # For other features, clip outliers at threshold
+                    threshold = thresholds.get(tac_feat, 2000)
+                    data = [np.clip(d, 0, threshold) for d in data]
+                    ax.set_ylim(bottom=0, top=threshold * 1.1)  # Add 10% space for threshold markers
                 
-                # Customize subplot
+                # Create box plot without outliers
+                bp = ax.boxplot(data,
+                              labels=labels,
+                              patch_artist=True,  # Fill boxes with color
+                              medianprops={'color': 'black', 'linewidth': 1.5},  # Black median lines
+                              showfliers=False,  # Don't show outliers (we'll plot all points manually)
+                              widths=box_width,  # Narrower box width
+                              zorder=2)  # Place boxes above grid but below points
+                
+                # Color the boxes
+                for box, color in zip(bp['boxes'], colors):
+                    box.set(facecolor=color, alpha=0.2)  # More transparent boxes
+                    box.set(edgecolor=color, linewidth=1.5)
+                
+                # Plot all points with jitter
+                for idx, (d, color) in enumerate(zip(data, colors)):
+                    # Get the original data before clipping
+                    original_data = valid_data if idx == 0 else invalid_data
+                    threshold = thresholds.get(tac_feat, 2000)
+                    
+                    # Split data into within-threshold and beyond-threshold
+                    within_threshold = original_data[original_data <= threshold]
+                    beyond_threshold = original_data[original_data > threshold]
+                    
+                    if len(within_threshold) > 0:
+                        # Create jitter for all points
+                        jitter = np.random.normal(0, jitter_std, size=len(within_threshold))
+                        x_pos = np.full_like(jitter, idx + 1) + jitter
+                        
+                        # Plot all points
+                        ax.scatter(x_pos, within_threshold,
+                                 color=color,
+                                 alpha=0.5,
+                                 s=point_size,
+                                 marker='o',
+                                 zorder=3)  # Points above boxes
+                    
+                    # Handle beyond-threshold values
+                    if len(beyond_threshold) > 0:
+                        # Create jitter for threshold markers
+                        jitter = np.random.normal(0, jitter_std, size=len(beyond_threshold))
+                        x_pos = np.full_like(jitter, idx + 1) + jitter
+                        
+                        # Plot triangle markers at threshold level
+                        ax.scatter(x_pos, [threshold * 1.05] * len(beyond_threshold),
+                                 color=color,
+                                 alpha=0.7,
+                                 s=beyond_threshold_size,
+                                 marker='^',  # Triangle pointing up
+                                 label=f'{len(beyond_threshold)} values > {threshold}',
+                                 zorder=4)  # Beyond-threshold markers on top
+                
+                # Set labels and grid
                 feature_label = self.feature_labels.get(tac_feat, tac_feat)
-                ax.set_xlabel(feature_label)
-                ax.set_ylabel('Proportion')
-                ax.grid(True, linestyle='--', alpha=0.7, zorder=0)
-                if show_legend:
-                    ax.legend()
+                ax.set_title(feature_label, pad=10)  # Added padding between title and plot
+                ax.grid(True, linestyle='--', alpha=0.7, zorder=1)  # Grid below everything
                 ax.set_facecolor('white')
+                
+                # Add legend if there are beyond-threshold values
+                if show_legend or any(len(d[d > thresholds.get(tac_feat, 2000)]) > 0 for d in [valid_data, invalid_data]):
+                    ax.legend(fontsize='small', loc='upper right')
+                
+                # Rotate x-axis labels for better readability
+                ax.tick_params(axis='x', rotation=45)
+                
+                # Set x-axis limits to accommodate wider jitter
+                ax.set_xlim(0.5, len(data) + 0.5)
             
-            # Adjust layout and save
-            plt.tight_layout(rect=[0, 0, 1, 0.95])
+            # Adjust layout with more space between subplots
+            plt.tight_layout(rect=[0, 0, 1, 0.98], h_pad=1.0, w_pad=1.0)  # Added w_pad for horizontal spacing
+            
+            # Save the plot
             if output_dir:
-                plt.savefig(f'{output_dir}/tac_distributions.png', dpi=300, bbox_inches='tight')
+                plt.savefig(f'{output_dir}/tac_boxplot_distributions.png', dpi=300, bbox_inches='tight')
             else:
-                plt.savefig('tac_distributions.png', dpi=300, bbox_inches='tight')
+                plt.savefig('tac_boxplot_distributions.png', dpi=300, bbox_inches='tight')
             
-            # Clean up this figure
             plt.close(fig)
             del fig
             del axes
             
-            # --- Compute summary statistics for each TAC feature, split by valid/invalid ---
-            summary_rows = []
-            for tac_feat in available_tac_features:
-                for quality_label, mask in zip(['High Quality', 'Low Quality'],
-                                               [(curve_features['CURVE_VALID'] == 1), (curve_features['CURVE_VALID'] != 1)]):
-                    data = curve_features.loc[mask, tac_feat].dropna()
-                    N = data.count()
-                    mean = data.mean()
-                    std = data.std()
-                    se = data.sem()
-                    median = data.median()
-                    min_ = data.min()
-                    max_ = data.max()
-                    summary_rows.append({
-                        'Feature': self.feature_labels.get(tac_feat, tac_feat),
-                        'Curve_Quality': quality_label,
-                        'N': N,
-                        'Mean': mean,
-                        'Std': std,
-                        'SE': se,
-                        'Median': median,
-                        'Min': min_,
-                        'Max': max_
-                    })
-            summary_df = pd.DataFrame(summary_rows)
-            # Save to Excel
-            excel_path = f'{output_dir}/tac_feature_summary.xlsx' if output_dir else 'tac_feature_summary.xlsx'
-            summary_df.to_excel(excel_path, index=False)
-            return summary_df
-            
         except Exception as e:
             import traceback
-            print(f"Error processing TAC features:")
+            print(f"Error processing TAC boxplot features:")
             print(f"Error type: {type(e).__name__}")
             print(f"Error message: {str(e)}")
             print("Full traceback:")
@@ -851,18 +824,16 @@ class QualityVisualizer:
             plt.close('all')
             
         finally:
-            # Clean up any remaining figures
             plt.close('all')
-            # Clear any remaining memory
             import gc
             gc.collect()
-
+  
     def create_tac_density_plots(self, curve_features, output_dir=None, show_legend=False):
         """
         Create density plots (KDE, area=1) for all TAC features, split by valid vs invalid curves.
         Uses a smooth kernel density estimate (KDE) with shading, overlaid for both groups.
         Only uses scipy.stats.gaussian_kde and matplotlib (no seaborn).
-        For the AUC plot, the red (Low Quality) KDE is plotted after the green (High Quality) KDE so the red line is always in front.
+        
         Args:
             curve_features (pd.DataFrame): DataFrame containing curve features
             output_dir (str, optional): Directory to save plots. If None, saves in current directory.
@@ -882,64 +853,68 @@ class QualityVisualizer:
             n_features = len(available_tac_features)
             for ax in axes[n_features:]:
                 ax.axis('off')
+            
+            # Define thresholds for each feature
             thresholds = {
-                'auc_total_CURVE': 100000,
-                'rise_rate_CURVE': 250,
-                'fall_rate_CURVE': 250
+                'auc_total_CURVE': 40000,  # Changed from 100000
+                'peak_CURVE': 1000,        # Added specific threshold
+                'rise_rate_CURVE': 500,
+                'fall_rate_CURVE': 500
             }
+            
             for ax, tac_feat in zip(axes, available_tac_features):
                 valid_data = curve_features[(curve_features['CURVE_VALID'] == 1)][tac_feat].dropna()
                 invalid_data = curve_features[(curve_features['CURVE_VALID'] != 1)][tac_feat].dropna()
-                if tac_feat == 'peak_CURVE':
-                    all_data = pd.concat([valid_data, invalid_data])
-                    threshold = all_data.max() * 1.05
-                    x_min, x_max = all_data.min(), all_data.max()
-                else:
-                    threshold = thresholds.get(tac_feat, 2000)
-                    x_min, x_max = 0, threshold
-                # KDE plot using only scipy and matplotlib
-                if tac_feat == 'auc_total_CURVE':
-                    valid_data = valid_data[valid_data > 0]
-                    invalid_data = invalid_data[invalid_data > 0]
-                    ax.set_xscale('log')
-                    x_grid = np.logspace(np.log10(max(10, valid_data.min() if not valid_data.empty else 10)), np.log10(threshold), 200)
-                    # Plot High Quality (green) first (background)
-                    if len(valid_data) > 1:
-                        kde = gaussian_kde(valid_data)
-                        y = kde(x_grid)
-                        ax.plot(x_grid, y, color='green', label='High Quality', linewidth=2, zorder=1)
-                        ax.fill_between(x_grid, y, color='green', alpha=0.3, zorder=1)
-                    # Plot Low Quality (red) second (foreground)
-                    if len(invalid_data) > 1:
-                        kde = gaussian_kde(invalid_data)
-                        y = kde(x_grid)
-                        ax.plot(x_grid, y, color='red', label='Low Quality', linewidth=2, zorder=2)
-                        ax.fill_between(x_grid, y, color='red', alpha=0.3, zorder=2)
-                else:
-                    x_grid = np.linspace(x_min, x_max, 200)
-                    if len(invalid_data) > 1:
-                        kde = gaussian_kde(invalid_data)
-                        ax.plot(x_grid, kde(x_grid), color='red', label='Low Quality', linewidth=2)
-                        ax.fill_between(x_grid, kde(x_grid), color='red', alpha=0.3)
-                    if len(valid_data) > 1:
-                        kde = gaussian_kde(valid_data)
-                        ax.plot(x_grid, kde(x_grid), color='green', label='High Quality', linewidth=2)
-                        ax.fill_between(x_grid, kde(x_grid), color='green', alpha=0.3)
+                
+                # Get threshold for this feature
+                threshold = thresholds.get(tac_feat, 2000)
+                
+                # Clip data to threshold
+                valid_data = valid_data[valid_data > 0]  # Remove non-positive values
+                invalid_data = invalid_data[invalid_data > 0]  # Remove non-positive values
+                valid_data = np.clip(valid_data, 0, threshold)
+                invalid_data = np.clip(invalid_data, 0, threshold)
+                
+                # Calculate means before KDE
+                valid_mean = valid_data.mean() if len(valid_data) > 0 else None
+                invalid_mean = invalid_data.mean() if len(invalid_data) > 0 else None
+                
+                # Create linear space for x values
+                x_grid = np.linspace(0, threshold, 200)
+                
+                # Plot Low Quality (red) first
+                if len(invalid_data) > 1:
+                    kde = gaussian_kde(invalid_data)
+                    y = kde(x_grid)
+                    ax.plot(x_grid, y, color='red', label='Low Quality', linewidth=2, zorder=2)
+                    ax.fill_between(x_grid, y, color='red', alpha=0.3, zorder=2)
+                    # Add vertical line at mean
+                    if invalid_mean is not None:
+                        ax.axvline(x=invalid_mean, color='red', linestyle='--', linewidth=1.5, 
+                                 alpha=0.8, zorder=4)
+                
+                # Plot High Quality (green) second
+                if len(valid_data) > 1:
+                    kde = gaussian_kde(valid_data)
+                    y = kde(x_grid)
+                    ax.plot(x_grid, y, color='green', label='High Quality', linewidth=2, zorder=3)
+                    ax.fill_between(x_grid, y, color='green', alpha=0.3, zorder=3)
+                    # Add vertical line at mean
+                    if valid_mean is not None:
+                        ax.axvline(x=valid_mean, color='green', linestyle='--', linewidth=1.5, 
+                                 alpha=0.8, zorder=4)
+                
                 feature_label = self.feature_labels.get(tac_feat, tac_feat)
                 ax.set_xlabel(feature_label)
                 ax.set_ylabel('Density')
-                ax.grid(True, linestyle='--', alpha=0.7, zorder=0)
+                ax.grid(True, linestyle='--', alpha=0.7, zorder=1)
                 if show_legend:
                     ax.legend()
                 ax.set_facecolor('white')
-                if tac_feat == 'auc_total_CURVE':
-                    ax.set_xlim(left=10, right=threshold)
-                    tick_locations = 10 ** np.arange(1, 6)
-                    tick_labels = [f'{int(tick)}' if tick < 100000 else '100000+' for tick in tick_locations]
-                    ax.set_xticks(tick_locations)
-                    ax.set_xticklabels(tick_labels)
-                else:
-                    ax.set_xlim(left=x_min, right=x_max)
+                
+                # Set axis limits
+                ax.set_xlim(left=0, right=threshold)
+            
             plt.tight_layout(rect=[0, 0, 1, 0.95])
             if output_dir:
                 plt.savefig(f'{output_dir}/tac_density_distributions.png', dpi=300, bbox_inches='tight')

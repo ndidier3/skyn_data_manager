@@ -20,6 +20,9 @@ DEFAULT_FLAG_SELECTIONS = {
     'flag_gaps_and_non_wear_periphery': {
         'percent_cutoff': 0.40
     },
+    'flag_gaps_and_non_wear_region': {
+        'percent_cutoff': 0.25
+    },
     'flag_extreme_negative_periphery': {
         'percent_cutoff': 0.40
     },
@@ -42,4 +45,5 @@ DEFAULT_FLAG_SELECTIONS = {
     'flag_low_quality_fall_curve': {
         'percent_cutoff': 0.50
     },
+    
 } 

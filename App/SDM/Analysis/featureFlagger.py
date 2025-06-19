@@ -17,6 +17,7 @@ class featureFlagger:
       'flag_extreme_negative_periphery': {},
       'flag_low_quality_periphery': {},
       'flag_unimputed_low_quality_periphery': {},
+      'flag_gaps_and_non_wear_region': {},
       
       # Curve completion flags (using only percent)
       'flag_incomplete_curve_start_curve': {},
@@ -108,6 +109,16 @@ class featureFlagger:
     self.flag_data_above_cutoff(
       'total_gaps_and_non_wear_percent_PERIPHERY', percent_cutoff,
       'FLAG_gaps_and_non_wear_periphery'
+    )
+
+  def flag_gaps_and_non_wear_region(self, percent_cutoff: float) -> None:
+    """
+    Flag region if the total percentage of gaps and non-wear exceeds the cutoff.
+    Uses the pre-computed total_gaps_and_non_wear_percent_REGION column.
+    """
+    self.flag_data_above_cutoff(
+      'total_gaps_and_non_wear_percent_REGION', percent_cutoff,
+      'FLAG_gaps_and_non_wear_region'
     )
 
   def flag_extreme_negative_periphery(self, percent_cutoff: float) -> None:
@@ -257,6 +268,11 @@ class featureFlagger:
         self.flag_selections['flag_gaps_and_non_wear_periphery']['percent_cutoff']
       )
       periphery_flags.append('FLAG_gaps_and_non_wear_periphery')
+    if 'flag_gaps_and_non_wear_region' in self.flag_selections and self.flag_selections['flag_gaps_and_non_wear_region']:
+      self.flag_gaps_and_non_wear_region(
+        self.flag_selections['flag_gaps_and_non_wear_region']['percent_cutoff']
+      )
+      periphery_flags.append('FLAG_gaps_and_non_wear_region')
     if 'flag_extreme_negative_periphery' in self.flag_selections and self.flag_selections['flag_extreme_negative_periphery']:
       self.flag_extreme_negative_periphery(
         self.flag_selections['flag_extreme_negative_periphery']['percent_cutoff']
