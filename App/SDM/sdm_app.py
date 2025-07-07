@@ -92,7 +92,6 @@ class SkynDataManagerGUI:
         
         ttk.Label(file_frame, text="Cohort Name:").grid(row=2, column=0, sticky=tk.W, pady=(5, 0))
         ttk.Entry(file_frame, textvariable=self.cohort_name, width=30).grid(row=2, column=1, sticky=tk.W, padx=(10, 0))
-        ttk.Label(file_frame, text="(Output folder: Results/cohort_name)", font=('TkDefaultFont', 8), foreground='gray').grid(row=2, column=2, sticky=tk.W, padx=(10, 0))
         
     def create_validation_section(self, parent):
         """Create file validation section."""
