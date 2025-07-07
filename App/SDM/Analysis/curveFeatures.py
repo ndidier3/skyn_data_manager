@@ -263,9 +263,90 @@ class curveFeatures():
     person_stats_valid = stats.get_subid_level_stats(self.person_level_dtypes)
     self.person_level_stats_valid = person_stats_valid
 
+  def compare_valid_invalid_tac_features(self):
+    """
+    Generates a DataFrame comparing TAC feature statistics for valid ('High Quality')
+    and invalid ('Low Quality') curves.
+    """
+    if self.curve_valid.empty and self.curve_invalid.empty:
+        print("No valid or invalid curves to compare.")
+        return
+
+    features_map = {
+        'Area Under': 'auc_total_CURVE',
+        'Peak Value': 'peak_CURVE',
+        'Rise Rate': 'rise_rate_CURVE',
+        'Fall Rate': 'fall_rate_CURVE'
+    }
+
+    results = []
+    
+    available_features = {name: col for name, col in features_map.items() if col in self.curve_features.columns}
+
+    if not available_features:
+        print("None of the specified TAC features for comparison are available in curve_features.")
+        return
+
+    # Process "High Quality" (valid) curves
+    if not self.curve_valid.empty:
+        valid_df = self.curve_valid[[col for col in available_features.values() if col in self.curve_valid.columns]]
+        if not valid_df.empty:
+            valid_stats = valid_df.agg(['count', 'mean', 'std', 'median', 'min', 'max'])
+            for feature_name, feature_col in available_features.items():
+                if feature_col in valid_stats.columns:
+                    stats = valid_stats[feature_col]
+                    n = stats['count']
+                    se = stats['std'] / np.sqrt(n) if n > 0 else 0
+                    results.append({
+                        'Feature': feature_name,
+                        'Curve_Quality': 'High Quality',
+                        'N': int(n),
+                        'Mean': stats['mean'],
+                        'Std': stats['std'],
+                        'SE': se,
+                        'Median': stats['median'],
+                        'Min': stats['min'],
+                        'Max': stats['max']
+                    })
+
+    # Process "Low Quality" (invalid) curves
+    if not self.curve_invalid.empty:
+        invalid_df = self.curve_invalid[[col for col in available_features.values() if col in self.curve_invalid.columns]]
+        if not invalid_df.empty:
+            invalid_stats = invalid_df.agg(['count', 'mean', 'std', 'median', 'min', 'max'])
+            for feature_name, feature_col in available_features.items():
+                if feature_col in invalid_stats.columns:
+                    stats = invalid_stats[feature_col]
+                    n = stats['count']
+                    se = stats['std'] / np.sqrt(n) if n > 0 else 0
+                    results.append({
+                        'Feature': feature_name,
+                        'Curve_Quality': 'Low Quality',
+                        'N': int(n),
+                        'Mean': stats['mean'],
+                        'Std': stats['std'],
+                        'SE': se,
+                        'Median': stats['median'],
+                        'Min': stats['min'],
+                        'Max': stats['max']
+                    })
+
+    if not results:
+        return
+
+    results_df = pd.DataFrame(results)
+    
+    results_df['Feature'] = pd.Categorical(results_df['Feature'], categories=available_features.keys(), ordered=True)
+    results_df = results_df.sort_values(['Feature', 'Curve_Quality'])
+
+    results_df = results_df.set_index(['Feature', 'Curve_Quality'])
+    
+    self.curve_stat_frames.append(results_df)
+
   def run_stats(self):
     self.compute_tac_feature_stats()
     self.count_curve_flags()
+    self.compare_valid_invalid_tac_features()
     self.compute_person_level_stats()
     self.compute_person_level_stats_valid()
     self.compute_imputation_stats()
@@ -550,3 +631,33 @@ class curveFeatures():
     total_curves = len(self.curve_features)
     perfect_curves = perfect_mask.sum()
     print(f"Found {perfect_curves} perfect curves out of {total_curves} total curves ({perfect_curves/total_curves*100:.1f}%)")
+
+    # Get the list of plot paths for these curves
+    plot_paths = self.curve_features[self.curve_features['perfect'] == 1]['signal_processing_plot_wide'].dropna().tolist()
+
+  def run_density_plots(self, output_filename='tac_density_distributions.png', show_legend=False):
+    """
+    Generate TAC feature density plots using QualityVisualizer.
+    Args:
+        output_filename (str): Filename for the output plot.
+        show_legend (bool): Whether to display legends on the plots.
+    """
+    print(f"Generating TAC density plots. Output file: {output_filename}")
+    self.quality_visualizer.create_tac_density_plots(
+        self.curve_features,
+        output_filename=output_filename,
+        show_legend=show_legend
+    )
+  
+  def run_violin_plots(self, output_filename='tac_violin_plots.png', show_legend=False):
+    """
+    Generate TAC feature violin plots using QualityVisualizer.
+    Args:
+        output_filename (str): Filename for the output plot.
+        show_legend (bool): Whether to display legends on the plots.
+    """ 
+    self.quality_visualizer.create_tac_violin_plots(
+        self.curve_features,
+        output_filename=output_filename,
+        show_legend=show_legend
+    )

@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 from scipy.stats import gaussian_kde
+from matplotlib.patches import Patch
 
 class QualityVisualizer:
     def __init__(self, quality_features=None, tac_features=None, use_three_imputation_ratio_groups=False):
@@ -828,7 +829,7 @@ class QualityVisualizer:
             import gc
             gc.collect()
   
-    def create_tac_density_plots(self, curve_features, output_dir=None, show_legend=False):
+    def create_tac_density_plots(self, curve_features, output_filename='tac_density_distributions.png', show_legend=False):
         """
         Create density plots (KDE, area=1) for all TAC features, split by valid vs invalid curves.
         Uses a smooth kernel density estimate (KDE) with shading, overlaid for both groups.
@@ -836,7 +837,7 @@ class QualityVisualizer:
         
         Args:
             curve_features (pd.DataFrame): DataFrame containing curve features
-            output_dir (str, optional): Directory to save plots. If None, saves in current directory.
+            output_filename (str, optional): Filename for the output plot.
             show_legend (bool, optional): Whether to display legends on the plots. Default is False.
         """
         import matplotlib.pyplot as plt
@@ -856,13 +857,13 @@ class QualityVisualizer:
             
             # Define thresholds for each feature
             thresholds = {
-                'auc_total_CURVE': 40000,  # Changed from 100000
-                'peak_CURVE': 1000,        # Added specific threshold
-                'rise_rate_CURVE': 500,
-                'fall_rate_CURVE': 500
+                'auc_total_CURVE': 15000,
+                'peak_CURVE': 800,        # Added specific threshold
+                'rise_rate_CURVE': 400,
+                'fall_rate_CURVE': 400
             }
             
-            for ax, tac_feat in zip(axes, available_tac_features):
+            for i, (ax, tac_feat) in enumerate(zip(axes, available_tac_features)):
                 valid_data = curve_features[(curve_features['CURVE_VALID'] == 1)][tac_feat].dropna()
                 invalid_data = curve_features[(curve_features['CURVE_VALID'] != 1)][tac_feat].dropna()
                 
@@ -906,26 +907,139 @@ class QualityVisualizer:
                 
                 feature_label = self.feature_labels.get(tac_feat, tac_feat)
                 ax.set_xlabel(feature_label)
-                ax.set_ylabel('Density')
+                ax.set_ylabel(None)
+                ax.set_yticks([])
                 ax.grid(True, linestyle='--', alpha=0.7, zorder=1)
-                if show_legend:
-                    ax.legend()
+                if show_legend and i == 0:
+                    legend_elements = [
+                        Line2D([0], [0], color='green', lw=2, label='High Quality'),
+                        Line2D([0], [0], color='red', lw=2, label='Low Quality'),
+                        Line2D([0], [0], color='black', linestyle='--', linewidth=1.5, label='Mean')
+                    ]
+                    ax.legend(handles=legend_elements)
                 ax.set_facecolor('white')
                 
                 # Set axis limits
                 ax.set_xlim(left=0, right=threshold)
             
             plt.tight_layout(rect=[0, 0, 1, 0.95])
-            if output_dir:
-                plt.savefig(f'{output_dir}/tac_density_distributions.png', dpi=300, bbox_inches='tight')
-            else:
-                plt.savefig('tac_density_distributions.png', dpi=300, bbox_inches='tight')
+            plt.savefig(output_filename, dpi=300, bbox_inches='tight')
             plt.close(fig)
             del fig
             del axes
         except Exception as e:
             import traceback
             print(f"Error processing TAC density features:")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
+            print("Full traceback:")
+            traceback.print_exc()
+            plt.close('all')
+        finally:
+            plt.close('all')
+            import gc
+            gc.collect()
+
+    def create_tac_violin_plots(self, curve_features, output_filename='tac_violin_plots.png', show_legend=False):
+        """
+        Create violin plots for all TAC features, split by valid vs invalid curves.
+        
+        Args:
+            curve_features (pd.DataFrame): DataFrame containing curve features
+            output_filename (str, optional): Filename for the output plot.
+            show_legend (bool, optional): Whether to display legends on the plots. Default is False.
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from matplotlib.patches import Patch
+
+        try:
+            available_tac_features = [feat for feat in self.tac_features if feat in curve_features.columns]
+            if not available_tac_features:
+                print("No TAC features found in the DataFrame. Available columns:", curve_features.columns.tolist())
+                return
+            
+            print(f"Plotting TAC violin plots for features: {available_tac_features}")
+            fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+            axes = axes.flatten()
+            n_features = len(available_tac_features)
+            for ax in axes[n_features:]:
+                ax.axis('off')
+            
+            thresholds = {
+                'auc_total_CURVE': 25000,
+                'peak_CURVE': 1000,
+                'rise_rate_CURVE': 500,
+                'fall_rate_CURVE': 500
+            }
+            
+            for i, (ax, tac_feat) in enumerate(zip(axes, available_tac_features)):
+                valid_data = curve_features[(curve_features['CURVE_VALID'] == 1)][tac_feat].dropna()
+                invalid_data = curve_features[(curve_features['CURVE_VALID'] != 1)][tac_feat].dropna()
+                
+                threshold = thresholds.get(tac_feat, 2000)
+                
+                valid_data = valid_data[valid_data > 0]
+                invalid_data = invalid_data[invalid_data > 0]
+                valid_data = np.clip(valid_data, 0, threshold)
+                invalid_data = np.clip(invalid_data, 0, threshold)
+                
+                datasets = []
+                labels = []
+                colors = []
+                
+                if len(invalid_data) > 1:
+                    datasets.append(invalid_data)
+                    labels.append('Low Quality')
+                    colors.append('red')
+
+                if len(valid_data) > 1:
+                    datasets.append(valid_data)
+                    labels.append('High Quality')
+                    colors.append('green')
+                
+                if not datasets:
+                    feature_label = self.feature_labels.get(tac_feat, tac_feat)
+                    ax.text(0.5, 0.5, 'No data to plot', ha='center', va='center')
+                    ax.set_title(feature_label)
+                    continue
+
+                parts = ax.violinplot(datasets, showmeans=True, showmedians=False, showextrema=True)
+
+                for idx, pc in enumerate(parts['bodies']):
+                    pc.set_facecolor(colors[idx])
+                    pc.set_edgecolor('black')
+                    pc.set_alpha(0.6)
+
+                for partname in ('cbars', 'cmins', 'cmaxes', 'cmeans'):
+                    vp = parts[partname]
+                    vp.set_edgecolor('black')
+                    vp.set_linewidth(1)
+                
+                feature_label = self.feature_labels.get(tac_feat, tac_feat)
+                ax.set_ylabel(feature_label)
+                ax.set_xlabel(None)
+                ax.set_xticks(np.arange(1, len(datasets) + 1))
+                ax.set_xticklabels(labels)
+                ax.grid(True, linestyle='--', alpha=0.7, zorder=1)
+
+                if show_legend and i == 0:
+                    legend_elements = [
+                        Patch(facecolor='green', alpha=0.6, edgecolor='black', label='High Quality'),
+                        Patch(facecolor='red', alpha=0.6, edgecolor='black', label='Low Quality')
+                    ]
+                    ax.legend(handles=legend_elements, loc='upper right')
+                
+                ax.set_facecolor('white')
+                ax.set_ylim(bottom=0, top=threshold)
+            
+            plt.tight_layout(rect=[0, 0, 1, 0.95])
+            plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+
+        except Exception as e:
+            import traceback
+            print(f"Error processing TAC violin plots:")
             print(f"Error type: {type(e).__name__}")
             print(f"Error message: {str(e)}")
             print("Full traceback:")

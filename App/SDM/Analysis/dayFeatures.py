@@ -8,16 +8,17 @@ from openpyxl import Workbook
 from openpyxl.drawing.image import Image
 
 class dayFeatures():
-    def __init__(self, processed_data_folder, subid=None):
+    def __init__(self, processed_data_folder, subids=None):
         print(f"Looking for files in: {processed_data_folder}")
         files = [f for f in os.listdir(processed_data_folder) if 'processed' in f]
         
         # Filter files by subid if specified
-        if subid is not None:
-            files = [file for file in files if extract_subid(file) == str(subid)]
+        if subids is not None:
+            subids_str = set(str(s) for s in subids)
+            files = [file for file in files if extract_subid(file) in subids_str]
             if not files:
-                raise ValueError(f"No processed files found for subid {subid}")
-            print(f"Filtered to files for subid {subid}: {files}")
+                raise ValueError(f"No processed files found for subids {subids}")
+            print(f"Filtered to files for subids {subids}: {files}")
         else:
             print(f"Found files: {files}")
         
@@ -45,47 +46,6 @@ class dayFeatures():
         self.day_features.drop_duplicates(subset=['SubID', 'day_no'], inplace=True)
         self.day_stat_frames = []
 
-        # Define default day-level features to analyze based on day_level_dataframe
-        self.default_day_features = [
-            'device_one',
-            'device_two',
-            'device_count',
-            'total_duration',
-            'device_turned_on_duration',
-            'device_turned_on_percent',
-            'device_worn_duration',
-            'device_worn_percent',
-            'imputed_duration',
-            'imputed_percent',
-            'low_quality_duration',
-            'low_quality_percent',
-            'unimputed_low_quality_duration',
-            'unimputed_low_quality_percent',
-            'negative_duration',
-            'sub_negative_10_duration',
-            'sub_negative_10_percent',
-            'consecutive_sub_negative_10_duration',
-            'sub_negative_20_duration',
-            'sub_negative_20_percent',
-            'consecutive_sub_negative_20_duration',
-            'sub_negative_40_duration',
-            'sub_negative_40_percent',
-            'consecutive_sub_negative_40_duration',
-            'started_curve_count',
-            'complete_curve_count',
-            'consecutive_non_wear_duration',
-            'consecutive_non_wear_percent',
-            'flatline_max',
-            'flatlined_percent',
-            'jump_duration',
-            'jump_percent',
-            'plummet_duration',
-            'plummet_percent',
-            'begin_day',
-            'end_day',
-            'date'
-        ]
-
         # Split data into valid and invalid days if there's a validity column
         if 'DAY_VALID' in self.day_features.columns:
             self.day_valid = self.day_features[self.day_features['DAY_VALID'] == 1]
@@ -93,6 +53,71 @@ class dayFeatures():
         else:
             self.day_valid = self.day_features
             self.day_invalid = pd.DataFrame()
+
+    def compute_low_quality_stats(self, output_filepath=None):
+        """
+        Calculates the percentage of time in various low-quality states and the percentage of that time that was imputed.
+        The results are stored in a dataframe and added to self.day_stat_frames.
+        If an output_filepath is provided, the stats are also saved to a simple Excel file.
+        """
+        stats = {}
+        
+        # Define the low-quality categories and their corresponding column prefixes
+        categories = {
+            'Gaps': 'gap',
+            'Non-Wear': 'non_wear',
+            'Jumps': 'jump',
+            'Plummets': 'plummet',
+            'Extreme Negative': 'extreme_negative'
+        }
+        
+        # Check if necessary columns exist
+        required_cols = ['begin_day', 'end_day']
+        for prefix in categories.values():
+            required_cols.append(f'{prefix}_duration')
+            required_cols.append(f'imputed_{prefix}_duration')
+
+        missing_cols = [col for col in required_cols if col not in self.day_features.columns]
+            
+        if missing_cols:
+            print(f"Warning: Missing required columns for low quality stats, skipping: {', '.join(missing_cols)}")
+            self.day_stat_frames.append(pd.DataFrame()) # Append empty frame
+            return
+
+        # Calculate total day duration using time difference between begin_day and end_day
+        # Convert to datetime if not already
+        self.day_features['begin_day'] = pd.to_datetime(self.day_features['begin_day'])
+        self.day_features['end_day'] = pd.to_datetime(self.day_features['end_day'])
+        
+        # Calculate duration in hours for each day
+        day_durations = (self.day_features['end_day'] - self.day_features['begin_day']).dt.total_seconds() / 3600
+        total_day_duration = day_durations.sum()
+
+        for name, prefix in categories.items():
+            duration_col = f'{prefix}_duration'
+            imputed_duration_col = f'imputed_{prefix}_duration'
+
+            total_category_duration = self.day_features[duration_col].sum()
+            total_imputed_duration = self.day_features[imputed_duration_col].sum()
+            
+            percent_of_total_time = (total_category_duration / total_day_duration) * 100 if total_day_duration > 0 else 0
+            
+            percent_imputed = (total_imputed_duration / total_category_duration) * 100 if total_category_duration > 0 else 0
+            
+            stats[name] = {
+                '% of Total Day Time': percent_of_total_time,
+                '% Imputed': percent_imputed
+            }
+            
+        stats_df = pd.DataFrame.from_dict(stats, orient='index')
+        self.day_stat_frames.append(stats_df)
+
+        if output_filepath:
+            # Ensure the directory exists
+            output_dir = os.path.dirname(output_filepath)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+            stats_df.to_excel(output_filepath)
 
     def export_workbook_days(self, file_name):
         """Export day features to an Excel workbook with plots."""

@@ -1,5 +1,33 @@
 import pandas as pd
 import scipy.stats as stats
+import numpy as np
+
+def compare_correlation_strengths(r1, n1, r2, n2):
+    """
+    Compare the strength of two independent correlation coefficients using Fisher's z-transformation.
+    Returns the p-value for the difference.
+    """
+    # Fisher's z-transformation cannot be computed for r = 1 or r = -1, handle this case
+    if abs(r1) == 1 or abs(r2) == 1:
+        return 0.0 # Or handle as a special case, a perfect correlation is likely significant
+        
+    if n1 <= 3 or n2 <= 3:
+        return np.nan
+    
+    # Fisher's z-transformation
+    z1 = np.arctanh(r1)
+    z2 = np.arctanh(r2)
+    
+    # Standard error of the difference
+    se_diff = np.sqrt(1 / (n1 - 3) + 1 / (n2 - 3))
+    
+    # Z-statistic for the difference
+    z_stat = (z1 - z2) / se_diff
+    
+    # Two-tailed p-value
+    p_value = stats.norm.sf(abs(z_stat)) * 2
+    
+    return p_value
 
 class statModel:
   def __init__(self, event_features):

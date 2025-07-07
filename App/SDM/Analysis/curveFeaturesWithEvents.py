@@ -1,4 +1,4 @@
-from App.SDM.Analysis.statModel import statModel
+from App.SDM.Analysis.statModel import statModel, compare_correlation_strengths
 from App.SDM.Analysis.curveFeatures import curveFeatures
 from App.SDM.Skyn_Processors.ema_region import emaRegion
 from App.SDM.Configuration.file_management import load, save_to_computer
@@ -23,6 +23,15 @@ class curveFeaturesWithEvents(curveFeatures):
     # Optional configuration dictionaries
     self.event_attrs = event_attrs
     self.day_attrs = day_attrs
+
+    # Find drink total column
+    self.drink_total_column = None
+    if not self.event_data.empty:
+        for col in self.event_data.columns:
+            # More specific search for drink total column
+            if ('drink' in col.lower() and 'total' in col.lower()) or 'totsd' in col.lower():
+                self.drink_total_column = col
+                break
 
     self.default_tac_features = report_guide.stats_features
 
@@ -290,18 +299,7 @@ class curveFeaturesWithEvents(curveFeatures):
     
     # Define the desired order of flags
     desired_flag_order = [
-        'FLAG_sub_negative_10_PERIPHERY_>80%_>2hrs',
-        'FLAG_sub_negative_20_PERIPHERY_>40%_>1.5hrs',
-        'FLAG_sub_negative_40_PERIPHERY_>20%_>0.5hrs',
-        'FLAG_non_wear_PERIPHERY_>40%',
-        'FLAG_flatlined_peak_CURVE_>20%flatline_peak>350',
-        'FLAG_sub_negative_10_CURVE_>20%_>1.0',
-        'FLAG_rise_completion_CURVE_<50%',
-        'FLAG_rise_rate_CURVE_>430',
-        'FLAG_fall_completion_CURVE_<50%',
-        'FLAG_short_curve_duration_CURVE_<0.25hrs',
-        'FLAG_imputed_CURVE_>40%_or_duration>3hrs',
-        'FLAG_unimputed_low_quality_CURVE_>20%'
+        col for col in self.curve_with_event.columns if 'FLAG' in col
     ]
     
     # Filter flag_cols to only include flags that exist in the data
@@ -426,6 +424,7 @@ class curveFeaturesWithEvents(curveFeatures):
     """
     Compute Pearson correlations between TAC features and drink total for valid vs invalid matched curves.
     Creates a DataFrame comparing correlations across the two groups and adds it to event_stat_frames.
+    Also includes means and standard deviations of self-reported drinks by valid vs invalid curves.
     """
     # Define the TAC features to analyze
     tac_features = ['auc_total_CURVE', 'peak_CURVE', 'rise_rate_CURVE', 'fall_rate_CURVE']
@@ -437,26 +436,41 @@ class curveFeaturesWithEvents(curveFeatures):
         print("No TAC features found in the data for correlation analysis")
         return
     
-    # Check if drink total column exists
-    drink_total_col = None
-    for col in self.curve_features.columns:
-        if 'drink_total' in col.lower() or 'drinks' in col.lower():
-            drink_total_col = col
-            break
+    # Use the drink total column found during initialization
+    drink_total_col = self.drink_total_column
     
     if drink_total_col is None:
-        print("No drink total column found in the data for correlation analysis")
+        print("No drink total column found in the event data for correlation analysis")
         return
+
+    # Create a mapping from event to drink total
+    drink_map = self.matched_events[['ID', 'ema_id', self.drink_total_column]].copy()
+    drink_map.drop_duplicates(subset=['ID', 'ema_id'], inplace=True)
+    drink_map[self.drink_total_column] = pd.to_numeric(drink_map[self.drink_total_column], errors='coerce')
     
     # Initialize results dictionary
     correlation_results = {}
+    drink_stats = {}
     
-    # Compute correlations for valid curves with events
+    # Compute correlations and drink statistics for valid curves with events
     if not self.curve_valid_with_event.empty:
-        valid_data = self.curve_valid_with_event[available_features + [drink_total_col]].dropna()
-        if len(valid_data) > 1:  # Need at least 2 rows for correlation
+        valid_data = self.curve_valid_with_event.merge(
+            drink_map,
+            left_on=['subid', 'event_matched_1'],
+            right_on=['ID', 'ema_id'],
+            how='left'
+        ).dropna(subset=available_features + [drink_total_col])
+
+        if len(valid_data) > 1:
             valid_corr = valid_data[available_features].corrwith(valid_data[drink_total_col], method='pearson')
             correlation_results['Valid Curves with Events'] = valid_corr
+            
+            # Calculate drink statistics for valid curves
+            drink_stats['Valid Curves with Events'] = {
+                'mean': valid_data[drink_total_col].mean(),
+                'std': valid_data[drink_total_col].std(),
+                'n': len(valid_data)
+            }
         else:
             print("Insufficient data for valid curves correlation analysis")
             return
@@ -464,12 +478,25 @@ class curveFeaturesWithEvents(curveFeatures):
         print("No valid curves with events found for correlation analysis")
         return
     
-    # Compute correlations for invalid curves with events
+    # Compute correlations and drink statistics for invalid curves with events
     if not self.curve_invalid_with_event.empty:
-        invalid_data = self.curve_invalid_with_event[available_features + [drink_total_col]].dropna()
-        if len(invalid_data) > 1:  # Need at least 2 rows for correlation
+        invalid_data = self.curve_invalid_with_event.merge(
+            drink_map,
+            left_on=['subid', 'event_matched_1'],
+            right_on=['ID', 'ema_id'],
+            how='left'
+        ).dropna(subset=available_features + [drink_total_col])
+        
+        if len(invalid_data) > 1:
             invalid_corr = invalid_data[available_features].corrwith(invalid_data[drink_total_col], method='pearson')
             correlation_results['Invalid Curves with Events'] = invalid_corr
+            
+            # Calculate drink statistics for invalid curves
+            drink_stats['Invalid Curves with Events'] = {
+                'mean': invalid_data[drink_total_col].mean(),
+                'std': invalid_data[drink_total_col].std(),
+                'n': len(invalid_data)
+            }
         else:
             print("Insufficient data for invalid curves correlation analysis")
             return
@@ -477,43 +504,144 @@ class curveFeaturesWithEvents(curveFeatures):
         print("No invalid curves with events found for correlation analysis")
         return
     
-    # Create comparison DataFrame
+    # Calculate sample sizes
+    valid_n = len(self.curve_valid_with_event.merge(drink_map, left_on=['subid', 'event_matched_1'], right_on=['ID', 'ema_id'], how='left').dropna(subset=available_features + [drink_total_col]))
+    invalid_n = len(self.curve_invalid_with_event.merge(drink_map, left_on=['subid', 'event_matched_1'], right_on=['ID', 'ema_id'], how='left').dropna(subset=available_features + [drink_total_col]))
+    
     comparison_data = []
     
     for feature in available_features:
-        valid_corr_val = correlation_results['Valid Curves with Events'][feature]
-        invalid_corr_val = correlation_results['Invalid Curves with Events'][feature]
+        valid_corr_val = correlation_results['Valid Curves with Events'].get(feature, np.nan)
+        invalid_corr_val = correlation_results['Invalid Curves with Events'].get(feature, np.nan)
         
         # Calculate difference
         corr_diff = valid_corr_val - invalid_corr_val
         
+        # Perform Fisher's z-test
+        p_value = compare_correlation_strengths(valid_corr_val, valid_n, invalid_corr_val, invalid_n)
+
         comparison_data.append({
             'TAC Feature': feature,
             'Valid Curves Correlation': valid_corr_val,
             'Invalid Curves Correlation': invalid_corr_val,
-            'Correlation Difference (Valid - Invalid)': corr_diff
+            'Correlation Difference (Valid - Invalid)': corr_diff,
+            'p-value (Difference)': p_value
         })
     
     # Create DataFrame and add sample sizes
     correlation_df = pd.DataFrame(comparison_data)
+
+    sample_size_info = pd.DataFrame([{
+        'TAC Feature': 'Sample Size',
+        'Valid Curves Correlation': valid_n,
+        'Invalid Curves Correlation': invalid_n,
+        'Correlation Difference (Valid - Invalid)': np.nan,
+        'p-value (Difference)': np.nan
+    }])
     
-    # Add sample size information
-    valid_n = len(self.curve_valid_with_event[available_features + [drink_total_col]].dropna())
-    invalid_n = len(self.curve_invalid_with_event[available_features + [drink_total_col]].dropna())
+    # Add drink statistics
+    drink_stats_info = pd.DataFrame([{
+        'TAC Feature': 'Drink Total Mean',
+        'Valid Curves Correlation': drink_stats['Valid Curves with Events']['mean'],
+        'Invalid Curves Correlation': drink_stats['Invalid Curves with Events']['mean'],
+        'Correlation Difference (Valid - Invalid)': drink_stats['Valid Curves with Events']['mean'] - drink_stats['Invalid Curves with Events']['mean'],
+        'p-value (Difference)': np.nan
+    }, {
+        'TAC Feature': 'Drink Total Std',
+        'Valid Curves Correlation': drink_stats['Valid Curves with Events']['std'],
+        'Invalid Curves Correlation': drink_stats['Invalid Curves with Events']['std'],
+        'Correlation Difference (Valid - Invalid)': drink_stats['Valid Curves with Events']['std'] - drink_stats['Invalid Curves with Events']['std'],
+        'p-value (Difference)': np.nan
+    }])
     
-    sample_size_info = pd.DataFrame({
-        'Metric': ['Sample Size'],
-        'Valid Curves with Events': [valid_n],
-        'Invalid Curves with Events': [invalid_n]
-    })
+    # Combine correlation results with sample size and drink statistics info
+    final_results = pd.concat([sample_size_info, drink_stats_info, correlation_df], ignore_index=True)
     
-    # Combine correlation results with sample size info
-    final_results = pd.concat([sample_size_info, correlation_df], ignore_index=True)
-    
-    print(final_results)
+    print("\n--- TAC Feature vs Drink Total Correlations ---")
+    print(final_results.to_string())
 
     # Add to event_stat_frames
     self.event_stat_frames.append(final_results)
+
+  def compare_valid_invalid_tac_features(self):
+    """
+    Generates a DataFrame comparing TAC feature statistics for valid ('High Quality')
+    and invalid ('Low Quality') curves that have matched events.
+    """
+    if self.curve_valid_with_event.empty and self.curve_invalid_with_event.empty:
+        print("No valid or invalid curves with events to compare.")
+        return
+
+    features_map = {
+        'Area Under': 'auc_total_CURVE',
+        'Peak Value': 'peak_CURVE',
+        'Rise Rate': 'rise_rate_CURVE',
+        'Fall Rate': 'fall_rate_CURVE'
+    }
+
+    results = []
+    
+    available_features = {name: col for name, col in features_map.items() if col in self.curve_features.columns}
+
+    if not available_features:
+        print("None of the specified TAC features for comparison are available in curve_features.")
+        return
+
+    # Process "High Quality" (valid) curves
+    if not self.curve_valid_with_event.empty:
+        valid_df = self.curve_valid_with_event[[col for col in available_features.values() if col in self.curve_valid_with_event.columns]]
+        if not valid_df.empty:
+            valid_stats = valid_df.agg(['count', 'mean', 'std', 'median', 'min', 'max'])
+            for feature_name, feature_col in available_features.items():
+                if feature_col in valid_stats.columns:
+                    stats = valid_stats[feature_col]
+                    n = stats['count']
+                    se = stats['std'] / np.sqrt(n) if n > 0 else 0
+                    results.append({
+                        'Feature': feature_name,
+                        'Curve_Quality': 'High Quality',
+                        'N': int(n),
+                        'Mean': stats['mean'],
+                        'Std': stats['std'],
+                        'SE': se,
+                        'Median': stats['median'],
+                        'Min': stats['min'],
+                        'Max': stats['max']
+                    })
+
+    # Process "Low Quality" (invalid) curves
+    if not self.curve_invalid_with_event.empty:
+        invalid_df = self.curve_invalid_with_event[[col for col in available_features.values() if col in self.curve_invalid_with_event.columns]]
+        if not invalid_df.empty:
+            invalid_stats = invalid_df.agg(['count', 'mean', 'std', 'median', 'min', 'max'])
+            for feature_name, feature_col in available_features.items():
+                if feature_col in invalid_stats.columns:
+                    stats = invalid_stats[feature_col]
+                    n = stats['count']
+                    se = stats['std'] / np.sqrt(n) if n > 0 else 0
+                    results.append({
+                        'Feature': feature_name,
+                        'Curve_Quality': 'Low Quality',
+                        'N': int(n),
+                        'Mean': stats['mean'],
+                        'Std': stats['std'],
+                        'SE': se,
+                        'Median': stats['median'],
+                        'Min': stats['min'],
+                        'Max': stats['max']
+                    })
+
+    if not results:
+        return
+
+    results_df = pd.DataFrame(results)
+    
+    results_df['Feature'] = pd.Categorical(results_df['Feature'], categories=available_features.keys(), ordered=True)
+    results_df = results_df.sort_values(['Feature', 'Curve_Quality'])
+
+    results_df = results_df.set_index(['Feature', 'Curve_Quality'])
+    
+    self.event_stat_frames.append(results_df)
 
   def run_event_stats(self):
     self.count_matches()
@@ -522,6 +650,7 @@ class curveFeaturesWithEvents(curveFeatures):
     self.assess_search_quality()
     self.compute_person_level_stats()
     self.compute_tac_feature_drink_correlations()
+    self.compare_valid_invalid_tac_features()
 
   def export_workbook_events_and_curves(self, file_name, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, export_plots=False):
     with pd.ExcelWriter(file_name, engine = 'xlsxwriter', mode = 'w') as writer:
@@ -801,80 +930,16 @@ class curveFeaturesWithEvents(curveFeatures):
     visualizer = QualityVisualizer(use_three_imputation_ratio_groups=use_three_imputation_ratio_groups)
     raw_curve_features = getattr(self, 'raw_curve_features', None)
     visualizer.create_tac_boxplots(self.curve_with_event, output_dir=output_dir)
-    visualizer.create_tac_density_plots(self.curve_with_event, output_dir=output_dir)
+    
+    # Create TAC density plots
+    density_plot_filename = os.path.join(output_dir, 'tac_density_distributions.png')
+    visualizer.create_tac_density_plots(self.curve_with_event, output_filename=density_plot_filename)
+    
     # Optionally, you can add more plot types here, e.g.:
     # visualizer.create_quality_mean_plots(self.curve_with_event, raw_curve_features=raw_curve_features, output_dir=output_dir)
 
-  """
   def clean_out_distant_events(self, distance_threshold=8):
-
-    #curve_vs_self_report_time_diff is self report - curve start
-    indices_too_far = self.curve_features.index[
-      (self.curve_features['curve_vs_self_report_time_diff']-1).abs() > distance_threshold
-    ] #-1 is to catch more events that occur later and account for TAC delay
-
-    self.events_too_far_from_curve = self.curve_features.loc[indices_too_far, ['curve_id', 'curve_vs_self_report_time_diff', 'curve_threshold'] + self.ema_columns + self.ema_region_quality_columns]
-    self.events_too_far_from_curve.drop_duplicates(subset=['ID', self.event_id_column], inplace=True)
-    
-    # removing ema data from curves that are too far from self report event start
-    self.curve_features.loc[indices_too_far, self.ema_columns + self.ema_region_quality_columns] = np.nan  
-
-    # Filter duplicate events and select the one with the lowest absolute curve_vs_self_report_time_diff - 1
-    duplicate_events = self.curve_features[self.curve_features.duplicated(subset=['ID', self.event_id_column], keep=False)].copy()
-    indices_closest_curve_to_event = duplicate_events.groupby(['ID', self.event_id_column])['curve_vs_self_report_time_diff']\
-      .apply(lambda x: (abs(x - 1)).idxmin()).values   
-    indices_closest_curve_to_event = pd.Index(indices_closest_curve_to_event)
-    indices_curves_not_closest_to_event = duplicate_events.index.difference(indices_closest_curve_to_event)
-    self.curves_with_event_match_but_event_data_removed_because_not_closest = len(indices_curves_not_closest_to_event)
-    #remove event data for curves that are farther away from event than a different curve
-    self.curve_features.loc[indices_curves_not_closest_to_event, self.ema_columns + self.ema_region_quality_columns] = np.nan     
-
-    # Precompute index sets for faster lookup
-    curve_features_idx = set(self.curve_features.set_index(['ID', self.event_id_column]).index)
-    events_without_curve_idx = set(self.events_too_far_from_curve.set_index(['ID', self.event_id_column]).index)
-
-    # Remove from self.events_without_curve if it's in curve_features
-    # print('TOO FAR: ',  len(self.events_too_far_from_curve))
-    self.events_without_curve = self.events_too_far_from_curve[
-        ~self.events_too_far_from_curve.set_index(['ID', self.event_id_column]).index.isin(curve_features_idx)
-    ]
-    print('TOO FAR [cleaned]: ',  len(self.events_without_curve))
-
-    # Find missing events in event_data that are:
-    # (1) In event_data, (2) Not in events_without_curve, (3) Not in curve_features
-    mask = ~self.event_data.set_index(['ID', self.event_id_column]).index.isin(events_without_curve_idx)
-    mask &= ~self.event_data.set_index(['ID', self.event_id_column]).index.isin(curve_features_idx)
-    df_missing_events = self.event_data[mask].reset_index(drop=True)
-    for col in self.ema_region_quality_columns + ['curve_id', 'curve_vs_self_report_time_diff', 'curve_threshold', 'nearest_curve_id', 'nearest_curve_time_diff']:
-      df_missing_events[col] = None
-    print('Events from event file not included: ', len(df_missing_events))
-
-    for i, missing_event in df_missing_events.iterrows():
-      subid = missing_event['ID']
-      ema_id = missing_event[self.event_id_column]
-      ema_start_time = missing_event[self.event_start_column]
-      self_reported_drinks = missing_event[self.event_drink_total_column]
-      processors = [p for p in self.processors if p.subid == str(subid) or p.subid == int(subid)]
-      if len(processors) > 0:
-        processor = processors[0]
-        ema_region = emaRegion(processor.dataset, subid, processor.dataset_identifier, ema_id, ema_start_time)
-        if len(ema_region.self_report_region) > 0:
-          df_filtered = self.curve_features[(self.curve_features['subid'] == int(subid)) | (self.curve_features['subid'] == str(subid))]
-          curve_threshold = df_filtered.iloc[0]['curve_threshold'] if len(df_filtered) else None
-          if len(df_filtered):
-            closest_row = df_filtered.loc[(df_filtered['begin_CURVE'] - ema_start_time).abs().idxmin()]
-            time_diff_hours = (closest_row['begin_CURVE'] - ema_start_time).total_seconds() / 3600
-            df_missing_events.at[missing_event.name, 'nearest_curve_id'] = closest_row['curve_id']
-            df_missing_events.at[missing_event.name, 'nearest_curve_time_diff'] = time_diff_hours
-          df_missing_events.at[missing_event.name, 'curve_threshold'] = curve_threshold
-          ema_region.make_device_removal_plot(processor.plot_folder)
-          ema_region.make_signal_processing_plot(processor.plot_folder, curve_threshold if curve_threshold else 10, self_reported_drinks)
-          for col, new_value in ema_region.self_report_region_quality_features.items():
-            if col in self.ema_region_quality_columns:
-              df_missing_events.at[missing_event.name, col] = new_value
-
-    # Add missing events and sort
-    self.events_without_curve = pd.concat([self.events_without_curve, df_missing_events], ignore_index=True)
-    self.events_without_curve.sort_values(by=['ID', self.event_id_column], inplace=True)
-
-  """
+    # This method is designed to remove events that are too far from their matched curves
+    # Get all columns for curve matches and their distances
+    match_cols = [f'curve_match_{i}' for i in range(1, 6)]
+    # ... rest of the method content ...

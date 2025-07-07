@@ -245,6 +245,7 @@ class skynDataset:
         index=False
       )
 
+      self.raw_curves = []
       if include_raw_curves:
         curve_start_and_end_indices_raw = adjust_curve_demarcation_for_raw_tac(
           self.dataset, 
@@ -258,7 +259,7 @@ class skynDataset:
         #process each curve using raw (unimputed) TAC
         curve_id = 0
         raw_rows = []
-        self.raw_curves = []
+        
         for curve_start, curve_end, curve_count in curve_start_and_end_indices_raw:
           curve = Curve(
             self.dataset, 
@@ -278,15 +279,15 @@ class skynDataset:
           raw_rows.append(curve.row)
           curve_id += 1
 
-        if len(self.raw_curves) > 0:
-          self.raw_curve_features = pd.DataFrame(raw_rows, columns=curve.features.columns)
-        else:
-          self.raw_curve_features = pd.DataFrame(columns=self.curve_columns)
-
+      if len(self.raw_curves) > 0:
+        self.raw_curve_features = pd.DataFrame(raw_rows, columns=curve.features.columns)
         self.raw_curve_features.to_excel(
           f'{self.data_out_folder}/raw_curve_features_{self.subid}_{self.dataset_identifier}.xlsx', 
           index=False
         )
+      else:
+        self.raw_curve_features = pd.DataFrame(columns=self.curve_columns)
+
 
       self.save_as_sdp(valid=True)
 
@@ -468,7 +469,7 @@ class skynDataset:
       self.log_error()
       self.save_as_sdp(valid=False)
 
-  def run_day_level_analysis(self, day_start_hour = 0, non_wear_self_report_column = '', morning_report = pd.DataFrame(), make_graphs=False):
+  def run_day_level_analysis(self, day_start_hour = 0, non_wear_self_report_column = '', morning_report = pd.DataFrame(), make_graphs=False, export_processed_data=False):
     print(f'Analyzing Days: {self.subid} - {self.dataset_identifier}')  
     self.days = [] #reset to empty
     self.day_level_data = pd.DataFrame() #reset to empty
@@ -505,9 +506,10 @@ class skynDataset:
 
       self.day_level_data = create_day_level_dataframe(self.days, self.subid, self.dataset_identifier, morning_report=morning_report)
       
-      with pd.ExcelWriter(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
-        self.dataset.to_excel(writer, sheet_name='processed_data', index=False)
-        signal_quality_feature_key.to_excel(writer, sheet_name='key', index=False)
+      if export_processed_data:
+        with pd.ExcelWriter(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
+          self.dataset.to_excel(writer, sheet_name='processed_data', index=False)
+          signal_quality_feature_key.to_excel(writer, sheet_name='key', index=False)
 
       with pd.ExcelWriter(f'{self.data_out_folder}/dayLevel_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
         self.day_level_data.set_index('day_no').to_excel(writer, sheet_name='day-level-results')

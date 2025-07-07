@@ -126,7 +126,7 @@ def get_artifact_indices(df, max_labeling_length=(60*6)):
                 if tac_values[idx] >= projected_tac:
                     break
                     
-                projected_tac -= 1.0  # Slightly decrease acceptable TAC values
+                projected_tac -= 3.0  # Slightly decrease acceptable TAC values
                 plummet_indices.add(df_indices[idx])
                 last_processed_idx = idx
             
