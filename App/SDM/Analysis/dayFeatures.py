@@ -119,6 +119,18 @@ class dayFeatures():
                 os.makedirs(output_dir, exist_ok=True)
             stats_df.to_excel(output_filepath)
 
+    def configure_columns_for_compliance_check(self):
+        self.day_features['FLAG_square_wave'] = None
+        self.day_features['FLAG_extreme_negative'] = (self.day_features['extreme_negative_duration'] > 2).astype(int)
+        self.day_features['FLAG_extreme_high_temp'] = (self.day_features['temp_max'] > 50).astype(int)
+        self.day_features['FLAG_extreme_low_temp'] = (self.day_features['temp_min'] < 0).astype(int)
+                                                                        
+        """Reorder the compliance flag columns to be the 4th column onwards."""
+        flag_columns = [col for col in self.day_features.columns if col.startswith('FLAG_')]
+        other_columns = [col for col in self.day_features.columns if not col.startswith('FLAG_')]
+        new_order = other_columns[:3] + flag_columns + other_columns[3:]
+        self.day_features = self.day_features[new_order]
+
     def export_workbook_days(self, file_name):
         """Export day features to an Excel workbook with plots."""
         print("\nExporting workbook...")

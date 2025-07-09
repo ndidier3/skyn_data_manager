@@ -495,7 +495,7 @@ class skynDataset:
           signal_processing_plot = plot_signal_processing(
             day.day_dataset, self.plot_folder, self.subid, day_id, self.dataset_identifier, f'DAY{day_id}',
             self.curve_threshold, time_variable='datetime', title = f'Signal Processing',
-            subtitle_text = f'{self.subid} -- Day: {day_id}'
+            subtitle_text = f'{self.subid} -- Day: {day_id+1}'
           )
           self.plot_paths.append(signal_processing_plot)
           

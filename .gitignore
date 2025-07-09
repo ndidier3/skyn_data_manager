@@ -37,3 +37,5 @@ Inputs/Skyn_Data/
 App/SDM/Scripts/LINC/run_curve_analysis.py
 .cursor
 node_modules
+run_sdm_gui.exe
+run_sdm_gui.spec
