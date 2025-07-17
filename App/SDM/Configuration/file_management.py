@@ -4,6 +4,8 @@ from datetime import date
 import xlsxwriter
 import os
 import re
+import numpy as np
+from collections import Counter
 
 def export_to_computer(object, filepath):
   out = open(filepath, "wb")

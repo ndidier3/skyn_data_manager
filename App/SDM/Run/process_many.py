@@ -127,18 +127,6 @@ def process_and_analyze_data(
         event_datasets.append(sdm_processor.events)
         if include_raw_curves:
           raw_curve_features.append(sdm_processor.raw_curve_features)
-      
-        
-      if analyze_events:
-        subids_found = event_data[event_subid_column].unique().tolist()
-        if (int(subid) in subids_found or str(subid) in subids_found):
-          print(f"Running event level analysis for {subid}_{dataset_identifier}")
-          sdm_processor.run_event_level_analysis(event_data, **event_attrs)
-          event_datasets.append(sdm_processor.event_level_data)
-          processors.append(sdm_processor)
-          no_skyn_data_found.append(sdm_processor.events_with_no_skyn_data)
-        else:
-          print(f"{subid} {dataset_identifier} -- NO Event DATA")
           
     except Exception as e:
       print(f"\nError processing file {file}:")

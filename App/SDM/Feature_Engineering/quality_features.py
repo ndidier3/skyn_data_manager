@@ -36,13 +36,13 @@ def count_longest_consecutive_non_wear(df, variable = 'device_worn_model'):
   df.drop(columns=['non_wear_group'], inplace=True)
   return longest_non_wear
 
-def count_longest_consecutive_below(df, variable='TAC', X=-10):
+def count_longest_consecutive_below(df, variable='TAC', X=-15):
   """Count the longest consecutive period where values are below threshold.
   
   Args:
       df: DataFrame containing the data
       variable: Column name to check (default: 'TAC')
-      X: Threshold value (default: -10)
+      X: Threshold value (default: -15)
   
   Returns:
       int: Length of longest period below threshold in minutes
@@ -456,10 +456,9 @@ def get_start_to_peak_interval(df, tac_variable='TAC'):
     # Since curve is reset_index(drop=True), index is positional
     start_to_peak_count = df.index[df[tac_variable] == df[tac_variable].max()].tolist()[0] if df[tac_variable].max() is not None else 0
     return start_to_peak_count
-def get_rise_low_quality_percent(df, tac_variable='TAC'):
-    """Calculate percentage of low quality data in the rise portion of a curve.
+def get_rise_imputed_percent(df, tac_variable='TAC'):
+    """Calculate percentage of imputed data in the rise portion of a curve.
     
-    Low quality includes: jumps, plummets, extreme negatives, non-wear periods, and gaps.
     Only considers data from start to peak.
     
     Args:
@@ -467,7 +466,7 @@ def get_rise_low_quality_percent(df, tac_variable='TAC'):
         tac_variable: Column name for TAC values (default: 'TAC')
     
     Returns:
-        float: Percentage of low quality data in rise portion (0-1)
+        float: Percentage of imputed data in rise portion (0-1)
     """
     peak_index = df[tac_variable].idxmax()
     rise_portion = df.loc[:peak_index]
@@ -475,20 +474,15 @@ def get_rise_low_quality_percent(df, tac_variable='TAC'):
     if len(rise_portion) == 0:
         return 0.0
         
-    low_quality_mask = (
-        (rise_portion['jump']) | 
-        (rise_portion['plummet']) | 
-        (rise_portion['extreme_negative']) | 
-        (rise_portion['non_wear']==1) | 
-        (rise_portion['gap'] == 1)
+    imputed_mask = (
+      rise_portion['imputed'] == 1
     )
     
-    return low_quality_mask.sum() / len(rise_portion)
+    return imputed_mask.sum() / len(rise_portion)
 
-def get_fall_low_quality_percent(df, tac_variable='TAC'):
-    """Calculate percentage of low quality data in the fall portion of a curve.
+def get_fall_imputed_percent(df, tac_variable='TAC'):
+    """Calculate percentage of imputed data in the fall portion of a curve.
     
-    Low quality includes: jumps, plummets, extreme negatives, non-wear periods, and gaps.
     Only considers data from peak to end.
     
     Args:
@@ -496,7 +490,7 @@ def get_fall_low_quality_percent(df, tac_variable='TAC'):
         tac_variable: Column name for TAC values (default: 'TAC')
     
     Returns:
-        float: Percentage of low quality data in fall portion (0-1)
+        float: Percentage of imputed data in fall portion (0-1)
     """
     peak_index = df[tac_variable].idxmax()
     fall_portion = df.loc[peak_index:]
@@ -504,15 +498,11 @@ def get_fall_low_quality_percent(df, tac_variable='TAC'):
     if len(fall_portion) == 0:
         return 0.0
         
-    low_quality_mask = (
-        (fall_portion['jump']) | 
-        (fall_portion['plummet']) | 
-        (fall_portion['extreme_negative']) | 
-        (fall_portion['non_wear']==1) | 
-        (fall_portion['gap'] == 1)
+    imputed_mask = (
+      fall_portion['imputed'] == 1
     )
     
-    return low_quality_mask.sum() / len(fall_portion)
+    return imputed_mask.sum() / len(fall_portion)
 
 def get_total_gaps_and_non_wear_percent(df: pd.DataFrame) -> float:
     """Calculate the total percentage of data that is either a gap or non-wear period.

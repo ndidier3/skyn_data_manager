@@ -61,6 +61,10 @@ class statModel:
         # Get all other flag columns
         flag_cols = [col for col in self.temp_data.columns if 'FLAG' in col and col != column]
         
+        # Initialize unique flag columns with default values
+        group_stats['Unique_Flag_Count'] = ''
+        group_stats['Unique_Flag_%'] = ''
+        
         # For rows where this flag is 1, check if any other flags are 1
         if 1 in group_stats.index:
             # Get rows where this flag is 1

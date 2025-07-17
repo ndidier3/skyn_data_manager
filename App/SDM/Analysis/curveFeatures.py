@@ -5,6 +5,8 @@ from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 from App.SDM.Documenting.report_guide import report_guide
 from App.SDM.Configuration.file_management import extract_subid
 from App.SDM.Visualization.quality import QualityVisualizer
+from App.SDM.Analysis.featureFlagger import featureFlagger
+from App.SDM.Run.default_settings.default_flag_settings import DEFAULT_FLAG_SELECTIONS
 import os
 import pandas as pd
 import numpy as np
@@ -90,6 +92,17 @@ class curveFeatures():
 
     # Initialize quality visualizer
     self.quality_visualizer = QualityVisualizer()
+  
+  def apply_flag_analysis(self, export = False, output_dir = None, flag_settings = DEFAULT_FLAG_SELECTIONS):
+    """
+    Apply flag analysis to the curve features.
+    """
+    self.curve_features.drop(columns=[col for col in self.curve_features.columns if 'FLAG' in col], inplace=True)
+    flag_analysis = featureFlagger(self.curve_features, flag_settings)
+    flags_result = flag_analysis.run_flags_and_validation()
+    self.curve_features = flag_analysis.ftrs
+    if export:
+      flag_analysis.export_flag_analysis_workbooks(output_dir=output_dir, plot_columns=['smoothed_curve_plot', 'signal_processing_plot', 'device_removal_plot', 'signal_processing_plot_wide'])
 
   def compile_imputation_info(self):
     """Compile imputation information from all processors"""
@@ -200,7 +213,9 @@ class curveFeatures():
       ] or col.startswith('shared_count_')]
       combined_flag_stats = combined_flag_stats[keep_cols]
       # Filter out rows where 'Unique_Flag_Count' is empty (removes counts of non-flagged curves, only keeping flag counts)
-      combined_flag_stats = combined_flag_stats[combined_flag_stats['Unique_Flag_Count'].notna() & (combined_flag_stats['Unique_Flag_Count'] != '')]
+      # Only perform this filtering if the Unique_Flag_Count column exists
+      if 'Unique_Flag_Count' in combined_flag_stats.columns:
+          combined_flag_stats = combined_flag_stats[combined_flag_stats['Unique_Flag_Count'].notna() & (combined_flag_stats['Unique_Flag_Count'] != '')]
       # Calculate % of total curves and rename column
       combined_flag_stats['% of Total Curves'] = (combined_flag_stats['Count'] / total_curves) * 100
       # Drop the old '%' column if it exists
@@ -487,8 +502,8 @@ class curveFeatures():
         flag_column = flag_prefix
       else:
         # Find corresponding flag column
-        # Remove _CURVE or _PERIPHERY suffix if present
-        base_column = sort_column.replace('_CURVE', '').replace('_PERIPHERY', '')
+        # Remove _CURVE, _PERIPHERY_BEFORE, _PERIPHERY_AFTER, or _PERIPHERY suffix if present
+        base_column = sort_column.replace('_CURVE', '').replace('_PERIPHERY_BEFORE', '').replace('_PERIPHERY_AFTER', '').replace('_PERIPHERY', '')
         
         # Flexibly match any flag column containing the base_column
         flag_candidates = [col for col in sorted_features.columns if col.startswith('FLAG_') and base_column in col]
@@ -586,14 +601,14 @@ class curveFeatures():
     """
     Identify curves that have no low quality data in either periphery or curve regions.
     Sets a 'perfect' column to 1 for curves that meet these criteria:
-    - No low quality data in periphery (low_quality_percent_PERIPHERY = 0)
+    - No low quality data in periphery before and after (low_quality_percent_PERIPHERY_BEFORE = 0 and low_quality_percent_PERIPHERY_AFTER = 0)
     - No low quality data in curve (low_quality_percent_CURVE = 0)
     """
     # Initialize perfect column to 0
     self.curve_features['perfect'] = 0
     
     # Calculate combined non-wear and gap features for each region type
-    region_types = ['CURVE', 'PERIPHERY', 'REGION']
+    region_types = ['CURVE', 'PERIPHERY_BEFORE', 'PERIPHERY_AFTER', 'REGION']
     for region in region_types:
         # Calculate combined percent features
         self.curve_features[f'total_non_wear_gap_percent_{region}'] = (
@@ -626,7 +641,8 @@ class curveFeatures():
     self.curve_features.loc[perfect_mask, 'perfect'] = 1
 
     self.curve_features.to_excel(f'{output_dir}/curve_features.xlsx', index=False)
-    self.raw_curve_features.to_excel(f'{output_dir}/raw_curve_features.xlsx', index=False)
+    if self.raw_curve_features is not None:
+        self.raw_curve_features.to_excel(f'{output_dir}/raw_curve_features.xlsx', index=False)
     # Print summary
     total_curves = len(self.curve_features)
     perfect_curves = perfect_mask.sum()

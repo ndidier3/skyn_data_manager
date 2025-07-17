@@ -143,14 +143,14 @@ def get_artifact_indices(df, max_labeling_length=(60*6)):
     
     return jump_indices, plummet_indices
 
-def get_extreme_negative_indices(df, negative_threshold = -10):
+def get_extreme_negative_indices(df, negative_threshold = -15):
   """
   Get indices where TAC values are below a negative threshold.
   These values are physically impossible since TAC should always be non-negative.
   
   Args:
     df: DataFrame containing TAC values
-    negative_threshold: Threshold below which values are considered extreme negative (default: -10)
+    negative_threshold: Threshold below which values are considered extreme negative (default: -15)
     
   Returns:
     List of indices with extreme negative values
@@ -473,20 +473,43 @@ def impute_low_quality_data(df: pd.DataFrame):
       df = label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices_filtered, jump_indices_filtered, plummet_indices_filtered, extreme_negative_indices_filtered)
       
       imputation_attempt['was_imputed'] = True
+
+    # Check if region contains only extreme negative and proximal low quality indices
     else:
-      print('NOT IMPUTED')
-      if low_quality_region_too_long:
-        imputation_attempt['reason_not_imputed'] = 'region_too_long'
-      elif not training_data_before_valid:
-        if len(train_data_before) < min_training_data:
-          imputation_attempt['reason_not_imputed'] = 'insufficient_quantity_before'
+      region_indices = set(range(low_quality_region_start, low_quality_region_end + 1))
+      
+      # Check if any indices in this region are gaps, non-wear, jumps, or plummets
+      has_gaps = bool(region_indices & set(gap_indices))
+      has_non_wear = bool(region_indices & set(non_wear_indices_filtered))
+      has_jumps = bool(region_indices & set(jump_indices_filtered))
+      has_plummets = bool(region_indices & set(plummet_indices_filtered))
+      
+      # If region only contains extreme negative and/or proximal low quality
+      if not (has_gaps or has_non_wear or has_jumps or has_plummets):
+        # Impute with TAC = 0
+        df.iloc[low_quality_region_start:low_quality_region_end+1, df.columns.get_loc('TAC')] = 0
+        df.iloc[low_quality_region_start:low_quality_region_end+1, df.columns.get_loc('imputed')] = 1
+        df = label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices_filtered, jump_indices_filtered, plummet_indices_filtered, extreme_negative_indices_filtered)
+        
+        imputation_attempt['was_imputed'] = True
+        
+      # If region contains other types of low quality data, don't impute
+      else:
+        print('NOT IMPUTED')
+        if low_quality_region_too_long:
+          imputation_attempt['reason_not_imputed'] = 'region_too_long'
+        elif not training_data_before_valid:
+          if len(train_data_before) < min_training_data:
+            imputation_attempt['reason_not_imputed'] = 'insufficient_quantity_before'
+          else:
+            imputation_attempt['reason_not_imputed'] = 'insufficient_quality_before'
+        elif not training_data_after_valid:
+          if len(train_data_after) < min_training_data:
+            imputation_attempt['reason_not_imputed'] = 'insufficient_quantity_after'
+          else:
+            imputation_attempt['reason_not_imputed'] = 'insufficient_quality_after'
         else:
-          imputation_attempt['reason_not_imputed'] = 'insufficient_quality_before'
-      elif not training_data_after_valid:
-        if len(train_data_after) < min_training_data:
-          imputation_attempt['reason_not_imputed'] = 'insufficient_quantity_after'
-        else:
-          imputation_attempt['reason_not_imputed'] = 'insufficient_quality_after'
+          imputation_attempt['reason_not_imputed'] = 'contains_other_low_quality_data'
     
     imputation_info = pd.concat([imputation_info, pd.DataFrame([imputation_attempt])], ignore_index=True)
   

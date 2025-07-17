@@ -11,6 +11,8 @@ class ReportGuide:
         self._region_definitions = {
             '_CURVE': 'The main TAC curve region where the alcohol concentration rises and falls',
             '_PERIPHERY': 'The region before and after the curve, used for quality assessment',
+            '_PERIPHERY_BEFORE': 'The region before the curve start, used for quality assessment',
+            '_PERIPHERY_AFTER': 'The region after the curve end, used for quality assessment',
             '_REGION': 'The region consisting of CURVE + PERIPHERY',
             '_EMA_REGION': 'The 12-hour region starting at the earliest timestamp of the event',
         }
@@ -137,6 +139,16 @@ class ReportGuide:
             'FLAG_short_curve_duration_CURVE_<Xhrs': 'Flag for curve duration <X hours',
             'FLAG_imputed_CURVE_>P%_or_duration>Xhrs': 'Flag for >P% imputed or duration >X hours',
             'FLAG_unimputed_low_quality_CURVE_>P%': 'Flag for >P% unimputed low quality data',
+            
+            # Periphery flags
+            'FLAG_gaps_and_non_wear_periphery_before': 'Flag for gaps and non-wear in periphery before exceeding threshold',
+            'FLAG_extreme_negative_periphery_before': 'Flag for extreme negative values in periphery before exceeding threshold',
+            'FLAG_low_quality_periphery_before': 'Flag for low quality data in periphery before exceeding threshold',
+            'FLAG_unimputed_low_quality_periphery_before': 'Flag for unimputed low quality data in periphery before exceeding threshold',
+            'FLAG_gaps_and_non_wear_periphery_after': 'Flag for gaps and non-wear in periphery after exceeding threshold',
+            'FLAG_extreme_negative_periphery_after': 'Flag for extreme negative values in periphery after exceeding threshold',
+            'FLAG_low_quality_periphery_after': 'Flag for low quality data in periphery after exceeding threshold',
+            'FLAG_unimputed_low_quality_periphery_after': 'Flag for unimputed low quality data in periphery after exceeding threshold',
             
             # Validity indicators
             'PERIPHERY_VALID': 'Whether the periphery meets validity criteria (1=valid)',
@@ -406,6 +418,117 @@ class ReportGuide:
             'sub_negative_10_sum_REGION': 'numeric',
             'extreme_negative_imputation_ratio_REGION': 'numeric',
             'low_quality_imputation_ratio_REGION': 'numeric',
+            'total_gaps_and_non_wear_percent_REGION': 'numeric',
+        }
+
+        # Periphery Before feature types
+        self._periphery_before_feature_types = {
+            'total_duration_PERIPHERY_BEFORE': 'numeric',
+            'device_turned_on_duration_PERIPHERY_BEFORE': 'numeric',
+            'device_turned_on_percent_PERIPHERY_BEFORE': 'numeric',
+            'device_worn_duration_PERIPHERY_BEFORE': 'numeric',
+            'device_worn_percent_PERIPHERY_BEFORE': 'numeric',
+            'imputed_duration_PERIPHERY_BEFORE': 'numeric',
+            'imputed_percent_PERIPHERY_BEFORE': 'numeric',
+            'imputed_low_quality_duration_PERIPHERY_BEFORE': 'numeric',
+            'imputed_low_quality_percent_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_low_quality_duration_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_low_quality_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_low_quality_duration_PERIPHERY_BEFORE': 'numeric',
+            'total_low_quality_percent_PERIPHERY_BEFORE': 'numeric',
+            'imputed_gap_duration_PERIPHERY_BEFORE': 'numeric',
+            'imputed_gap_percent_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_gap_duration_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_gap_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_gap_duration_PERIPHERY_BEFORE': 'numeric',
+            'total_gap_percent_PERIPHERY_BEFORE': 'numeric',
+            'gap_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
+            'imputed_non_wear_duration_PERIPHERY_BEFORE': 'numeric',
+            'imputed_non_wear_percent_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_non_wear_duration_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_non_wear_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_non_wear_duration_PERIPHERY_BEFORE': 'numeric',
+            'total_non_wear_percent_PERIPHERY_BEFORE': 'numeric',
+            'non_wear_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
+            'imputed_jump_duration_PERIPHERY_BEFORE': 'numeric',
+            'imputed_jump_percent_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_jump_duration_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_jump_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_jump_duration_PERIPHERY_BEFORE': 'numeric',
+            'total_jump_percent_PERIPHERY_BEFORE': 'numeric',
+            'jump_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
+            'imputed_plummet_duration_PERIPHERY_BEFORE': 'numeric',
+            'imputed_plummet_percent_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_plummet_duration_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_plummet_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_plummet_duration_PERIPHERY_BEFORE': 'numeric',
+            'total_plummet_percent_PERIPHERY_BEFORE': 'numeric',
+            'plummet_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
+            'imputed_extreme_negative_duration_PERIPHERY_BEFORE': 'numeric',
+            'imputed_extreme_negative_percent_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_extreme_negative_duration_PERIPHERY_BEFORE': 'numeric',
+            'unimputed_extreme_negative_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_extreme_negative_duration_PERIPHERY_BEFORE': 'numeric',
+            'total_extreme_negative_percent_PERIPHERY_BEFORE': 'numeric',
+            'sub_negative_10_sum_PERIPHERY_BEFORE': 'numeric',
+            'extreme_negative_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
+            'low_quality_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
+            'total_gaps_and_non_wear_percent_PERIPHERY_BEFORE': 'numeric',
+        }
+
+        # Periphery After feature types
+        self._periphery_after_feature_types = {
+            'total_duration_PERIPHERY_AFTER': 'numeric',
+            'device_turned_on_duration_PERIPHERY_AFTER': 'numeric',
+            'device_turned_on_percent_PERIPHERY_AFTER': 'numeric',
+            'device_worn_duration_PERIPHERY_AFTER': 'numeric',
+            'device_worn_percent_PERIPHERY_AFTER': 'numeric',
+            'imputed_duration_PERIPHERY_AFTER': 'numeric',
+            'imputed_percent_PERIPHERY_AFTER': 'numeric',
+            'imputed_low_quality_duration_PERIPHERY_AFTER': 'numeric',
+            'imputed_low_quality_percent_PERIPHERY_AFTER': 'numeric',
+            'unimputed_low_quality_duration_PERIPHERY_AFTER': 'numeric',
+            'unimputed_low_quality_percent_PERIPHERY_AFTER': 'numeric',
+            'total_low_quality_duration_PERIPHERY_AFTER': 'numeric',
+            'total_low_quality_percent_PERIPHERY_AFTER': 'numeric',
+            'imputed_gap_duration_PERIPHERY_AFTER': 'numeric',
+            'imputed_gap_percent_PERIPHERY_AFTER': 'numeric',
+            'unimputed_gap_duration_PERIPHERY_AFTER': 'numeric',
+            'unimputed_gap_percent_PERIPHERY_AFTER': 'numeric',
+            'total_gap_duration_PERIPHERY_AFTER': 'numeric',
+            'total_gap_percent_PERIPHERY_AFTER': 'numeric',
+            'gap_imputation_ratio_PERIPHERY_AFTER': 'numeric',
+            'imputed_non_wear_duration_PERIPHERY_AFTER': 'numeric',
+            'imputed_non_wear_percent_PERIPHERY_AFTER': 'numeric',
+            'unimputed_non_wear_duration_PERIPHERY_AFTER': 'numeric',
+            'unimputed_non_wear_percent_PERIPHERY_AFTER': 'numeric',
+            'total_non_wear_duration_PERIPHERY_AFTER': 'numeric',
+            'total_non_wear_percent_PERIPHERY_AFTER': 'numeric',
+            'non_wear_imputation_ratio_PERIPHERY_AFTER': 'numeric',
+            'imputed_jump_duration_PERIPHERY_AFTER': 'numeric',
+            'imputed_jump_percent_PERIPHERY_AFTER': 'numeric',
+            'unimputed_jump_duration_PERIPHERY_AFTER': 'numeric',
+            'unimputed_jump_percent_PERIPHERY_AFTER': 'numeric',
+            'total_jump_duration_PERIPHERY_AFTER': 'numeric',
+            'total_jump_percent_PERIPHERY_AFTER': 'numeric',
+            'jump_imputation_ratio_PERIPHERY_AFTER': 'numeric',
+            'imputed_plummet_duration_PERIPHERY_AFTER': 'numeric',
+            'imputed_plummet_percent_PERIPHERY_AFTER': 'numeric',
+            'unimputed_plummet_duration_PERIPHERY_AFTER': 'numeric',
+            'unimputed_plummet_percent_PERIPHERY_AFTER': 'numeric',
+            'total_plummet_duration_PERIPHERY_AFTER': 'numeric',
+            'total_plummet_percent_PERIPHERY_AFTER': 'numeric',
+            'plummet_imputation_ratio_PERIPHERY_AFTER': 'numeric',
+            'imputed_extreme_negative_duration_PERIPHERY_AFTER': 'numeric',
+            'imputed_extreme_negative_percent_PERIPHERY_AFTER': 'numeric',
+            'unimputed_extreme_negative_duration_PERIPHERY_AFTER': 'numeric',
+            'unimputed_extreme_negative_percent_PERIPHERY_AFTER': 'numeric',
+            'total_extreme_negative_duration_PERIPHERY_AFTER': 'numeric',
+            'total_extreme_negative_percent_PERIPHERY_AFTER': 'numeric',
+            'sub_negative_10_sum_PERIPHERY_AFTER': 'numeric',
+            'extreme_negative_imputation_ratio_PERIPHERY_AFTER': 'numeric',
+            'low_quality_imputation_ratio_PERIPHERY_AFTER': 'numeric',
+            'total_gaps_and_non_wear_percent_PERIPHERY_AFTER': 'numeric',
         }
 
         # Imputation feature descriptions (used in Imputations tab)
@@ -538,6 +661,7 @@ class ReportGuide:
             'sub_negative_10_sum_REGION': 'Sum of all TAC values below -10 in region',
             'extreme_negative_imputation_ratio_REGION': 'Ratio of extreme negative data that has been imputed in region (0-1)',
             'low_quality_imputation_ratio_REGION': 'Ratio of overall low quality data that has been imputed in region (0-1)',
+            'total_gaps_and_non_wear_percent_REGION': 'Total percentage of gaps and non-wear combined in region',
         }
 
         # Periphery quality features
@@ -592,12 +716,129 @@ class ReportGuide:
             'sub_negative_10_sum_PERIPHERY': 'Sum of all TAC values below -10 in periphery',
             'extreme_negative_imputation_ratio_PERIPHERY': 'Ratio of extreme negative data that has been imputed in periphery (0-1)',
             'low_quality_imputation_ratio_PERIPHERY': 'Ratio of overall low quality data that has been imputed in periphery (0-1)',
+            'total_gaps_and_non_wear_percent_PERIPHERY': 'Total percentage of gaps and non-wear combined in periphery',
+        }
+
+        # Periphery Before quality features
+        self._periphery_before_quality_features = {
+            'total_duration_PERIPHERY_BEFORE': 'Total duration of the periphery before the curve (hours)',
+            'device_turned_on_duration_PERIPHERY_BEFORE': 'Duration device was turned on in periphery before (hours)',
+            'device_turned_on_percent_PERIPHERY_BEFORE': 'Percentage of time device was turned on in periphery before',
+            'device_worn_duration_PERIPHERY_BEFORE': 'Duration device was worn in periphery before (hours)',
+            'device_worn_percent_PERIPHERY_BEFORE': 'Percentage of time device was worn in periphery before',
+            'imputed_duration_PERIPHERY_BEFORE': 'Duration of imputed data in periphery before (hours)',
+            'imputed_percent_PERIPHERY_BEFORE': 'Percentage of imputed data in periphery before',
+            'imputed_low_quality_duration_PERIPHERY_BEFORE': 'Duration of imputed low quality data in periphery before (hours)',
+            'imputed_low_quality_percent_PERIPHERY_BEFORE': 'Percentage of imputed low quality data in periphery before',
+            'unimputed_low_quality_duration_PERIPHERY_BEFORE': 'Duration of low quality data not imputed in periphery before (hours)',
+            'unimputed_low_quality_percent_PERIPHERY_BEFORE': 'Percentage of low quality data not imputed in periphery before',
+            'total_low_quality_duration_PERIPHERY_BEFORE': 'Total duration of low quality data in periphery before (hours)',
+            'total_low_quality_percent_PERIPHERY_BEFORE': 'Total percentage of low quality data in periphery before',
+            'imputed_gap_duration_PERIPHERY_BEFORE': 'Duration of imputed gap data in periphery before (hours)',
+            'imputed_gap_percent_PERIPHERY_BEFORE': 'Percentage of imputed gap data in periphery before',
+            'unimputed_gap_duration_PERIPHERY_BEFORE': 'Duration of unimputed gap data in periphery before (hours)',
+            'unimputed_gap_percent_PERIPHERY_BEFORE': 'Percentage of unimputed gap data in periphery before',
+            'total_gap_duration_PERIPHERY_BEFORE': 'Total duration of gap data in periphery before (hours)',
+            'total_gap_percent_PERIPHERY_BEFORE': 'Total percentage of gap data in periphery before',
+            'gap_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of gap data that has been imputed in periphery before (0-1)',
+            'imputed_non_wear_duration_PERIPHERY_BEFORE': 'Duration of imputed non-wear data in periphery before (hours)',
+            'imputed_non_wear_percent_PERIPHERY_BEFORE': 'Percentage of imputed non-wear data in periphery before',
+            'unimputed_non_wear_duration_PERIPHERY_BEFORE': 'Duration of unimputed non-wear data in periphery before (hours)',
+            'unimputed_non_wear_percent_PERIPHERY_BEFORE': 'Percentage of unimputed non-wear data in periphery before',
+            'total_non_wear_duration_PERIPHERY_BEFORE': 'Total duration of non-wear data in periphery before (hours)',
+            'total_non_wear_percent_PERIPHERY_BEFORE': 'Total percentage of non-wear data in periphery before',
+            'non_wear_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of non-wear data that has been imputed in periphery before (0-1)',
+            'imputed_jump_duration_PERIPHERY_BEFORE': 'Duration of imputed jump data in periphery before (hours)',
+            'imputed_jump_percent_PERIPHERY_BEFORE': 'Percentage of imputed jump data in periphery before',
+            'unimputed_jump_duration_PERIPHERY_BEFORE': 'Duration of unimputed jump data in periphery before (hours)',
+            'unimputed_jump_percent_PERIPHERY_BEFORE': 'Percentage of unimputed jump data in periphery before',
+            'total_jump_duration_PERIPHERY_BEFORE': 'Total duration of jump data in periphery before (hours)',
+            'total_jump_percent_PERIPHERY_BEFORE': 'Total percentage of jump data in periphery before',
+            'jump_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of jump data that has been imputed in periphery before (0-1)',
+            'imputed_plummet_duration_PERIPHERY_BEFORE': 'Duration of imputed plummet data in periphery before (hours)',
+            'imputed_plummet_percent_PERIPHERY_BEFORE': 'Percentage of imputed plummet data in periphery before',
+            'unimputed_plummet_duration_PERIPHERY_BEFORE': 'Duration of unimputed plummet data in periphery before (hours)',
+            'unimputed_plummet_percent_PERIPHERY_BEFORE': 'Percentage of unimputed plummet data in periphery before',
+            'total_plummet_duration_PERIPHERY_BEFORE': 'Total duration of plummet data in periphery before (hours)',
+            'total_plummet_percent_PERIPHERY_BEFORE': 'Total percentage of plummet data in periphery before',
+            'plummet_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of plummet data that has been imputed in periphery before (0-1)',
+            'imputed_extreme_negative_duration_PERIPHERY_BEFORE': 'Duration of imputed extreme negative data in periphery before (hours)',
+            'imputed_extreme_negative_percent_PERIPHERY_BEFORE': 'Percentage of imputed extreme negative data in periphery before',
+            'unimputed_extreme_negative_duration_PERIPHERY_BEFORE': 'Duration of unimputed extreme negative data in periphery before (hours)',
+            'unimputed_extreme_negative_percent_PERIPHERY_BEFORE': 'Percentage of unimputed extreme negative data in periphery before',
+            'total_extreme_negative_duration_PERIPHERY_BEFORE': 'Total duration of extreme negative data in periphery before (hours)',
+            'total_extreme_negative_percent_PERIPHERY_BEFORE': 'Total percentage of extreme negative data in periphery before',
+            'sub_negative_10_sum_PERIPHERY_BEFORE': 'Sum of all TAC values below -10 in periphery before',
+            'extreme_negative_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of extreme negative data that has been imputed in periphery before (0-1)',
+            'low_quality_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of overall low quality data that has been imputed in periphery before (0-1)',
+            'total_gaps_and_non_wear_percent_PERIPHERY_BEFORE': 'Total percentage of gaps and non-wear combined in periphery before',
+        }
+
+        # Periphery After quality features  
+        self._periphery_after_quality_features = {
+            'total_duration_PERIPHERY_AFTER': 'Total duration of the periphery after the curve (hours)',
+            'device_turned_on_duration_PERIPHERY_AFTER': 'Duration device was turned on in periphery after (hours)',
+            'device_turned_on_percent_PERIPHERY_AFTER': 'Percentage of time device was turned on in periphery after',
+            'device_worn_duration_PERIPHERY_AFTER': 'Duration device was worn in periphery after (hours)',
+            'device_worn_percent_PERIPHERY_AFTER': 'Percentage of time device was worn in periphery after',
+            'imputed_duration_PERIPHERY_AFTER': 'Duration of imputed data in periphery after (hours)',
+            'imputed_percent_PERIPHERY_AFTER': 'Percentage of imputed data in periphery after',
+            'imputed_low_quality_duration_PERIPHERY_AFTER': 'Duration of imputed low quality data in periphery after (hours)',
+            'imputed_low_quality_percent_PERIPHERY_AFTER': 'Percentage of imputed low quality data in periphery after',
+            'unimputed_low_quality_duration_PERIPHERY_AFTER': 'Duration of low quality data not imputed in periphery after (hours)',
+            'unimputed_low_quality_percent_PERIPHERY_AFTER': 'Percentage of low quality data not imputed in periphery after',
+            'total_low_quality_duration_PERIPHERY_AFTER': 'Total duration of low quality data in periphery after (hours)',
+            'total_low_quality_percent_PERIPHERY_AFTER': 'Total percentage of low quality data in periphery after',
+            'imputed_gap_duration_PERIPHERY_AFTER': 'Duration of imputed gap data in periphery after (hours)',
+            'imputed_gap_percent_PERIPHERY_AFTER': 'Percentage of imputed gap data in periphery after',
+            'unimputed_gap_duration_PERIPHERY_AFTER': 'Duration of unimputed gap data in periphery after (hours)',
+            'unimputed_gap_percent_PERIPHERY_AFTER': 'Percentage of unimputed gap data in periphery after',
+            'total_gap_duration_PERIPHERY_AFTER': 'Total duration of gap data in periphery after (hours)',
+            'total_gap_percent_PERIPHERY_AFTER': 'Total percentage of gap data in periphery after',
+            'gap_imputation_ratio_PERIPHERY_AFTER': 'Ratio of gap data that has been imputed in periphery after (0-1)',
+            'imputed_non_wear_duration_PERIPHERY_AFTER': 'Duration of imputed non-wear data in periphery after (hours)',
+            'imputed_non_wear_percent_PERIPHERY_AFTER': 'Percentage of imputed non-wear data in periphery after',
+            'unimputed_non_wear_duration_PERIPHERY_AFTER': 'Duration of unimputed non-wear data in periphery after (hours)',
+            'unimputed_non_wear_percent_PERIPHERY_AFTER': 'Percentage of unimputed non-wear data in periphery after',
+            'total_non_wear_duration_PERIPHERY_AFTER': 'Total duration of non-wear data in periphery after (hours)',
+            'total_non_wear_percent_PERIPHERY_AFTER': 'Total percentage of non-wear data in periphery after',
+            'non_wear_imputation_ratio_PERIPHERY_AFTER': 'Ratio of non-wear data that has been imputed in periphery after (0-1)',
+            'imputed_jump_duration_PERIPHERY_AFTER': 'Duration of imputed jump data in periphery after (hours)',
+            'imputed_jump_percent_PERIPHERY_AFTER': 'Percentage of imputed jump data in periphery after',
+            'unimputed_jump_duration_PERIPHERY_AFTER': 'Duration of unimputed jump data in periphery after (hours)',
+            'unimputed_jump_percent_PERIPHERY_AFTER': 'Percentage of unimputed jump data in periphery after',
+            'total_jump_duration_PERIPHERY_AFTER': 'Total duration of jump data in periphery after (hours)',
+            'total_jump_percent_PERIPHERY_AFTER': 'Total percentage of jump data in periphery after',
+            'jump_imputation_ratio_PERIPHERY_AFTER': 'Ratio of jump data that has been imputed in periphery after (0-1)',
+            'imputed_plummet_duration_PERIPHERY_AFTER': 'Duration of imputed plummet data in periphery after (hours)',
+            'imputed_plummet_percent_PERIPHERY_AFTER': 'Percentage of imputed plummet data in periphery after',
+            'unimputed_plummet_duration_PERIPHERY_AFTER': 'Duration of unimputed plummet data in periphery after (hours)',
+            'unimputed_plummet_percent_PERIPHERY_AFTER': 'Percentage of unimputed plummet data in periphery after',
+            'total_plummet_duration_PERIPHERY_AFTER': 'Total duration of plummet data in periphery after (hours)',
+            'total_plummet_percent_PERIPHERY_AFTER': 'Total percentage of plummet data in periphery after',
+            'plummet_imputation_ratio_PERIPHERY_AFTER': 'Ratio of plummet data that has been imputed in periphery after (0-1)',
+            'imputed_extreme_negative_duration_PERIPHERY_AFTER': 'Duration of imputed extreme negative data in periphery after (hours)',
+            'imputed_extreme_negative_percent_PERIPHERY_AFTER': 'Percentage of imputed extreme negative data in periphery after',
+            'unimputed_extreme_negative_duration_PERIPHERY_AFTER': 'Duration of unimputed extreme negative data in periphery after (hours)',
+            'unimputed_extreme_negative_percent_PERIPHERY_AFTER': 'Percentage of unimputed extreme negative data in periphery after',
+            'total_extreme_negative_duration_PERIPHERY_AFTER': 'Total duration of extreme negative data in periphery after (hours)',
+            'total_extreme_negative_percent_PERIPHERY_AFTER': 'Total percentage of extreme negative data in periphery after',
+            'sub_negative_10_sum_PERIPHERY_AFTER': 'Sum of all TAC values below -10 in periphery after',
+            'extreme_negative_imputation_ratio_PERIPHERY_AFTER': 'Ratio of extreme negative data that has been imputed in periphery after (0-1)',
+            'low_quality_imputation_ratio_PERIPHERY_AFTER': 'Ratio of overall low quality data that has been imputed in periphery after (0-1)',
+            'total_gaps_and_non_wear_percent_PERIPHERY_AFTER': 'Total percentage of gaps and non-wear combined in periphery after',
         }
 
     @property
     def curve_feature_descriptions(self):
         """Get curve feature descriptions."""
-        return self._curve_feature_descriptions
+        return {
+            **self._curve_feature_descriptions,
+            **self._region_quality_features,
+            **self._periphery_quality_features,
+            **self._periphery_before_quality_features,
+            **self._periphery_after_quality_features
+        }
 
     @property
     def curve_features_descriptions(self):
@@ -626,7 +867,11 @@ class ReportGuide:
             **self._curve_feature_descriptions,
             **self._person_level_feature_descriptions,
             **self._event_feature_descriptions,
-            **self._imputation_feature_descriptions
+            **self._imputation_feature_descriptions,
+            **self._region_quality_features,
+            **self._periphery_quality_features,
+            **self._periphery_before_quality_features,
+            **self._periphery_after_quality_features
         }
 
     @property
@@ -653,6 +898,26 @@ class ReportGuide:
     def periphery_quality_features(self):
         """Get periphery quality features."""
         return self._periphery_quality_features
+
+    @property
+    def periphery_before_quality_features(self):
+        """Get periphery before quality features."""
+        return self._periphery_before_quality_features
+
+    @property
+    def periphery_after_quality_features(self):
+        """Get periphery after quality features."""
+        return self._periphery_after_quality_features
+
+    @property
+    def periphery_before_feature_types(self):
+        """Get periphery before feature types."""
+        return self._periphery_before_feature_types
+
+    @property
+    def periphery_after_feature_types(self):
+        """Get periphery after feature types."""
+        return self._periphery_after_feature_types
 
     @classmethod
     def get_variable_key_dataframes(cls):

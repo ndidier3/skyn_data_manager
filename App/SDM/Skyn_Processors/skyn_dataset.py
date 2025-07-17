@@ -12,7 +12,6 @@ from ..Signal_Processing.label_device_non_wear import label_device_non_wear_usin
 from ..Signal_Processing.label_signal_stability import *
 from ..Signal_Processing.curve_demarcation import *
 from ..Skyn_Processors.skyn_day import skynDay
-from ..Skyn_Processors.alcohol_event import alcoholEvent
 from ..Skyn_Processors.curve import Curve
 from App.SDM.Skyn_Processors.ema_region import emaRegion
 from ..Visualization.tac import *
@@ -288,7 +287,6 @@ class skynDataset:
       else:
         self.raw_curve_features = pd.DataFrame(columns=self.curve_columns)
 
-
       self.save_as_sdp(valid=True)
 
     except Exception as e:
@@ -308,6 +306,24 @@ class skynDataset:
           row[col] for col in event_timestamp_columns 
           if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp)
         ]
+        
+        # Handle cases where end timestamp is null or same as start timestamp
+        timestamp_modified = False
+        if len(valid_timestamps) == 1 or (len(valid_timestamps) == 2 and valid_timestamps[0] == valid_timestamps[1]):
+          # If only start timestamp exists or start/end are the same, set end to start + 6 hours
+          start_timestamp = row['drinkStart'] if pd.notna(row['drinkStart']) else row['drinkEnd']
+          end_timestamp = start_timestamp + pd.Timedelta(hours=6)
+          
+          # Update the row data
+          row['drinkEnd'] = end_timestamp
+          timestamp_modified = True
+          
+          # Recalculate valid timestamps
+          valid_timestamps = [
+            row[col] for col in event_timestamp_columns 
+            if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp)
+          ]
+        
         if valid_timestamps:
           earliest_timestamp = min(valid_timestamps)
           latest_timestamp = max(valid_timestamps)
@@ -323,6 +339,11 @@ class skynDataset:
           self.events.loc[i, 'matching_end_timestamp'] = matching_end_timestamp
           self.events.loc[i, 'drink_total'] = row[drink_total_column]
           self.events.loc[i, 'ema_id'] = row[ema_id_column]
+          self.events.loc[i, 'end_timestamp_modified'] = timestamp_modified
+          if timestamp_modified:
+            self.events.loc[i, 'modification_note'] = 'drinkEnd set to drinkStart + 6 hours (was null or same as start)'
+            # Update the original DataFrame with the modified drinkEnd
+            self.events.loc[i, 'drinkEnd'] = row['drinkEnd']
           
           #Creating labels for curve plots
           # Add earliest timestamp label
@@ -337,8 +358,27 @@ class skynDataset:
                if pd.notna(row[col]) and isinstance(row[col], pd.Timestamp) and row[col] == latest_timestamp][0]
           ]
 
+
           earliest_label = f'{earliest_col}_{row[ema_id_column]}{drink_suffix}'
           self.event_labels = pd.concat([self.event_labels, pd.DataFrame({'timestamp': [earliest_timestamp], 'label': [earliest_label]})], ignore_index=True)
+          
+          print(earliest_label)
+          print(self.event_labels)
+
+          # Get middle timestamps (excluding earliest and latest, and only including valid timestamps)
+          middle_timestamps = [
+              row[col] for col in event_timestamp_columns 
+              if col not in [earliest_col, latest_col] 
+              and pd.notna(row[col]) 
+              and isinstance(row[col], pd.Timestamp)
+          ]
+          middle_abbreviated_labels = [f'EMA' for i in range(len(middle_timestamps))]
+          print(middle_abbreviated_labels)
+          print(middle_timestamps)
+
+          # Only add middle timestamps if there are any
+          if middle_timestamps:
+              self.event_labels = pd.concat([self.event_labels, pd.DataFrame({'timestamp': middle_timestamps, 'label': middle_abbreviated_labels})], ignore_index=True)
 
           latest_label = f'{latest_col}_{row[ema_id_column]}{drink_suffix}'
           self.event_labels = pd.concat([self.event_labels, pd.DataFrame({'timestamp': [latest_timestamp], 'label': [latest_label]})], ignore_index=True)
@@ -521,132 +561,4 @@ class skynDataset:
       self.error = traceback.format_exc()
       self.log_error()
       self.save_as_sdp(valid=False)
-
-  def run_event_level_analysis(
-      self, event_data, 
-      drink_start_column = 'drinkstarttime_m', 
-      drink_total_column = 'totsd_all_m',
-      day_id_column = 'STUDYDAY',
-      extra_columns = [],
-      search_method = 'peak',
-      curve_threshold = 10,
-      curve_search_pad_hours_before = 2,
-      curve_search_pad_hours_after = 22,
-      allow_duplicate_events = False,
-      include_prior_curves = False,
-      include_subsequent_curves = False,
-      make_plots = True,
-      save = True
-    ):
-    #TBD: Common formatting for event_files
-    print(f'Analyzing Events: {self.subid} - {self.dataset_identifier}') 
-    # self.dataset.to_excel(f'test_{self.subid}.xlsx')
-    self.events = []  #reset to empty
-    self.event_level_data = pd.DataFrame() #reset to empty
-    try:
-      event_data[drink_start_column] = pd.to_datetime(event_data[drink_start_column])
-      alcohol_event_indices, extra_info = get_event_level_indices(
-        self.subid, self.dataset, event_data,
-        pad_hours_before = curve_search_pad_hours_before,
-        pad_hours_after = curve_search_pad_hours_after, 
-        drink_start_column = drink_start_column, 
-        drink_total_column = drink_total_column,
-        day_id_column = day_id_column,
-        extra_columns = extra_columns,
-        append_duplicates=allow_duplicate_events
-      )
-      self.curve_datasets = []
-      self.search_datasets = []
-      self.no_skyn_data_events = []
-      if curve_threshold == 'auto':
-        curve_threshold, unadjusted_curve_threshold = determine_curve_threshold(self.dataset)
-      for event_number, event_details in enumerate(alcohol_event_indices):
-        start, end, drink_total, day_id = event_details[:4]
-        if start is not None and end is not None:
-          event = alcoholEvent(
-            self.dataset, self.subid, self.dataset_identifier, event_number, start, end, 
-            drink_total = drink_total, 
-            day_id = day_id, 
-            extra_info = extra_info[event_number], 
-            search_method = search_method, 
-            curve_threshold=curve_threshold, 
-            include_prior_curves=include_prior_curves,
-            include_subsequent_curves=include_subsequent_curves
-          )
-          event.get_features_of_search_dataset()
-          event.get_features_of_curve_dataset()
-          event.set_search_plot_dataset()
-          event.set_curve_plot_dataset()
-          
-          if event.quality_features_of_search['data_found_SEARCH'] and make_plots:
-            plot_path = event.save_plot_smooth_tac(self.plot_folder, 'SEARCH')
-            self.tac_smooth_search_plot_paths[event_number] = plot_path
-            plot_path = event.save_plot_of_device_removal(self.plot_folder, 'SEARCH')
-            self.non_wear_search_plot_paths[event_number] = plot_path
-            plot_path = event.save_plot_of_signal_processing(self.plot_folder, 'SEARCH')
-            self.tac_processing_search_plot_paths[event_number] = plot_path
-          else:
-            self.tac_smooth_search_plot_paths[event_number] = ''
-            self.non_wear_search_plot_paths[event_number] = ''
-            self.tac_processing_search_plot_paths[event_number] = ''
-          
-          if event.quality_features_of_curve['data_found_CURVE'] and make_plots:
-            plot_path = event.save_plot_smooth_tac(self.plot_folder, 'CURVE')
-            self.tac_smooth_curve_plot_paths[event_number] = plot_path
-            plot_path = event.save_plot_of_device_removal(self.plot_folder, 'CURVE')
-            self.non_wear_curve_plot_paths[event_number] = plot_path
-            plot_path = event.save_plot_of_signal_processing(self.plot_folder, 'CURVE')
-            self.tac_processing_curve_plot_paths[event_number] = plot_path
-          else:
-            self.tac_smooth_curve_plot_paths[event_number] = ''
-            self.non_wear_curve_plot_paths[event_number] = ''
-            self.tac_processing_curve_plot_paths[event_number] = ''
-            
-          self.events.append(event)
-          event.curve_dataset['unadjusted_threshold'] = unadjusted_curve_threshold
-          self.curve_datasets.append(event.curve_dataset)
-        else:
-          self.tac_smooth_search_plot_paths[event_number] = ''
-          self.non_wear_search_plot_paths[event_number] = ''
-          self.tac_processing_search_plot_paths[event_number] = ''
-          self.tac_smooth_curve_plot_paths[event_number] = ''
-          self.non_wear_curve_plot_paths[event_number] = ''
-          self.tac_processing_curve_plot_paths[event_number] = ''
-          info = {
-            'dataset_identifier': self.dataset_identifier,
-            'event': event_number,
-            'drink_total': drink_total,
-            'day_id': day_id,
-          }
-          info.update(extra_info[event_number])
-          self.no_skyn_data_events.append(
-            pd.DataFrame([info])
-          )
-          #subid dataset_id drink_total day_id extra info as pandas.dataframe
-        # event.curve_dataset.to_excel(f'curve_{self.subid}_{event.day_id}.xlsx')
-      
-      self.event_level_data = create_event_level_dataframe(self.subid, self.dataset_identifier, self.events)
-      self.event_level_data = identify_overlapping_curves(self.event_level_data)
-      self.event_level_data['unadjusted_threshold'] = unadjusted_curve_threshold
-      self.events_with_no_skyn_data = (
-          pd.concat(self.no_skyn_data_events)
-          if len(self.no_skyn_data_events)
-          else pd.DataFrame(
-              columns=['subid', 'dataset_identifier', 'drink_total', 'day_id'] + list(extra_info[0].keys())
-          )
-      )      
-      all_event_data = pd.concat(self.curve_datasets, ignore_index=True)
-        
-      with pd.ExcelWriter(f'{self.data_out_folder}/eventLevel_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
-        self.event_level_data.to_excel(writer, sheet_name='event-features', index=False)
-        all_event_data.to_excel(writer, sheet_name='event-data')
-        self.events_with_no_skyn_data.to_excel(writer, sheet_name = 'events-no-skyn', index=False)
-      if save:
-        self.save_as_sdp(valid=True)
-
-    except Exception:
-      self.error = traceback.format_exc()
-      self.log_error()
-      if save:
-        self.save_as_sdp(valid=False)
 

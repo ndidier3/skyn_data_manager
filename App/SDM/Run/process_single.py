@@ -134,17 +134,6 @@ def process_and_analyze_single_subject(
             print(f"Setting EMA regions for {subid}_{dataset_identifier}")
             sdm_processor.set_ema_regions()
             sdm_processor.curve_features.to_excel(f'{results_dir}/curve_features_{subid}.xlsx', index=None)
-            
-        if analyze_events:
-            subids_found = event_data[event_subid_column].unique().tolist()
-            if (int(subid) in subids_found or str(subid) in subids_found):
-                print(f"Running event level analysis for {subid}_{dataset_identifier}")
-                sdm_processor.run_event_level_analysis(event_data, **event_attrs)
-                sdm_processor.event_level_data.to_excel(f'{results_dir}/event_level_results_{subid}.xlsx', index=None)
-                if hasattr(sdm_processor, 'events_with_no_skyn_data'):
-                    sdm_processor.events_with_no_skyn_data.to_excel(f'{results_dir}/no_skyn_data_{subid}.xlsx', index=None)
-            else:
-                print(f"{subid} {dataset_identifier} -- NO Event DATA")
                 
     except Exception as e:
         print(f"\nError processing file {file}:")

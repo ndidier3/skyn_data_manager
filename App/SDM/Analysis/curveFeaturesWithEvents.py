@@ -327,7 +327,9 @@ class curveFeaturesWithEvents(curveFeatures):
       ] or col.startswith('shared_count_')]
       combined_flag_stats = combined_flag_stats[keep_cols]
       # Filter out rows where 'Unique_Flag_Count' is empty (removes counts of non-flagged curves, only keeping flag counts)
-      combined_flag_stats = combined_flag_stats[combined_flag_stats['Unique_Flag_Count'].notna() & (combined_flag_stats['Unique_Flag_Count'] != '')]
+      # Only perform this filtering if the Unique_Flag_Count column exists
+      if 'Unique_Flag_Count' in combined_flag_stats.columns:
+          combined_flag_stats = combined_flag_stats[combined_flag_stats['Unique_Flag_Count'].notna() & (combined_flag_stats['Unique_Flag_Count'] != '')]
       # Calculate % of total curves and rename column
       combined_flag_stats['% of Total Curves'] = (combined_flag_stats['Count'] / total_curves) * 100
       # Drop the old '%' column if it exists
@@ -787,8 +789,8 @@ class curveFeaturesWithEvents(curveFeatures):
           flag_column = flag_prefix
       else:
           # Find corresponding flag column
-          # Remove _CURVE or _PERIPHERY suffix if present
-          base_column = sort_column.replace('_CURVE', '').replace('_PERIPHERY', '')
+          # Remove _CURVE, _PERIPHERY_BEFORE, _PERIPHERY_AFTER, or _PERIPHERY suffix if present
+          base_column = sort_column.replace('_CURVE', '').replace('_PERIPHERY_BEFORE', '').replace('_PERIPHERY_AFTER', '').replace('_PERIPHERY', '')
           
           # Flexibly match any flag column containing the base_column
           flag_candidates = [col for col in sorted_features.columns if col.startswith('FLAG_') and base_column in col]

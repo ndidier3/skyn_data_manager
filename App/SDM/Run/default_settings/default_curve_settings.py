@@ -9,6 +9,6 @@ DEFAULT_CURVE_ATTRS = {
     'flag_selections': DEFAULT_FLAG_SELECTIONS,
     'curve_threshold': 'auto',
     'periphery_buffer_before': 2, 
-    'periphery_buffer_after': 2,
+    'periphery_buffer_after': 1,
     'merge_curves_within_duration': 2
 } 
