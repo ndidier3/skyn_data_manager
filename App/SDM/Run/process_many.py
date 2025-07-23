@@ -17,7 +17,6 @@ def process_and_analyze_data(
   smooth_and_impute = False,
   adjust_for_gaps_and_non_wear = False,
   analyze_days = False,
-  analyze_events = False,
   identify_curves = False,
   include_raw_curves = False,
   match_events_to_curves = False,

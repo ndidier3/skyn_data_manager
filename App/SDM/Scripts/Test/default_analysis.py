@@ -23,7 +23,6 @@ process_and_analyze_data(
     adjust_for_gaps_and_non_wear=True,
     smooth_and_impute=True,
     analyze_days=True,
-    analyze_events=False,
     identify_curves=True,
     include_raw_curves=True,  # Added to match ARC analysis
     match_events_to_curves=False,  # Set to False since no event data available

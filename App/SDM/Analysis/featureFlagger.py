@@ -317,8 +317,6 @@ class featureFlagger:
       'flag_incomplete_curve_end_curve': (self.flag_incomplete_curve_end_curve, ['percent_cutoff']),
       'flag_imputed_fall_curve': (self.flag_imputed_fall_curve, ['percent_cutoff']),
       
-
-      
       # Periphery flags using dynamic methods
       'flag_gaps_and_non_wear_periphery_before': (self.flag_gaps_and_non_wear_periphery_dynamic, ['percent_cutoff']),
       'flag_gaps_and_non_wear_periphery_after': (self.flag_gaps_and_non_wear_periphery_dynamic, ['percent_cutoff']),

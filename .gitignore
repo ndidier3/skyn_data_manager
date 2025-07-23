@@ -37,3 +37,16 @@ Inputs/Skyn_Data/
 App/SDM/Scripts/LINC/run_curve_analysis.py
 .cursor
 node_modules
+analysis_scripts/available_subjects_completeness_report_relaxed.csv
+analysis_scripts/available_subjects_completeness_report.csv
+analysis_scripts/compare_data_structures.py
+analysis_scripts/compare_selected_vs_available.py
+analysis_scripts/compare_selected_vs_nonselected.py
+analysis_scripts/convert_drk_times.py
+analysis_scripts/data_structure_comparison.csv
+analysis_scripts/evaluate_event_completeness.py
+analysis_scripts/explore_sdm_attributes.py
+analysis_scripts/final_groupings_summary.csv
+analysis_scripts/README.md
+analysis_scripts/selected_vs_nonselected_comparison.csv
+analysis_scripts/update_final_groupings.py

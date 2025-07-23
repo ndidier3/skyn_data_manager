@@ -147,7 +147,6 @@ def get_start_and_end_of_discrete_curves(df, curve_threshold, TAC_column = 'TAC'
   return curve_start_and_end_indices
 
 def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separation_minutes = 60, curve_minutes_limit = (60*24)):
-  i = 0
   merged_curve_start_and_end_indices = []
   for i, (curve_start, curve_end) in enumerate(approved_curve_start_and_end_indices):
     if i > 0:
@@ -156,7 +155,7 @@ def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separati
       merged_curve_minutes = curve_end - prior_curve_start
       if (curve_start - prior_curve_end) < max_curve_separation_minutes and (merged_curve_minutes < curve_minutes_limit):
         merged_curve_start_and_end_indices[-1][1] = curve_end
-        merged_curve_start_and_end_indices[-1][2] += 1  
+        merged_curve_start_and_end_indices[-1][2] += 1 # ke
       else:
         merged_curve_start_and_end_indices.append([curve_start, curve_end, 1])  
     else:

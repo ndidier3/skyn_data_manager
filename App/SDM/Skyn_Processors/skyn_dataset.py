@@ -296,9 +296,22 @@ class skynDataset:
       raise ValueError(f"Failed to identify curves: {str(e)}")
   
   def configure_event_data(self, data: pd.DataFrame, subid_column, ema_id_column, drink_total_column, event_timestamp_columns, buffer_before=2, buffer_after=0, max_event_duration=12, export_excel=False):
+    print(f'Configuring event data for {self.subid} - {self.dataset_identifier}')
     try:
       self.events = data[(data[subid_column] == str(self.subid)) | (data[subid_column] == int(self.subid))]
       self.events['max_event_duration'] = max_event_duration
+      # Initialize timestamp columns for all rows
+      self.events['earliest_timestamp'] = pd.NaT
+      self.events['latest_timestamp'] = pd.NaT
+      self.events['matching_end_timestamp'] = pd.NaT
+      self.events['end_timestamp_modified'] = False
+      self.events['modification_note'] = ''
+      self.events['ema_id'] = None
+      # Convert timestamp columns to datetime
+      for col in event_timestamp_columns:
+        if col in self.events.columns:
+          self.events[col] = pd.to_datetime(self.events[col], errors='coerce')
+      
       self.event_labels = pd.DataFrame(columns=['timestamp', 'label'])
       event_ranges = []
       for i, row in self.events.iterrows():
@@ -487,7 +500,7 @@ class skynDataset:
       self.ema_regions = []
       ema_region_feature_dictionaries = []
       for i, row in self.events.iterrows():
-        if pd.notna(row['ema_id']):
+        if pd.notna(row['ema_id']) and pd.notna(row['earliest_timestamp']):
           drink_start = row['earliest_timestamp']
           drink_total = row['drink_total']
           ema_id = row['ema_id']
