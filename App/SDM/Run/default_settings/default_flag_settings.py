@@ -34,7 +34,7 @@ DEFAULT_FLAG_SELECTIONS = {
     },
     # Periphery Before flags (using only percent)
     'flag_gaps_and_non_wear_periphery_before': {
-        'percent_cutoff': 0.60
+        'percent_cutoff': 0.50
     },
     'flag_extreme_negative_periphery_before': {
         'percent_cutoff': 0.95
@@ -44,7 +44,7 @@ DEFAULT_FLAG_SELECTIONS = {
     },
     # Periphery After flags (using only percent)
     'flag_gaps_and_non_wear_periphery_after': {
-        'percent_cutoff': 0.60
+        'percent_cutoff': 0.50
     },
     'flag_extreme_negative_periphery_after': {
         'percent_cutoff': 0.95

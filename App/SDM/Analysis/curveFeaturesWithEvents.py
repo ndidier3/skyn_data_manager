@@ -13,8 +13,42 @@ import numpy as np
 class curveFeaturesWithEvents(curveFeatures):
   def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, subids=None):
     super().__init__(processed_data_folder, smooth_and_impute_attrs, curve_attrs, subids)
-    self.processors = [processor for processor in self.processors if hasattr(processor, 'event_labels')]
-    self.event_data = pd.concat([processor.events for processor in self.processors if isinstance(processor.events, pd.DataFrame)], ignore_index=True)
+    
+    # Filter processors to only include those with both curve features and events
+    self.processors = [processor for processor in self.processors 
+                      if hasattr(processor, 'event_labels') and 
+                      hasattr(processor, 'curve_features') and 
+                      len(processor.curve_features) > 0 and
+                      hasattr(processor, 'events') and 
+                      isinstance(processor.events, pd.DataFrame) and 
+                      len(processor.events) > 0]
+    
+    print(f"Filtered to {len(self.processors)} processors with both curve features and events")
+    
+    # Collect events from processors
+    events_list = []
+    for processor in self.processors:
+        if hasattr(processor, 'events') and isinstance(processor.events, pd.DataFrame):
+            events_list.append(processor.events.reset_index(drop=True))
+    
+    if events_list:
+        # Standardize columns across all DataFrames
+        all_columns = set()
+        for df in events_list:
+            all_columns.update(df.columns)
+        all_columns = sorted(list(all_columns))
+        
+        # Ensure all DataFrames have the same columns
+        for df in events_list:
+            for col in all_columns:
+                if col not in df.columns:
+                    df[col] = pd.NA
+            df.reindex(columns=all_columns)
+        
+        # Concatenate with standardized columns
+        self.event_data = pd.concat(events_list, ignore_index=True)
+    else:
+        self.event_data = pd.DataFrame()
     self.event_stat_frames = []
     self.ema_region_columns = [col for col in self.event_data if 'EMA_REGION' in col]
     self.event_type_column = ''
@@ -35,183 +69,14 @@ class curveFeaturesWithEvents(curveFeatures):
 
     self.default_tac_features = report_guide.stats_features
 
-  def label_event_curve_matches(self):
     # Convert ID to integer and ema_id to string for consistent data types
     self.event_data['ID'] = self.event_data['ID'].astype(int)
     self.event_data['ema_id'] = self.event_data['ema_id'].astype(str)
     self.event_data.drop(columns=['subid'], inplace=True, errors='ignore')    
-    
-    # Mark events that have matched to any curve (1 if matched, 0 if not)
-    # This is done by checking if curve_match_1 has any non-null values for each ID-ema_id group
-    self.event_data['matched'] = self.event_data.groupby(['ID', 'ema_id'])['curve_match_1'].transform(lambda x: int(x.notna().any()))
-    
-    # Initialize columns to track shared matches between events
-    self.event_data['has_shared_match'] = False
-    self.event_data['shared_curve_id'] = None
-    self.event_data['has_shared_first_match'] = False
-    self.event_data['shared_first_curve_id'] = None
-
-    # Get list of curve match columns (curve_match_1 through curve_match_5 if they exist)
-    curve_cols = [f'curve_match_{i}' for i in range(1, 6) if f'curve_match_{i}' in self.event_data.columns]
-    
-    # Add curve validity information for each match
-    for i in range(1, 6):
-        if f'curve_match_{i}' in self.event_data.columns:
-            # Create a mapping of (subid, curve_id) to validity flags
-            validity_map = self.curve_features.set_index(['subid', 'curve_id'])[['CURVE_VALID', 'PERIPHERY_VALID']]
-            
-            # Function to check if a curve match is valid (both CURVE_VALID and PERIPHERY_VALID are 1)
-            def get_curve_validity(row):
-                if pd.isna(row[f'curve_match_{i}']):
-                    return None
-                try:
-                    curve_id = int(row[f'curve_match_{i}'])
-                    # Look up validity flags for this curve
-                    validity = validity_map.loc[(row['ID'], curve_id)]
-                    # Return 1 if both validity flags are 1, else 0
-                    return 1 if validity['CURVE_VALID'] == 1 and validity['PERIPHERY_VALID'] == 1 else 0
-                except (KeyError, ValueError):
-                    return None
-            
-            # Add validity flag for this curve match
-            self.event_data[f'CURVE_and_PERIPHERY_VALID_{i}'] = self.event_data.apply(get_curve_validity, axis=1)
-    
-    # Process valid and invalid curve matches for each event
-    curve_match_cols = [f'curve_match_{i}' for i in range(1, 6) if f'curve_match_{i}' in self.event_data.columns]
-    valid_cols = []
-    invalid_cols = []
-    for idx, row in self.event_data.iterrows():
-        valid_matches = []
-        invalid_matches = []
-        # Check each curve match and categorize as valid or invalid
-        for i, col in enumerate(curve_match_cols, 1):
-            val = row[col]
-            is_valid = row.get(f'CURVE_and_PERIPHERY_VALID_{i}', None) == 1
-            if is_valid:
-                valid_matches.append(val)
-            else:
-                invalid_matches.append(val)
-        # Assign valid matches to columns valid_curve_match_1, valid_curve_match_2, etc.
-        for j, v in enumerate(valid_matches, 1):
-            colname = f'valid_curve_match_{j}'
-            self.event_data.at[idx, colname] = v
-            if colname not in valid_cols:
-                valid_cols.append(colname)
-        # Assign invalid matches to columns invalid_curve_match_1, invalid_curve_match_2, etc.
-        for j, v in enumerate(invalid_matches, 1):
-            colname = f'invalid_curve_match_{j}'
-            self.event_data.at[idx, colname] = v
-            if colname not in invalid_cols:
-                invalid_cols.append(colname)
-
-    # Process shared matches between events for each participant
-    for _, group in self.event_data.groupby('ID'):
-        # Check if multiple events share the same first valid curve match
-        first_valid_curve_ids = group['valid_curve_match_1'].dropna()
-        # Find curve IDs that appear multiple times (shared between multiple events)
-        shared_first_valid_curves = first_valid_curve_ids[first_valid_curve_ids.duplicated(keep=False)]
-        # Mark events that share first valid curve match
-        shared_first_mask = group['valid_curve_match_1'].isin(shared_first_valid_curves)
-        self.event_data.loc[group.index, 'has_shared_first_match'] = shared_first_mask
-        self.event_data.loc[group.index[shared_first_mask], 'shared_first_curve_id'] = group.loc[group.index[shared_first_mask], 'valid_curve_match_1']
-
-        # Get all valid curve match columns for this group
-        valid_curve_cols = [col for col in group.columns if col.startswith('valid_curve_match_') and not col.endswith('_overlap')]
-        
-        # Check for any shared curves between pairs of events
-        for i, row1 in group.iterrows():
-            for j, row2 in group.iterrows():
-                if i >= j:
-                    continue
-                # Get all valid curves for both events
-                curves1 = [row1[col] for col in valid_curve_cols if pd.notna(row1[col])]
-                curves2 = [row2[col] for col in valid_curve_cols if pd.notna(row2[col])]
-                # Find shared curves between the two events
-                shared_curves = set(curves1) & set(curves2)
-                if shared_curves:
-                    self.event_data.loc[[i,j], 'has_shared_match'] = True
-                    # Store one of the shared curve IDs
-                    shared_curve = list(shared_curves)[0]
-                    self.event_data.loc[[i,j], 'shared_curve_id'] = shared_curve
-                    
+                        
     # Split events into matched and unmatched
     self.matched_events = self.event_data[self.event_data['matched']==1]
     self.unmatched_events = self.event_data[self.event_data['matched']!=1]
-
-    # Unpivot all curve_match_{i} columns so each (event, curve) pair is a row
-    curve_match_cols = [f'curve_match_{i}' for i in range(1, 6) if f'curve_match_{i}' in self.matched_events.columns]
-    melted = self.matched_events.melt(
-        id_vars=['ID', 'ema_id'],
-        value_vars=curve_match_cols,
-        var_name='match_rank',
-        value_name='curve_id'
-    )
-    # Remove rows with no match
-    melted = melted[pd.notna(melted['curve_id'])].copy()
-    melted['curve_id'] = melted['curve_id'].astype(int)
-    melted = melted.rename(columns={'ID': 'subid'})
-
-    # Remove duplicate curve-event matches
-    melted = melted.drop_duplicates(subset=['subid', 'curve_id', 'ema_id'])
-
-    # Assign rank to each event within its subid-curve_id group
-    melted['event_rank'] = melted.groupby(['subid', 'curve_id']).cumcount() + 1
-
-    # Pivot to wide format for event_matched_{i}
-    matched_pivot = melted.pivot(index=['subid', 'curve_id'], columns='event_rank', values='ema_id')
-    matched_pivot.columns = [f'event_matched_{col}' for col in matched_pivot.columns]
-    matched_pivot.reset_index(inplace=True)
-    # Find maximum number of events per curve
-    max_events = melted.groupby(['subid', 'curve_id'])['ema_id'].nunique().max()
-    # Keep only columns up to max_events
-    valid_columns = [
-      col for col in matched_pivot.columns if col.startswith('event_matched_') 
-      and int(col.replace('event_matched_', '')) <= max_events
-    ]
-    # Select final columns and clean data
-    matched_pivot = matched_pivot[['subid', 'curve_id'] + valid_columns]
-    matched_pivot = matched_pivot.dropna(subset=['subid', 'curve_id'])
-    matched_pivot['subid'] = matched_pivot['subid'].astype(int)
-    matched_pivot['curve_id'] = matched_pivot['curve_id'].astype(int)
-    # Merge matched events back into curve_features
-    self.curve_features = self.curve_features.merge(matched_pivot, on=['subid', 'curve_id'], how='left')
-
-    # Compute counts and binary flags for curve matches
-    valid_curve_cols = [col for col in self.event_data.columns if col.startswith('valid_curve_match_') and not col.endswith('_overlap')]
-    invalid_curve_cols = [col for col in self.event_data.columns if col.startswith('invalid_curve_match_') and not col.endswith('_overlap')]
-
-    # Count number of valid and invalid curves matched to each event
-    self.event_data['num_valid_curves_matched'] = self.event_data[valid_curve_cols].notna().sum(axis=1)
-    self.event_data['num_invalid_curves_matched'] = self.event_data[invalid_curve_cols].notna().sum(axis=1)
-
-    # Create binary flags for different matching scenarios
-    self.event_data['multiple_valid_curves_matched'] = (self.event_data['num_valid_curves_matched'] > 1) & (self.event_data['num_invalid_curves_matched'] == 0)
-    self.event_data['multiple_invalid_curves_matched'] = (self.event_data['num_invalid_curves_matched'] > 1) & (self.event_data['num_valid_curves_matched'] == 0)
-    self.event_data['multiple_mixed_curves_matched'] = (self.event_data['num_valid_curves_matched'] > 0) & (self.event_data['num_invalid_curves_matched'] > 0) & ((self.event_data['num_valid_curves_matched'] + self.event_data['num_invalid_curves_matched']) > 1)
-
-  # def set_events_by_type(self):
-  #   """Set event types based on event_type_settings configuration"""
-  #   self.event_data['eventuse_merged'] = self.event_data[self.event_type_column].copy()
-    
-  #   # Initialize counters
-  #   self.shared_curve_count = 0
-  #   self.relabeled_event_count = 0
-    
-  #   for _, group in self.event_data.groupby(['ID', 'curve_match_1']):
-  #     if len(group) > 1:  # Multiple events matched to same curve
-  #       self.shared_curve_count += 1
-  #       # Get all unique labels for events matching this curve
-  #       all_labels = group[self.event_type_column].unique()
-        
-  #       # If multiple events match same curve, merge their types according to settings
-  #       if len(all_labels) > 1:
-  #         # Check if both substance types are present
-  #         has_substance_one = self.event_type_settings['substance_one'] in all_labels
-  #         has_substance_two = self.event_type_settings['substance_two'] in all_labels
-  #         has_both = (has_substance_one and has_substance_two) or self.event_type_settings['substance_one_and_two'] in all_labels
-  #         if has_both:
-  #           self.event_data.loc[group.index, 'eventuse_type_merged'] = self.event_type_settings['substance_one_and_two']
-  #           self.relabeled_event_count += len(group)
 
   def set_datasets_by_valid_and_match(self):
     valid = (self.curve_features['CURVE_VALID'] == 1)

@@ -12,12 +12,6 @@ smooth_and_impute_attrs = DEFAULT_SMOOTH_AND_IMPUTE_ATTRS
 # Curve analysis settings - using defaults for consistency
 curve_attrs = DEFAULT_CURVE_ATTRS
 
-# Event settings (placeholder for future use if test event data becomes available)
-event_attrs = {
-    'subid_column': 'ID',
-    'event_timestamp_columns': ['drinkStart', 'drinkEnd']
-}
-
 # Day settings
 day_attrs = {
     'day_start_hour': 0,

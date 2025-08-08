@@ -473,6 +473,7 @@ def impute_low_quality_data(df: pd.DataFrame):
       df = label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices_filtered, jump_indices_filtered, plummet_indices_filtered, extreme_negative_indices_filtered)
       
       imputation_attempt['was_imputed'] = True
+      print('IMPUTED (Using Gaussian Process for low-quality region)')
 
     # Check if region contains only extreme negative and proximal low quality indices
     else:
@@ -492,6 +493,7 @@ def impute_low_quality_data(df: pd.DataFrame):
         df = label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices_filtered, jump_indices_filtered, plummet_indices_filtered, extreme_negative_indices_filtered)
         
         imputation_attempt['was_imputed'] = True
+        print('IMPUTED (Zeros during all-negative region)')
         
       # If region contains other types of low quality data, don't impute
       else:

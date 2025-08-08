@@ -8,6 +8,8 @@ from App.SDM.Scripts.Test.test_settings import (
     gaps_and_non_wear_attrs
 )
 
+curve_attrs['curve_threshold'] = 10
+
 # gaps_and_non_wear_attrs['export_excel'] = True
 
 # Path settings
@@ -24,12 +26,13 @@ process_and_analyze_data(
     smooth_and_impute=True,
     analyze_days=True,
     identify_curves=True,
-    include_raw_curves=True,  # Added to match ARC analysis
+    include_raw_curves=False,  # Added to match ARC analysis
     match_events_to_curves=False,  # Set to False since no event data available
     curve_attrs=curve_attrs,
     smooth_and_impute_attrs=smooth_and_impute_attrs,
     day_attrs=day_attrs,
-    gaps_and_non_wear_attrs=gaps_and_non_wear_attrs
+    gaps_and_non_wear_attrs=gaps_and_non_wear_attrs,
+    subids_to_process=[5011]
 )
 
 from datetime import datetime
@@ -43,5 +46,5 @@ output_dir = f'{project_root}/Results/{cohort_name}'
 curves.run_stats()
 curves.count_curve_flags()
 curves.compute_imputation_stats()
-curves.identify_perfect_curves(output_dir)
+# curves.identify_perfect_curves(output_dir)
 curves.export_workbook_curves(f'{project_root}/Results/{cohort_name}/{cohort_name}_curve_stats_{today}.xlsx')
