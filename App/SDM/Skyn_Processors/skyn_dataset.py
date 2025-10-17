@@ -49,7 +49,7 @@ class skynDataset:
     #load data
     self.unprocessed_dataset = load_dataset(self)
     self.sampling_rate = 1 #biosensor readings per minute. this is updated in the command below
-    self.dataset = configure_raw_data(self)
+    self.dataset = configure_raw_data(self, error_logger=self.log_error)
 
     self.time_elapsed_column = 'Duration_Hrs' #updated after cropping/processing
 
@@ -88,6 +88,7 @@ class skynDataset:
     self.curves = []
     self.curve_features = pd.DataFrame()
     self.curve_threshold = 10.0  # Default curve threshold
+    self.curve_threshold_computed = False  # Flag to track if threshold was computed
     self.curve_columns = [
     ]
   
@@ -133,7 +134,7 @@ class skynDataset:
   def smooth_and_impute(self, median_smooth = True, impute_low_quality = True, savgol_smooth = False, export_excel = False):
     print(f'Processing Skyn Dataset: {self.subid} - {self.dataset_identifier}')  
     try:
-      raw_dataset = configure_raw_data(self)
+      raw_dataset = configure_raw_data(self, error_logger=self.log_error)
       raw_dataset_gaps_filled = fill_device_off_gaps(raw_dataset)
       self.dataset['TAC'] = raw_dataset_gaps_filled['TAC'].copy()
 
@@ -165,13 +166,72 @@ class skynDataset:
       self.log_error()
       self.save_as_sdp(valid=False)  
   
+  def compute_curve_threshold(self, curve_attrs: Dict = {}):
+    """
+    Determine the curve threshold for the dataset.
+    This method only handles threshold determination and saves the results.
+    
+    Args:
+      curve_attrs (dict): Curve threshold attributes
+        - curve_threshold (float | str): Either a numeric threshold or 'auto' to determine automatically
+        
+    Returns:
+      None
+      
+    Raises:
+      ValueError: If curve_threshold is invalid or automatic threshold determination fails
+    """
+    self.curve_threshold_method = curve_attrs.get('curve_threshold', 'auto')
+    
+    try:
+      # Get curve threshold using the new function
+      self.curve_threshold, self.curve_threshold_results = get_curve_threshold_from_method(
+          self.dataset, self.curve_threshold_method
+      )
+
+      # Generate cluster analysis visualization
+      if hasattr(self.dataset, 'attrs') and 'labeled_cluster_data' in self.dataset.attrs:
+        cluster_plot_path = plot_cluster_analysis(
+          self.dataset, 
+          self.plot_folder, 
+          self.subid, 
+          self.dataset_identifier, 
+          self.curve_threshold,
+          title=f"TAC Cluster Analysis - {self.subid}",
+          subtitle_text=f"Dataset: {self.dataset_identifier} | Threshold: {self.curve_threshold:.2f}"
+        )
+        if cluster_plot_path:
+          self.plot_paths.append(cluster_plot_path)
+          print(f"Cluster analysis plot saved: {cluster_plot_path}")
+
+      # Export curve threshold results to Excel
+      if hasattr(self, 'curve_threshold_results'):
+          threshold_results_df = pd.DataFrame([self.curve_threshold_results])
+          threshold_results_df.to_excel(
+              f'{self.data_out_folder}/curve_threshold_results_{self.subid}_{self.dataset_identifier}.xlsx', 
+              index=False
+          )
+      
+      self.curve_threshold_computed = True
+      
+      self.save_as_sdp(valid=True)
+      print(f"Successfully determined curve threshold {self.curve_threshold:.2f} for {self.subid}_{self.dataset_identifier}")
+
+    except Exception as e:
+      self.error = traceback.format_exc()
+      self.log_error()
+      self.save_as_sdp(valid=False)
+      raise ValueError(f"Failed to determine curve threshold: {str(e)}")
+
   def identify_curves(self, curve_attrs: Dict = {}, include_raw_curves = False):
     """
-    Identify curves in the dataset using either an automatic or manual threshold.
+    Find curve boundaries and process them into Curve objects and extract features.
+    If curve threshold has not been determined yet, this method will automatically call demarcate_curves()
+    first for backward compatibility.
     
     Args:
       curve_attrs (dict): Additional curve attributes for processing
-        - curve_threshold (float | str): Either a numeric threshold or 'auto' to determine automatically
+        - curve_threshold (float | str): Either a numeric threshold or 'auto' to determine automatically (used if thresholding needed)
         - merge_curves_within_duration (int): Duration in hours to merge nearby curves
         - flag_selections (dict): Dictionary containing both curve and periphery flags
         - periphery_buffer_before (int): Buffer before curve in hours
@@ -182,18 +242,18 @@ class skynDataset:
       None
       
     Raises:
-      ValueError: If curve_threshold is invalid or automatic threshold determination fails
+      ValueError: If curve thresholding or processing fails
     """
     self.curve_features = pd.DataFrame()
     self.raw_curve_features = pd.DataFrame()
-    self.curve_threshold_method = curve_attrs.get('curve_threshold', 'auto')
+    
+    # Check if curve threshold has been computed - if not, do it automatically for backward compatibility
+    if not self.curve_threshold_computed:
+      print(f"Curve threshold not computed yet for {self.subid}_{self.dataset_identifier}. Auto-computing threshold...")
+      self.compute_curve_threshold(curve_attrs=curve_attrs)
     
     try:
-      # Get curve threshold using the new function
-      result = get_curve_threshold_from_method(self.dataset, self.curve_threshold_method)
-      self.curve_threshold, unadjusted_curve_threshold, baseline_mean, baseline_sd = result
-
-      # Get curve start and end indices
+      # Get curve start and end indices using the determined threshold
       curve_start_and_end_indices = get_start_and_end_of_discrete_curves(self.dataset, self.curve_threshold)
 
       # Merge nearby curves if specified
@@ -202,6 +262,11 @@ class skynDataset:
           curve_start_and_end_indices, 
           max_curve_separation_minutes=curve_attrs['merge_curves_within_duration']*60
         )
+      else:
+        # Add curve_count = 1 to each curve if no merging
+        curve_start_and_end_indices_with_curve_count = [
+          [start, end, 1] for start, end in curve_start_and_end_indices
+        ]
       
       # Process each curve
       curve_id = 0
@@ -236,9 +301,21 @@ class skynDataset:
         self.curve_features = pd.DataFrame(columns=self.curve_columns)
 
       # Add threshold information
-      self.curve_features['unadjusted_threshold'] = unadjusted_curve_threshold
-      self.curve_features['baseline_mean'] = baseline_mean
-      self.curve_features['baseline_sd'] = baseline_sd
+      self.curve_features['unadjusted_threshold'] = self.curve_threshold_results['unadjusted_threshold']
+      self.curve_features['baseline_mean'] = self.curve_threshold_results['baseline_mean']
+      self.curve_features['next_cluster_mean'] = self.curve_threshold_results['next_cluster_mean']
+      self.curve_features['threshold_calculation_method'] = self.curve_threshold_results['threshold_calculation_method']
+      self.curve_features['beta_value'] = self.curve_threshold_results['beta_value']
+      self.curve_features['threshold_capped'] = self.curve_threshold_results['threshold_capped']
+      self.curve_features['capped_reason'] = self.curve_threshold_results['capped_reason']
+      
+      # Add clustering information
+      self.curve_features['optimal_k'] = self.curve_threshold_results['optimal_k']
+      self.curve_features['k_values_tested'] = str(self.curve_threshold_results['k_values_tested']) if self.curve_threshold_results['k_values_tested'] else None
+      self.curve_features['clustering_quality_silhouette'] = self.curve_threshold_results['clustering_quality_silhouette']
+      self.curve_features['clustering_quality_calinski_harabasz'] = self.curve_threshold_results['clustering_quality_calinski_harabasz']
+      self.curve_features['clustering_quality_davies_bouldin'] = self.curve_threshold_results['clustering_quality_davies_bouldin']
+      self.curve_features['clustering_quality_inertia'] = self.curve_threshold_results['clustering_quality_inertia']
       
       # Reset index to ensure unique, sequential indices
       self.curve_features = self.curve_features.reset_index(drop=True)
@@ -251,11 +328,12 @@ class skynDataset:
 
       self.raw_curves = []
       if include_raw_curves:
+        # Use the original curve boundaries but adjust for raw TAC
         curve_start_and_end_indices_raw = adjust_curve_demarcation_for_raw_tac(
           self.dataset, 
           curve_start_and_end_indices_with_curve_count, 
           self.curve_threshold, 
-          curve_attrs['merge_curves_within_duration']*60
+          curve_attrs.get('merge_curves_within_duration', 0)*60
         )
         assert len(curve_start_and_end_indices_raw) == len(curve_start_and_end_indices_with_curve_count), \
           f"Length mismatch between raw and processed curve indices: {len(curve_start_and_end_indices_raw)} vs {len(curve_start_and_end_indices_with_curve_count)}"
@@ -293,8 +371,9 @@ class skynDataset:
         )
       else:
         self.raw_curve_features = pd.DataFrame(columns=self.curve_columns)
-
+      
       self.save_as_sdp(valid=True)
+      print(f"Successfully processed {len(self.curves)} curves for {self.subid}_{self.dataset_identifier}")
 
     except Exception as e:
       self.error = traceback.format_exc()
@@ -318,6 +397,26 @@ class skynDataset:
       for col in event_timestamp_columns:
         if col in self.events.columns:
           self.events[col] = pd.to_datetime(self.events[col], errors='coerce')
+      
+      # Clean and correct timestamps before processing
+      print(f"Cleaning and correcting timestamps for {self.subid}...")
+      
+      # Handle missing end timestamps by adding 8-hour buffer
+      if len(event_timestamp_columns) >= 2:
+        start_col = event_timestamp_columns[0]  # Assume first is start, second is end
+        end_col = event_timestamp_columns[1]
+        
+        if start_col in self.events.columns and end_col in self.events.columns:
+          missing_end_mask = self.events[end_col].isna() & self.events[start_col].notna()
+          if missing_end_mask.sum() > 0:
+            self.events.loc[missing_end_mask, end_col] = self.events.loc[missing_end_mask, start_col] + pd.Timedelta(hours=8)
+            print(f"  Added 8-hour buffer to {missing_end_mask.sum()} events with missing end timestamps")
+          
+          # Add 24 hours to end times that occur before start times (overnight events)
+          overnight_mask = self.events[end_col] < self.events[start_col]
+          if overnight_mask.sum() > 0:
+            self.events.loc[overnight_mask, end_col] = self.events.loc[overnight_mask, end_col] + pd.Timedelta(hours=24)
+            print(f"  Added 24 hours to {overnight_mask.sum()} overnight events")
       
       # Process event timestamps
       self.events, self.event_labels, event_ranges = process_event_timestamps(
@@ -397,6 +496,27 @@ class skynDataset:
       self.error = traceback.format_exc()
       self.log_error()
       self.save_as_sdp(valid=False)
+
+  def get_curve_threshold_summary(self):
+    """
+    Get a summary of the curve threshold determination results.
+    
+    Returns:
+        dict: Dictionary containing curve threshold determination results
+    """
+    if hasattr(self, 'curve_threshold_results'):
+        return self.curve_threshold_results.copy()
+    else:
+        return {
+            'curve_threshold': self.curve_threshold,
+            'threshold_method': 'manual' if isinstance(self.curve_threshold, (int, float)) else 'not_determined',
+            'baseline_mean': None,
+            'next_cluster_mean': None,
+            'threshold_calculation_method': 'manual',
+            'beta_value': None,
+            'threshold_capped': False,
+            'capped_reason': None
+        }
 
   def set_ema_regions(self, export_excel=True):
     try:

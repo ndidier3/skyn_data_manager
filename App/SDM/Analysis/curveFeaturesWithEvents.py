@@ -512,6 +512,7 @@ class curveFeaturesWithEvents(curveFeatures):
 
   def run_event_stats(self):
     self.count_matches()
+    self.count_curve_flags()
     self.count_flags_for_curves_with_events()
     self.compute_tac_feature_stats_for_matched_curves()
     self.assess_search_quality()

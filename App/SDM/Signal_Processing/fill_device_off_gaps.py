@@ -30,16 +30,25 @@ def fill_device_off_gaps(df):
       # For each generated datetime, create a new row with specified columns
       for new_time in new_times:
         new_row = {
-          'SubID': row['SubID'],
-          'Dataset_Identifier': row['Dataset_Identifier'],
-          'Episode_Identifier': row['Episode_Identifier'],
-          'Full_Identifier': row['Full_Identifier'],
-          'Row_ID': None,  # Temporary value; will be updated later
-          'email': row['email'],
           'datetime': new_time,
-          'device_id': row['device_id'],
           'device_turned_on': 0
         }
+        
+        # Add optional columns if they exist
+        if 'device_id' in row:
+          new_row['device_id'] = row['device_id']
+        if 'subid' in row:
+          new_row['subid'] = row['subid']
+        elif 'SubID' in row:
+          new_row['SubID'] = row['SubID']
+        if 'Dataset_Identifier' in row:
+          new_row['Dataset_Identifier'] = row['Dataset_Identifier']
+        if 'Episode_Identifier' in row:
+          new_row['Episode_Identifier'] = row['Episode_Identifier']
+        if 'Full_Identifier' in row:
+          new_row['Full_Identifier'] = row['Full_Identifier']
+        if 'email' in row:
+          new_row['email'] = row['email']
         # Add the new row to the list of rows to add
         rows_to_add.append(new_row)
 
@@ -49,8 +58,16 @@ def fill_device_off_gaps(df):
   # Append the new rows to the original DataFrame
   df = pd.concat([df, new_rows_df]).sort_values(by='datetime').reset_index(drop=True)
 
-  # Update Row_ID for all rows using Full_Identifier and the new index
-  df['Row_ID'] = df['Full_Identifier'].astype(str) + '_' + df.index.astype(str)
+  # Update Row_ID for all rows using available identifier columns
+  if 'Full_Identifier' in df.columns:
+    df['Row_ID'] = df['Full_Identifier'].astype(str) + '_' + df.index.astype(str)
+  elif 'subid' in df.columns:
+    df['Row_ID'] = df['subid'].astype(str) + '_' + df.index.astype(str)
+  elif 'SubID' in df.columns:
+    df['Row_ID'] = df['SubID'].astype(str) + '_' + df.index.astype(str)
+  else:
+    # Create a generic Row_ID if no identifier column is found
+    df['Row_ID'] = 'unknown_' + df.index.astype(str)
 
   # Drop the temporary 'time_diff' column
   df.drop(columns=['time_diff', 'gap'], inplace=True)

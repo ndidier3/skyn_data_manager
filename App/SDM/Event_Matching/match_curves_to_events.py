@@ -113,55 +113,11 @@ def match_curves_to_events(
         curve_features['CURVE_MATCH_START'] = pd.to_datetime(curve_features['begin_CURVE']) - pd.Timedelta(hours=buffer_before)
         curve_features['CURVE_MATCH_END'] = pd.to_datetime(curve_features['end_CURVE']) + pd.Timedelta(hours=buffer_after)
         
-        # Debug: Print curve information
-        print(f"\n=== CURVE DEBUG INFO ===")
-        print(f"Total curves: {len(curve_features)}")
-        print(f"Curve features DataFrame indices: {curve_features.index.tolist()}")
-        print(f"Curve features DataFrame shape: {curve_features.shape}")
-        print(f"Buffer before: {buffer_before} hours, Buffer after: {buffer_after} hours")
-        print("Curve time ranges:")
-        for idx, curve in curve_features.iterrows():
-            print(f"  Curve {curve['curve_id']} (DataFrame index {idx}): {curve['begin_CURVE']} to {curve['end_CURVE']} (duration: {(curve['end_CURVE'] - curve['begin_CURVE']).total_seconds()/3600:.1f}h)")
-            print(f"    Match range: {curve['CURVE_MATCH_START']} to {curve['CURVE_MATCH_END']} (duration: {(curve['CURVE_MATCH_END'] - curve['CURVE_MATCH_START']).total_seconds()/3600:.1f}h)")
-        
-        # Debug: Print event ranges
-        print(f"\n=== EVENT RANGES DEBUG INFO ===")
-        print(f"Total event ranges: {len(event_ranges)}")
-        for i, event_range in enumerate(event_ranges):
-            print(f"  Event {i+1} (ema_id: {event_range['ema_id']}):")
-            print(f"    Original: {event_range['earliest_timestamp']} to {event_range['latest_timestamp']}")
-            print(f"    Match range: {event_range['event_match_start']} to {event_range['event_match_end']}")
-            print(f"    Duration: {(event_range['event_match_end'] - event_range['event_match_start']).total_seconds()/3600:.1f}h)")
-        
         # Track curve-event matches in a dictionary to avoid accumulation issues
         curve_event_matches = {idx: {'ema_ids': [], 'raw_overlaps': [], 'adjusted_overlaps': [], 'valid_ema_ids': [], 'invalid_ema_ids': [], 'count': 0} 
                              for idx in curve_features.index}
         
         for event_range in event_ranges:
-            print(f"\n=== PROCESSING EVENT {event_range['ema_id']} ===")
-            print(f"Event time range: {event_range['event_match_start']} to {event_range['event_match_end']}")
-            print(f"Event duration: {(event_range['event_match_end'] - event_range['event_match_start']).total_seconds()/3600:.2f}h")
-            
-            # Debug: Show all curves and their temporal relationship to this event
-            print(f"\nChecking temporal relationships with {len(curve_features)} curves:")
-            for idx, curve in curve_features.iterrows():
-                curve_start = curve['CURVE_MATCH_START']
-                curve_end = curve['CURVE_MATCH_END']
-                event_start = event_range['event_match_start']
-                event_end = event_range['event_match_end']
-                
-                # Check overlap conditions
-                no_overlap_condition1 = curve_end < event_start
-                no_overlap_condition2 = curve_start > event_end
-                has_overlap = not (no_overlap_condition1 or no_overlap_condition2)
-                
-                print(f"  Curve {curve['curve_id']}: {curve_start} to {curve_end}")
-                print(f"    Event: {event_start} to {event_end}")
-                print(f"    Condition 1 (curve_end < event_start): {curve_end} < {event_start} = {no_overlap_condition1}")
-                print(f"    Condition 2 (curve_start > event_end): {curve_start} > {event_end} = {no_overlap_condition2}")
-                print(f"    Has overlap: {has_overlap}")
-                print()
-            
             # Find curves that overlap with this event's time range using event_match_end
             overlapping_curves = curve_features[
               ~(
@@ -169,22 +125,6 @@ def match_curves_to_events(
                 (curve_features['CURVE_MATCH_START'] > event_range['event_match_end'])
               )
             ].sort_values('CURVE_MATCH_START')  # Sort by start time to get earliest first
-            
-            print(f"Found {len(overlapping_curves)} overlapping curves:")
-            print(f"Overlapping curves indices: {overlapping_curves.index.tolist()}")
-            for idx, curve in overlapping_curves.iterrows():
-                overlap_start = max(event_range['event_match_start'], curve['CURVE_MATCH_START'])
-                overlap_end = min(event_range['event_match_end'], curve['CURVE_MATCH_END'])
-                overlap_duration = (overlap_end - overlap_start).total_seconds() / 3600
-                event_duration = (event_range['event_match_end'] - event_range['event_match_start']).total_seconds() / 3600
-                curve_duration = (curve['CURVE_MATCH_END'] - curve['CURVE_MATCH_START']).total_seconds() / 3600
-                overlap_percentage_of_event = (overlap_duration / event_duration) * 100 if event_duration > 0 else 0
-                overlap_percentage_of_curve = (overlap_duration / curve_duration) * 100 if curve_duration > 0 else 0
-                
-                print(f"  Curve {curve['curve_id']} (original index {idx}): {curve['CURVE_MATCH_START']} to {curve['CURVE_MATCH_END']}")
-                print(f"    Overlap: {overlap_start} to {overlap_end} ({overlap_duration:.2f}h)")
-                print(f"    Event duration: {event_duration:.2f}h, Curve duration: {curve_duration:.2f}h")
-                print(f"    Overlap is {overlap_percentage_of_event:.1f}% of event and {overlap_percentage_of_curve:.1f}% of curve")
             
             matching_curve_ids = overlapping_curves['curve_id'].tolist()
             events_df.loc[events_df['ema_id'] == event_range['ema_id'], 'num_curves_matched'] = len(matching_curve_ids)
@@ -248,10 +188,6 @@ def match_curves_to_events(
                 new_raw_overlap = f"{raw_overlap_proportion:.3f}" if raw_overlap_proportion is not None else "None"
                 new_adjusted_overlap = f"{adjusted_overlap_proportion:.3f}" if adjusted_overlap_proportion is not None else "None"
                 
-                print(f"    Updating curve {curve_id} (index {curve_idx}) with event {new_ema_id}")
-                print(f"      Current matched_ema_ids: '{curve_event_matches[curve_idx]['ema_ids']}'")
-                print(f"      Adding new ema_id: '{new_ema_id}'")
-                
                 # Add to dictionary using DataFrame index
                 curve_event_matches[curve_idx]['ema_ids'].append(new_ema_id)
                 curve_event_matches[curve_idx]['raw_overlaps'].append(new_raw_overlap)
@@ -262,18 +198,8 @@ def match_curves_to_events(
                     curve_event_matches[curve_idx]['valid_ema_ids'].append(new_ema_id)
                 else:
                     curve_event_matches[curve_idx]['invalid_ema_ids'].append(new_ema_id)
-                
-                print(f"      New matched_ema_ids: '{curve_event_matches[curve_idx]['ema_ids']}'")
         
         # Apply the accumulated curve-event matches to the DataFrame
-        print(f"\n=== FINAL CURVE-EVENT MATCHES ===")
-        for curve_idx, matches in curve_event_matches.items():
-            if matches['count'] > 0:
-                print(f"Curve index {curve_idx}: {matches['count']} events matched")
-                print(f"  ema_ids: {matches['ema_ids']}")
-                print(f"  valid_ema_ids: {matches['valid_ema_ids']}")
-                print(f"  invalid_ema_ids: {matches['invalid_ema_ids']}")
-        
         for curve_idx, matches in curve_event_matches.items():
             if matches['count'] > 0:
                 curve_features.loc[curve_idx, 'matched_ema_ids'] = ';'.join(matches['ema_ids'])
@@ -282,7 +208,6 @@ def match_curves_to_events(
                 curve_features.loc[curve_idx, 'matched_events_valid'] = ';'.join(matches['valid_ema_ids'])
                 curve_features.loc[curve_idx, 'matched_events_invalid'] = ';'.join(matches['invalid_ema_ids'])
                 curve_features.loc[curve_idx, 'num_events_matched'] = matches['count']
-                print(f"Applied to curve index {curve_idx}: num_events_matched = {matches['count']}")
     
     # Calculate counts and binary flags for each event (optimized)
     valid_cols = [f'valid_curve_match_{i}' for i in range(1, 6)]

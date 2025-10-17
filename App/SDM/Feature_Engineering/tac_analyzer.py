@@ -187,14 +187,159 @@ class TACAnalyzer:
         else:
             return 1
 
-    def get_rise_rate(self, rise_duration, relative_peak):
-        """Calculate rise rate."""
+    def get_rise_rate(self, rise_duration, relative_peak, curve_threshold):
+        """Calculate rise rate (peak-based) using curve threshold as baseline.
+        
+        Args:
+            rise_duration: Duration of rise period in hours
+            relative_peak: Peak TAC minus curve threshold (already calculated)
+            curve_threshold: The curve threshold value (unused, kept for compatibility)
+            
+        Returns:
+            float: Rise rate from curve threshold to peak
+        """
         if rise_duration and (relative_peak is not None):
-            return relative_peak / rise_duration
+            rise_rate = relative_peak / rise_duration
+            return rise_rate
         elif rise_duration == 0:
             return 0
         else:
             return None
+
+    def get_point_to_point_rise_rate(self, curve_start_index):
+        """Calculate average of all ascending point-to-point TAC changes.
+        
+        Based on: ΔTAC_{t,t-1} / ΔHours_{t,t-1} > 0
+        This calculates the rate of change for all consecutive points where TAC increases,
+        starting from the first curve value.
+        
+        Args:
+            curve_start_index: Index where the curve starts (unused, kept for compatibility)
+            
+        Returns:
+            float: Average rise rate across all ascending segments
+        """
+        def compute():
+            if len(self.df) < 2:
+                return None
+            
+            rise_rates = []
+            tac_values = self.df[self.tac_column].dropna()
+            
+            if len(tac_values) < 2:
+                return None
+            
+            # Calculate point-to-point differences within the curve
+            for i in range(1, len(tac_values)):
+                current_tac = tac_values.iloc[i]
+                previous_tac = tac_values.iloc[i-1]
+                tac_diff = current_tac - previous_tac
+                
+                # Only include positive changes (ascending rates)
+                if tac_diff > 0:
+                    rise_rates.append(tac_diff)
+            
+            if len(rise_rates) == 0:
+                return 0  # No ascending segments found
+            
+            return np.mean(rise_rates)
+        
+        cache_key = f'point_to_point_rise_rate_{curve_start_index}'
+        return self._get_cached(cache_key, compute)
+
+    def get_rise_rate_1hr(self, curve_start_index, peak_index, curve_threshold):
+        """Calculate rise rate over 1 hour period, bounded by peak time.
+        
+        Computes TAC change from curve threshold to the median 
+        of the last 5 values within 1 hour of curve start, but not beyond peak time.
+        
+        Args:
+            curve_start_index: Index where the curve starts
+            peak_index: Index where the peak occurs
+            curve_threshold: The curve threshold value
+            
+        Returns:
+            float: Rise rate over 1 hour period (or None if insufficient data)
+        """
+        def compute():
+            if len(self.df) < 2:
+                return None
+            
+            # Find end index: min of (1-hour window, peak time)
+            # 1-hour window = 60 data points from curve start
+            hour_window_end = curve_start_index + 60
+            end_index = min(hour_window_end, peak_index, len(self.df) - 1)
+            
+            # Ensure we have at least 5 values in the rise period
+            rise_length = end_index - curve_start_index + 1
+            if rise_length < 5:
+                return None
+            
+            # Calculate actual time duration in hours
+            time_diff_hours = rise_length / 60.0  # Convert minutes to hours
+            
+            # Get last 5 values within the bounded window
+            if rise_length < 5:
+                return None
+            
+            last_5_values = self.df.iloc[end_index-4:end_index+1][self.tac_column]
+            median_tac = last_5_values.median()
+            
+            # Calculate rise rate from curve threshold to median
+            tac_change = median_tac - curve_threshold
+            rise_rate = tac_change / time_diff_hours
+            
+            return rise_rate
+        
+        cache_key = f'rise_rate_1hr_{curve_start_index}_{peak_index}_{curve_threshold}'
+        return self._get_cached(cache_key, compute)
+
+    def get_rise_rate_2hr(self, curve_start_index, peak_index, curve_threshold):
+        """Calculate rise rate over 2 hour period, bounded by peak time.
+        
+        Computes TAC change from curve threshold to the median 
+        of the last 5 values within 2 hours of curve start, but not beyond peak time.
+        
+        Args:
+            curve_start_index: Index where the curve starts
+            peak_index: Index where the peak occurs
+            curve_threshold: The curve threshold value
+            
+        Returns:
+            float: Rise rate over 2 hour period (or None if insufficient data)
+        """
+        def compute():
+            if len(self.df) < 2:
+                return None
+            
+            # Find end index: min of (2-hour window, peak time)
+            # 2-hour window = 120 data points from curve start
+            hour_window_end = curve_start_index + 120
+            end_index = min(hour_window_end, peak_index, len(self.df) - 1)
+            
+            # Ensure we have at least 5 values in the rise period
+            rise_length = end_index - curve_start_index + 1
+            if rise_length < 5:
+                return None
+            
+            # Calculate actual time duration in hours
+            time_diff_hours = rise_length / 60.0  # Convert minutes to hours
+            
+            # Get last 5 values within the bounded window
+            if rise_length < 5:
+                return None
+            
+            last_5_values = self.df.iloc[end_index-4:end_index+1][self.tac_column]
+            median_tac = last_5_values.median()
+            
+            # Calculate rise rate from curve threshold to median
+            tac_change = median_tac - curve_threshold
+            rise_rate = tac_change / time_diff_hours
+            
+            return rise_rate
+        
+        cache_key = f'rise_rate_2hr_{curve_start_index}_{peak_index}_{curve_threshold}'
+        return self._get_cached(cache_key, compute)
 
     def get_fall_rate(self, fall_duration, relative_peak):
         """Calculate fall rate."""
@@ -204,6 +349,139 @@ class TACAnalyzer:
             return 0
         else:
             return None
+
+    def get_point_to_point_fall_rate(self, peak_index):
+        """Calculate average of all descending point-to-point TAC rates.
+        
+        Based on: ΔTAC_{t,t-1} / ΔHours_{t,t-1} < 0
+        This calculates the rate of change for all consecutive points where TAC decreases,
+        starting from the peak.
+        
+        Args:
+            peak_index: Index where the peak occurs
+            
+        Returns:
+            float: Average fall rate across all descending segments
+        """
+        def compute():
+            if len(self.df) < 2:
+                return None
+            
+            fall_rates = []
+            tac_values = self.df[self.tac_column].dropna()
+            
+            if len(tac_values) < 2:
+                return None
+            
+            # Calculate point-to-point differences from peak onwards
+            for i in range(peak_index + 1, len(tac_values)):
+                current_tac = tac_values.iloc[i]
+                previous_tac = tac_values.iloc[i-1]
+                tac_diff = current_tac - previous_tac
+                
+                # Only include negative changes (descending rates)
+                if tac_diff < 0:
+                    fall_rates.append(abs(tac_diff))  # Use absolute value for consistency
+            
+            if len(fall_rates) == 0:
+                return 0  # No descending segments found
+            
+            return np.mean(fall_rates)
+        
+        cache_key = f'point_to_point_fall_rate_{peak_index}'
+        return self._get_cached(cache_key, compute)
+
+    def get_fall_rate_1hr(self, peak_index, curve_threshold):
+        """Calculate fall rate over last 1 hour period.
+        
+        Computes TAC change from curve threshold to the median 
+        of the first 5 values within 1 hour before curve end.
+        
+        Args:
+            peak_index: Index where the peak occurs
+            curve_threshold: The curve threshold value
+            
+        Returns:
+            float: Fall rate over last 1 hour period (or None if insufficient data)
+        """
+        def compute():
+            if len(self.df) < 2:
+                return None
+            
+            # Find start index: max of (1-hour window from end, peak time)
+            # 1-hour window = 60 data points from curve end
+            hour_window_start = len(self.df) - 60
+            start_index = max(hour_window_start, peak_index)
+            
+            # Ensure we have at least 5 values in the fall period
+            fall_length = len(self.df) - start_index
+            if fall_length < 5:
+                return None
+            
+            # Calculate actual time duration in hours
+            time_diff_hours = fall_length / 60.0  # Convert minutes to hours
+            
+            # Get first 5 values within the bounded window
+            if fall_length < 5:
+                return None
+            
+            first_5_values = self.df.iloc[start_index:start_index+5][self.tac_column]
+            median_tac = first_5_values.median()
+            
+            # Calculate fall rate from median to curve threshold
+            tac_change = curve_threshold - median_tac
+            fall_rate = tac_change / time_diff_hours
+            
+            return fall_rate
+        
+        cache_key = f'fall_rate_1hr_{peak_index}_{curve_threshold}'
+        return self._get_cached(cache_key, compute)
+
+    def get_fall_rate_2hr(self, peak_index, curve_threshold):
+        """Calculate fall rate over last 2 hour period.
+        
+        Computes TAC change from curve threshold to the median 
+        of the first 5 values within 2 hours before curve end.
+        
+        Args:
+            peak_index: Index where the peak occurs
+            curve_threshold: The curve threshold value
+            
+        Returns:
+            float: Fall rate over last 2 hour period (or None if insufficient data)
+        """
+        def compute():
+            if len(self.df) < 2:
+                return None
+            
+            # Find start index: max of (2-hour window from end, peak time)
+            # 2-hour window = 120 data points from curve end
+            hour_window_start = len(self.df) - 120
+            start_index = max(hour_window_start, peak_index)
+            
+            # Ensure we have at least 5 values in the fall period
+            fall_length = len(self.df) - start_index
+            if fall_length < 5:
+                return None
+            
+            # Calculate actual time duration in hours
+            time_diff_hours = fall_length / 60.0  # Convert minutes to hours
+            
+            # Get first 5 values within the bounded window
+            if fall_length < 5:
+                return None
+            
+            first_5_values = self.df.iloc[start_index:start_index+5][self.tac_column]
+            median_tac = first_5_values.median()
+            
+            # Calculate fall rate from median to curve threshold
+            tac_change = curve_threshold - median_tac
+            fall_rate = tac_change / time_diff_hours
+            
+            return fall_rate
+        
+        cache_key = f'fall_rate_2hr_{peak_index}_{curve_threshold}'
+        return self._get_cached(cache_key, compute)
 
     def get_curve_duration(self, rise_duration, fall_duration):
         """Calculate total curve duration."""

@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from App.SDM.Feature_Engineering.tac_features import *
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
 import scipy.interpolate
@@ -191,7 +190,7 @@ def convert_index_sets_to_index_region_pairs(*args):
     - list of [start, end] region pairs with extended boundaries
     - sorted list of proximal indices, which includes:
       a) Extension indices: Values added by extending before/after each region
-         (extension length = min(10, max(3, 3 + round(region_length/3))))
+         (extension length = min(15, max(3, 3 + round(region_length/7))))
       b) Merged gap indices: Values that fall between merged regions
          (when regions are within dynamic merge_distance of each other)
       Note: Proximal indices never include any of the original input indices
@@ -224,8 +223,9 @@ def convert_index_sets_to_index_region_pairs(*args):
   
   for region in initial_regions:
     region_length = region[1] - region[0] + 1
-    # Calculate extension length: min 3, max 10, otherwise 3 + round(length/3)
-    extension = min(10, max(3, 3 + round(region_length / 3)))
+    # Calculate extension length: min 3, max 15, otherwise 3 + round(length/7)
+    # 81 minutes (indices) required to reach max extension of 15
+    extension = min(15, 3 + round(region_length / 7))
     
     # Calculate extended boundaries with bounds checking
     start_extension = max(min_valid_idx, region[0] - extension)
@@ -324,6 +324,98 @@ def label_imputation_reason(df, low_quality_region_start, low_quality_region_end
       df.loc[indices, reason] = 1 
     
     return df
+
+def generate_blended_imputation(df, low_quality_region_start, low_quality_region_end, t_all, 
+                               blend_window=20, start_blend_points=10, end_blend_points=10):
+    """
+    Generate imputed values with smooth transitions to surrounding high-quality means.
+    
+    Args:
+        df: DataFrame containing TAC values
+        low_quality_region_start: Start index of low quality region
+        low_quality_region_end: End index of low quality region
+        t_all: DataFrame containing only high-quality training data
+        blend_window: Number of surrounding values to consider for mean calculation
+        start_blend_points: Number of points to blend at the start of imputation
+        end_blend_points: Number of points to blend at the end of imputation
+    
+    Returns:
+        Array of imputed TAC values with smooth transitions
+    """
+    # Get indices for the blend window before and after the imputation region
+    before_start = low_quality_region_start - blend_window
+    after_end = low_quality_region_end + blend_window
+    
+    # Ensure we don't go out of bounds
+    before_start = max(0, before_start)
+    after_end = min(len(df), after_end)
+    
+    # Calculate means of surrounding high-quality regions
+    # Only use high-quality data (not in t_all means it's low quality)
+    before_indices = range(before_start, low_quality_region_start)
+    after_indices = range(low_quality_region_end + 1, after_end)
+    
+    # Filter to only high-quality data in surrounding regions
+    before_high_quality = df.iloc[before_indices]
+    after_high_quality = df.iloc[after_indices]
+    
+    # Get high-quality indices from surrounding regions
+    before_high_quality_indices = set(before_high_quality.index) & set(t_all.index)
+    after_high_quality_indices = set(after_high_quality.index) & set(t_all.index)
+    
+    # Calculate means using only high-quality data
+    before_mean = df.loc[list(before_high_quality_indices), 'TAC'].mean() if before_high_quality_indices else 0
+    after_mean = df.loc[list(after_high_quality_indices), 'TAC'].mean() if after_high_quality_indices else 0
+    
+    # If no high-quality data in surrounding regions, use the mean of t_all
+    if not before_high_quality_indices and not after_high_quality_indices:
+        overall_mean = t_all['TAC'].mean()
+        before_mean = overall_mean
+        after_mean = overall_mean
+    elif not before_high_quality_indices:
+        before_mean = after_mean
+    elif not after_high_quality_indices:
+        after_mean = before_mean
+    
+    # Get the low quality region data for imputation
+    low_quality_region_data = df.iloc[low_quality_region_start:low_quality_region_end + 1]
+    x_non_wear = low_quality_region_data['Duration_Hrs']
+    
+    # Use only high-quality training data from t_all
+    x = t_all['Duration_Hrs']
+    y = t_all['TAC']
+    
+    # Fit GPR model with high-quality data only
+    kernel = Matern(length_scale=0.4, nu=0.3, length_scale_bounds=(1e-3, 1e3)) * ConstantKernel(constant_value=5)
+    model = GaussianProcessRegressor(kernel=kernel, random_state=0)
+    model.fit(x.to_numpy().reshape(-1, 1), y)
+    
+    # Get GPR predictions
+    predictions = model.predict(x_non_wear.to_numpy().reshape(-1, 1))
+    predictions = predictions.flatten()
+    
+    # Blend the predictions with the surrounding means
+    n_points = len(predictions)
+    
+    if n_points > 2:
+        # Blend start: from before_mean to predictions
+        actual_start_blend = min(start_blend_points, n_points // 3)
+        if actual_start_blend > 0:
+            start_weights = np.linspace(0, 1, actual_start_blend)
+            for i in range(actual_start_blend):
+                alpha = start_weights[i]
+                predictions[i] = (1 - alpha) * before_mean + alpha * predictions[i]
+        
+        # Blend end: from predictions to after_mean
+        actual_end_blend = min(end_blend_points, n_points // 3)
+        if actual_end_blend > 0:
+            end_weights = np.linspace(1, 0, actual_end_blend)
+            for i in range(actual_end_blend):
+                alpha = end_weights[i]
+                idx = n_points - actual_end_blend + i
+                predictions[idx] = (1 - alpha) * after_mean + alpha * predictions[idx]
+    
+    return predictions
 
 def impute_low_quality_data(df: pd.DataFrame):
   df['imputed'] = 0
@@ -459,17 +551,14 @@ def impute_low_quality_data(df: pd.DataFrame):
     if (not low_quality_region_too_long) and training_data_before_valid and training_data_after_valid:
       t_all = pd.concat([high_quality_before, high_quality_after])
 
-      x = t_all['Duration_Hrs']
-      y = t_all['TAC']
-      x_non_wear = low_quality_region_data['Duration_Hrs']      
-
-      kernel = Matern(length_scale=0.4, nu=0.3, length_scale_bounds=(1e-3, 1e3)) * ConstantKernel(constant_value=5)
-      model = GaussianProcessRegressor(kernel=kernel, random_state=0)
-      model.fit(x.to_numpy().reshape(-1, 1), y)
-      predictions = model.predict(x_non_wear.to_numpy().reshape(-1, 1))
-      predictions = predictions.flatten()  # Ensures it's always 1D
-      df.iloc[x_non_wear.index, df.columns.get_loc('TAC')] = predictions
-      df.iloc[x_non_wear.index, df.columns.get_loc('imputed')] = 1
+      # Use the new blended imputation function
+      predictions = generate_blended_imputation(
+          df, low_quality_region_start, low_quality_region_end, t_all,
+          blend_window=30, start_blend_points=10, end_blend_points=10
+      )
+      
+      df.iloc[low_quality_region_start:low_quality_region_end+1, df.columns.get_loc('TAC')] = predictions
+      df.iloc[low_quality_region_start:low_quality_region_end+1, df.columns.get_loc('imputed')] = 1
       df = label_imputation_reason(df, low_quality_region_start, low_quality_region_end, gap_indices, non_wear_indices_filtered, jump_indices_filtered, plummet_indices_filtered, extreme_negative_indices_filtered)
       
       imputation_attempt['was_imputed'] = True

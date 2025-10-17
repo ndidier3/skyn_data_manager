@@ -58,14 +58,19 @@ class Curve:
     self.region_tac_analyzer = TACAnalyzer(self.region, self.TAC_column)
 
     peak_index = self.curve_tac_analyzer.get_peak_index()
-    rise_duration = (self.curve.loc[peak_index, 'Duration_Hrs'] - self.curve.loc[0, 'Duration_Hrs']) + (1/60)
-    fall_duration = (self.curve.loc[len(self.curve)-1, 'Duration_Hrs'] - self.curve.loc[peak_index, 'Duration_Hrs']) + (1/60)
+    
+    # Get curve start index for time-windowed rise rate calculations
+    curve_start_index = self.curve.index[0]
+    
+    # Calculate rise duration by counting rows (minutes) from curve start to peak
+    rise_duration = (peak_index + 1) / 60.0  # +1 to include both start and peak
+    
+    # Calculate fall duration by counting rows (minutes) from peak to curve end
+    fall_duration = (len(self.curve) - peak_index) / 60.0  # peak_index to end (inclusive)
     peak_tac = self.curve.loc[peak_index, self.TAC_column]
     first_tac = self.curve.iloc[0][self.TAC_column]
     last_tac = self.curve.iloc[-1][self.TAC_column]
     relative_peak = peak_tac - self.curve_threshold
-    relative_rise = (peak_tac - first_tac)
-    relative_fall = (peak_tac - last_tac)
     mean_tac, sd_tac, sem_tac = self.curve_tac_analyzer.get_mean_stdev_sem()
 
     # Calculate rise and fall portions
@@ -321,8 +326,14 @@ class Curve:
       'rise_duration_CURVE' : rise_duration,
       'fall_duration_CURVE' : fall_duration,
       'relative_peak_CURVE' : relative_peak,
-      'rise_rate_CURVE' : self.curve_tac_analyzer.get_rise_rate(rise_duration, relative_rise),
-      'fall_rate_CURVE' : self.curve_tac_analyzer.get_fall_rate(fall_duration, relative_fall),
+      'rise_rate_CURVE' : self.curve_tac_analyzer.get_rise_rate(rise_duration, relative_peak, self.curve_threshold),
+      'rise_rate_point_to_point_CURVE': self.curve_tac_analyzer.get_point_to_point_rise_rate(curve_start_index),
+      'rise_rate_1hr_CURVE': self.curve_tac_analyzer.get_rise_rate_1hr(curve_start_index, peak_index, self.curve_threshold),
+      'rise_rate_2hr_CURVE': self.curve_tac_analyzer.get_rise_rate_2hr(curve_start_index, peak_index, self.curve_threshold),
+      'fall_rate_CURVE' : self.curve_tac_analyzer.get_fall_rate(fall_duration, relative_peak),
+      'fall_rate_point_to_point_CURVE': self.curve_tac_analyzer.get_point_to_point_fall_rate(peak_index),
+      'fall_rate_1hr_CURVE': self.curve_tac_analyzer.get_fall_rate_1hr(peak_index, self.curve_threshold),
+      'fall_rate_2hr_CURVE': self.curve_tac_analyzer.get_fall_rate_2hr(peak_index, self.curve_threshold),
       'smoothed_curve_plot': None,
       'signal_processing_plot': None,
       'device_removal_plot': None,

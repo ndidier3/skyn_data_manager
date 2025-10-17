@@ -484,3 +484,120 @@ def plot_rf_tree(rf, feature_names, cohort_name, model_figures_folder):
   fig.savefig(f'{model_figures_folder}/Random Forest - {cohort_name} - Decision Tree.png')
   plt.close('all')
 
+
+def plot_cluster_analysis(df, plot_folder, subid, dataset_identifier, curve_threshold, title="TAC Cluster Analysis", subtitle_text=""):
+  """
+  Visualize the different clusters and excluded data in the TAC data.
+  
+  Args:
+    df (pd.DataFrame): Main dataframe with cluster labels
+    plot_folder (str): Path to save the plot
+    subid (str): Subject ID
+    dataset_identifier (str): Dataset identifier
+    curve_threshold (float): Curve threshold value
+    title (str): Plot title
+    subtitle_text (str): Subtitle text
+  """
+  # Check if cluster data exists
+  if 'labeled_cluster_data' not in df.attrs:
+    print("Warning: No cluster data found in dataframe attributes")
+    return None
+    
+  labeled_data = df.attrs['labeled_cluster_data']
+  
+  # Create figure and axis
+  fig, ax = plt.subplots(figsize=(16, 10))
+  
+  # Plot TAC data with different colors for each cluster
+  colors = {
+    'baseline': 'darkgreen',
+    'excluded': 'lightgray'
+  }
+  
+  # Generate colors for other clusters
+  cluster_ids = labeled_data['cluster_id'].dropna().unique()
+  if len(cluster_ids) > 0:
+    import matplotlib.cm as cm
+    cmap = cm.Set3
+    for i, cluster_id in enumerate(cluster_ids):
+      if cluster_id != labeled_data[labeled_data['is_baseline'] == True]['cluster_id'].iloc[0] if any(labeled_data['is_baseline']) else None:
+        colors[f'cluster_{int(cluster_id)}'] = cmap(i % cmap.N)
+  
+  # Plot each cluster type
+  for cluster_type in colors.keys():
+    if cluster_type == 'excluded':
+      # Plot excluded data
+      excluded_mask = labeled_data['cluster_label'] == 'excluded'
+      if excluded_mask.any():
+        excluded_data = labeled_data[excluded_mask]
+        ax.scatter(excluded_data['datetime'], excluded_data['TAC'], 
+                  c=colors[cluster_type], alpha=0.3, s=10, 
+                  label=f'Excluded ({excluded_mask.sum()} points)', marker='x')
+    else:
+      # Plot cluster data
+      cluster_mask = labeled_data['cluster_label'] == cluster_type
+      if cluster_mask.any():
+        cluster_data = labeled_data[cluster_mask]
+        ax.scatter(cluster_data['datetime'], cluster_data['TAC'], 
+                  c=colors[cluster_type], alpha=0.7, s=15, 
+                  label=f'{cluster_type.replace("_", " ").title()} ({cluster_mask.sum()} points)')
+  
+  # Add curve threshold line
+  ax.axhline(y=curve_threshold, color='red', linestyle='--', linewidth=2, 
+             label=f'Curve Threshold: {curve_threshold:.2f}')
+  
+  # Add zero line for reference
+  ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+  
+  # Add TAC = -5 line to show exclusion boundary
+  ax.axhline(y=-5, color='orange', linestyle=':', linewidth=1, alpha=0.7, 
+             label='TAC = -5 (Exclusion Boundary)')
+  
+  # Format the plot
+  ax.set_xlabel('Time', fontsize=14)
+  ax.set_ylabel('TAC (μg/L)', fontsize=14)
+  ax.set_title(title, fontsize=18, fontweight="semibold", pad=25)
+  
+  # Add subtitle
+  if subtitle_text:
+    ax.text(0.5, 1.025, subtitle_text, fontsize=12, style='italic',
+            ha='center', va='center', transform=ax.transAxes)
+  
+  # Format x-axis for time
+  ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+  ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+  
+  # Add legend
+  ax.legend(loc='upper right', bbox_to_anchor=(1.15, 1.0), 
+           frameon=True, framealpha=1, edgecolor='black', facecolor='white')
+  
+  # Set y-axis limits to show full range
+  y_min = labeled_data['TAC'].min()
+  y_max = labeled_data['TAC'].max()
+  y_range = y_max - y_min
+  ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.1 * y_range)
+  
+  # Add grid for better readability
+  ax.grid(True, alpha=0.3)
+  
+  # Add exclusion reason summary in text box
+  if 'exclusion_reason' in labeled_data.columns:
+    exclusion_counts = labeled_data['exclusion_reason'].value_counts()
+    exclusion_text = "Exclusion Reasons:\n"
+    for reason, count in exclusion_counts.items():
+      if reason != 'none':
+        exclusion_text += f"• {reason}: {count}\n"
+    
+    if exclusion_text != "Exclusion Reasons:\n":
+      ax.text(0.02, 0.98, exclusion_text, transform=ax.transAxes, 
+              verticalalignment='top', fontsize=10, 
+              bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+  
+  # Save the plot
+  path = f'{plot_folder}{subid}_{dataset_identifier}_cluster_analysis.png'
+  plt.tight_layout()
+  plt.savefig(path, bbox_inches='tight', dpi=300)
+  plt.close('all')
+  
+  return path
+

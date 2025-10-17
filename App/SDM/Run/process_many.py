@@ -17,6 +17,7 @@ def process_and_analyze_data(
   smooth_and_impute = False,
   adjust_for_gaps_and_non_wear = False,
   analyze_days = False,
+  compute_curve_threshold = False,
   identify_curves = False,
   include_raw_curves = False,
   match_events_to_curves = False,
@@ -95,6 +96,14 @@ def process_and_analyze_data(
       if smooth_and_impute:
         print(f"Smoothing and imputing for {subid}_{dataset_identifier}")
         sdm_processor.smooth_and_impute(**smooth_and_impute_attrs)
+        
+      if compute_curve_threshold:
+        print(f"Computing curve threshold for {subid}_{dataset_identifier}")
+        sdm_processor.compute_curve_threshold(curve_attrs=curve_attrs)
+      elif identify_curves and not sdm_processor.curve_threshold_computed:
+        print(f"Warning: identify_curves=True but compute_curve_threshold=False and threshold not computed for {subid}_{dataset_identifier}")
+        print(f"Auto-computing threshold for {subid}_{dataset_identifier}")
+        sdm_processor.compute_curve_threshold(curve_attrs=curve_attrs)
         
       if identify_curves:
         print(f"Identifying curves for {subid}_{dataset_identifier}")

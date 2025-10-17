@@ -74,9 +74,9 @@ def process_event_timestamps(
             # Check if earliest and latest timestamps are equal and adjust curve match timestamps if needed
             if earliest_timestamp == latest_timestamp:
                 event_match_start = earliest_timestamp - pd.Timedelta(hours=1)
-                event_match_end = latest_timestamp + pd.Timedelta(hours=1)
+                event_match_end = latest_timestamp + pd.Timedelta(hours=8)
                 timestamp_modified = True
-                modification_note = 'event_match_start adjusted -1 hour, event_match_end adjusted +1 hour; timestamps were equal'
+                modification_note = 'event_match_start adjusted -1 hour, event_match_end adjusted +8 hours; timestamps were equal'
             # Ensure event_match_end is no longer than 12 hours after event_match_start
             elif event_match_end > event_match_start + pd.Timedelta(hours=12):
                 event_match_end = event_match_start + pd.Timedelta(hours=12)
