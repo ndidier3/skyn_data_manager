@@ -339,4 +339,65 @@ class DataQualityAnalyzer:
             
         # Combine unimputed gap and unimputed non-wear masks
         unimputed_gaps_and_non_wear = (self.gap_mask & (~self.imputed_mask)) | (self.non_wear_mask & (~self.imputed_mask))
-        return unimputed_gaps_and_non_wear.sum() / len(self.df) 
+        return unimputed_gaps_and_non_wear.sum() / len(self.df)
+
+    def get_high_quality_duration(self):
+        """Calculate duration of high-quality data (non-low quality) in hours.
+        
+        High-quality data is defined as data points that are NOT flagged as low quality.
+        This includes data that is not imputed, not gapped, not non-wear, not jumped, 
+        not plummeted, and not extreme negative.
+        
+        Returns:
+            float: Duration of high-quality data in hours
+        """
+        def compute():
+            if len(self.df) == 0:
+                return 0.0
+            
+            # Count high-quality data points (not flagged as any quality issue)
+            high_quality_mask = (
+                (self.df.get('imputed', 0) == 0) &  # Not imputed
+                (self.df.get('gap', 0) == 0) &      # Not gapped
+                (self.df.get('non_wear', 0) == 0) & # Not non-wear
+                (self.df.get('jump', 0) == 0) &     # Not jumped
+                (self.df.get('plummet', 0) == 0) &  # Not plummeted
+                (self.df.get('extreme_negative', 0) == 0)  # Not extreme negative
+            )
+            
+            high_quality_count = high_quality_mask.sum()
+            duration_hours = high_quality_count / 60.0  # Convert minutes to hours
+            
+            return duration_hours
+        
+        return self._get_cached('high_quality_duration', compute)
+
+    def get_high_quality_percent(self):
+        """Calculate percentage of high-quality data within the curve.
+        
+        High-quality data is defined as data points that are NOT flagged as low quality.
+        
+        Returns:
+            float: Percentage of high-quality data (0-100)
+        """
+        def compute():
+            if len(self.df) == 0:
+                return 0.0
+            
+            # Count high-quality data points (not flagged as any quality issue)
+            high_quality_mask = (
+                (self.df.get('imputed', 0) == 0) &  # Not imputed
+                (self.df.get('gap', 0) == 0) &      # Not gapped
+                (self.df.get('non_wear', 0) == 0) & # Not non-wear
+                (self.df.get('jump', 0) == 0) &     # Not jumped
+                (self.df.get('plummet', 0) == 0) &  # Not plummeted
+                (self.df.get('extreme_negative', 0) == 0)  # Not extreme negative
+            )
+            
+            high_quality_count = high_quality_mask.sum()
+            total_count = len(self.df)
+            percent = (high_quality_count / total_count) * 100 if total_count > 0 else 0.0
+            
+            return percent
+        
+        return self._get_cached('high_quality_percent', compute) 

@@ -134,7 +134,7 @@ class dayFeatures():
             return
         
         # Ensure required columns exist in curve features
-        required_curve_cols = ['subid', 'dataset_id', 'curve_id', 'begin_CURVE', 'end_CURVE', 'CURVE_VALID']
+        required_curve_cols = ['subid', 'dataset_id', 'curve_id', 'begin_CURVE', 'end_CURVE', 'CURVE_VALID', 'high_quality_duration_CURVE']
         missing_curve_cols = [col for col in required_curve_cols if col not in curve_features_df.columns]
         if missing_curve_cols:
             print(f"Warning: Missing required columns in curve features: {missing_curve_cols}")
@@ -184,6 +184,7 @@ class dayFeatures():
             self.day_features[f'curve_{n}_id'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
             self.day_features[f'curve_{n}_valid'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
             self.day_features[f'curve_{n}_overlap_hours'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
+            self.day_features[f'curve_{n}_high_quality_duration'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
             self.day_features[f'curve_{n}_extends_prior_day'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
             self.day_features[f'curve_{n}_extends_next_day'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
         
@@ -252,6 +253,7 @@ class dayFeatures():
                         self.day_features.loc[day_row.name, f'curve_{n}_id'] = curve_row['curve_id']
                         self.day_features.loc[day_row.name, f'curve_{n}_valid'] = int(curve_row['CURVE_VALID'] == 1)
                         self.day_features.loc[day_row.name, f'curve_{n}_overlap_hours'] = overlap_hours
+                        self.day_features.loc[day_row.name, f'curve_{n}_high_quality_duration'] = curve_row.get('high_quality_duration_CURVE', 0)
                         self.day_features.loc[day_row.name, f'curve_{n}_extends_prior_day'] = int(extends_prior)
                         self.day_features.loc[day_row.name, f'curve_{n}_extends_next_day'] = int(extends_next)
         

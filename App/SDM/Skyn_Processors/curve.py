@@ -50,8 +50,8 @@ class Curve:
     }
 
     # Create analyzers for each region to enable caching and efficient computation
-    self.curve_quality_analyzer = DataQualityAnalyzer(self.curve, self.TAC_column)
     self.curve_tac_analyzer = TACAnalyzer(self.curve, self.TAC_column)
+    self.curve_quality_analyzer = DataQualityAnalyzer(self.curve, self.TAC_column)
     self.periphery_before_quality_analyzer = DataQualityAnalyzer(self.periphery_before, self.TAC_column)
     self.periphery_after_quality_analyzer = DataQualityAnalyzer(self.periphery_after, self.TAC_column)
     self.region_quality_analyzer = DataQualityAnalyzer(self.region, self.TAC_column)
@@ -140,6 +140,8 @@ class Curve:
       'rise_imputed_percent_CURVE': DataQualityAnalyzer(rise_portion, self.TAC_column).get_rise_imputed_percent(),
       'fall_complete_percent_CURVE' : 1 if last_tac <= self.curve_threshold else (peak_tac - last_tac) / relative_peak,
       'fall_imputed_percent_CURVE': DataQualityAnalyzer(fall_portion, self.TAC_column).get_fall_imputed_percent(),
+      'high_quality_duration_CURVE': self.curve_quality_analyzer.get_high_quality_duration(),
+      'high_quality_percent_CURVE': self.curve_quality_analyzer.get_high_quality_percent(),
     }
 
     self.periphery_before_quality_features = {
