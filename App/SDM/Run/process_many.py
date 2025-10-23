@@ -30,7 +30,7 @@ def process_and_analyze_data(
 ):
   
   """ CREATE SAVE DIRECTORIES"""
-  processed_data_out = data_input_folder.replace('_RAW', '_PROCESSED')
+  processed_data_out = str(data_input_folder).replace('_RAW', '_PROCESSED')
   results_dir = f'{project_root}/Results/{output_folder_name}/{date.today().strftime("%m.%d.%Y")}'
   data_out = f'{results_dir}/Datasets'
   graphs_out = f'{results_dir}/Plots'
