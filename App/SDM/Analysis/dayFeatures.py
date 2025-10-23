@@ -126,6 +126,7 @@ class dayFeatures():
         self.day_features['drinking_curve_overlap'] = 0
         self.day_features['valid_drinking_curve_overlap'] = 0
         self.day_features['total_curve_overlap_hours'] = 0.0
+        self.day_features['valid_curve_overlap_hours'] = 0.0
         
         if curve_features_df is None or curve_features_df.empty:
             print("No curve features provided - curve overlap columns initialized with default values")
@@ -146,6 +147,9 @@ class dayFeatures():
         self.day_features['begin_day'] = pd.to_datetime(self.day_features['begin_day'])
         self.day_features['end_day'] = pd.to_datetime(self.day_features['end_day'])
         
+        # Reset index to ensure unique indices for proper assignment
+        self.day_features = self.day_features.reset_index(drop=True)
+        
         # Find maximum number of curves overlapping any single day to determine column count
         max_overlapping_curves = 0
         
@@ -157,9 +161,10 @@ class dayFeatures():
             day_end = day_row['end_day']
             
             # Filter curves for this subject and dataset
+            # Convert to same data types to ensure proper matching
             subject_curves = curve_features_df[
-                (curve_features_df['subid'] == subid) & 
-                (curve_features_df['dataset_id'] == dataset_id)
+                (curve_features_df['subid'].astype(str) == str(subid)) & 
+                (curve_features_df['dataset_id'].astype(str) == str(dataset_id))
             ].copy()
             
             if subject_curves.empty:
@@ -175,11 +180,11 @@ class dayFeatures():
         
         # Initialize dynamic curve columns based on maximum overlapping curves
         for n in range(1, max_overlapping_curves + 1):
-            self.day_features[f'curve_{n}_id'] = None
-            self.day_features[f'curve_{n}_valid'] = None
-            self.day_features[f'curve_{n}_overlap_hours'] = None
-            self.day_features[f'curve_{n}_extends_prior_day'] = None
-            self.day_features[f'curve_{n}_extends_next_day'] = None
+            self.day_features[f'curve_{n}_id'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
+            self.day_features[f'curve_{n}_valid'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
+            self.day_features[f'curve_{n}_overlap_hours'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
+            self.day_features[f'curve_{n}_extends_prior_day'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
+            self.day_features[f'curve_{n}_extends_next_day'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
         
         # Process each day to populate curve overlap data
         for idx, day_row in self.day_features.iterrows():
@@ -189,9 +194,10 @@ class dayFeatures():
             day_end = day_row['end_day']
             
             # Filter curves for this subject and dataset
+            # Convert to same data types to ensure proper matching
             subject_curves = curve_features_df[
-                (curve_features_df['subid'] == subid) & 
-                (curve_features_df['dataset_id'] == dataset_id)
+                (curve_features_df['subid'].astype(str) == str(subid)) & 
+                (curve_features_df['dataset_id'].astype(str) == str(dataset_id))
             ].copy()
             
             if subject_curves.empty:
@@ -205,22 +211,29 @@ class dayFeatures():
             
             if not overlapping_curves.empty:
                 # Update summary columns
-                self.day_features.loc[idx, 'drinking_curve_overlap'] = 1
+                self.day_features.loc[day_row.name, 'drinking_curve_overlap'] = 1
                 
                 # Check if any overlapping curves are valid
-                if (overlapping_curves['CURVE_VALID'] == 1).any():
-                    self.day_features.loc[idx, 'valid_drinking_curve_overlap'] = 1
+                valid_curves = overlapping_curves[overlapping_curves['CURVE_VALID'] == 1]
+                if not valid_curves.empty:
+                    self.day_features.loc[day_row.name, 'valid_drinking_curve_overlap'] = 1
                 
                 # Calculate total overlap hours
                 total_overlap = 0
+                valid_overlap = 0
                 for curve_idx, curve_row in overlapping_curves.iterrows():
                     # Calculate overlap duration
                     overlap_start = max(curve_row['begin_CURVE'], day_start)
                     overlap_end = min(curve_row['end_CURVE'], day_end)
                     overlap_hours = (overlap_end - overlap_start).total_seconds() / 3600
                     total_overlap += overlap_hours
+                    
+                    # Add to valid overlap only if curve is valid
+                    if curve_row['CURVE_VALID'] == 1:
+                        valid_overlap += overlap_hours
                 
-                self.day_features.loc[idx, 'total_curve_overlap_hours'] = total_overlap
+                self.day_features.loc[day_row.name, 'total_curve_overlap_hours'] = total_overlap
+                self.day_features.loc[day_row.name, 'valid_curve_overlap_hours'] = valid_overlap
                 
                 # Populate individual curve columns
                 for n, (curve_idx, curve_row) in enumerate(overlapping_curves.iterrows(), 1):
@@ -235,11 +248,11 @@ class dayFeatures():
                         extends_next = curve_row['end_CURVE'] > day_end
                         
                         # Populate curve columns
-                        self.day_features.loc[idx, f'curve_{n}_id'] = curve_row['curve_id']
-                        self.day_features.loc[idx, f'curve_{n}_valid'] = int(curve_row['CURVE_VALID'] == 1)
-                        self.day_features.loc[idx, f'curve_{n}_overlap_hours'] = overlap_hours
-                        self.day_features.loc[idx, f'curve_{n}_extends_prior_day'] = int(extends_prior)
-                        self.day_features.loc[idx, f'curve_{n}_extends_next_day'] = int(extends_next)
+                        self.day_features.loc[day_row.name, f'curve_{n}_id'] = curve_row['curve_id']
+                        self.day_features.loc[day_row.name, f'curve_{n}_valid'] = int(curve_row['CURVE_VALID'] == 1)
+                        self.day_features.loc[day_row.name, f'curve_{n}_overlap_hours'] = overlap_hours
+                        self.day_features.loc[day_row.name, f'curve_{n}_extends_prior_day'] = int(extends_prior)
+                        self.day_features.loc[day_row.name, f'curve_{n}_extends_next_day'] = int(extends_next)
         
         print(f"Curve overlap detection completed. Found curve overlaps on {self.day_features['drinking_curve_overlap'].sum()} days.")
         
@@ -248,7 +261,9 @@ class dayFeatures():
             'Days with curve overlap': self.day_features['drinking_curve_overlap'].sum(),
             'Days with valid curve overlap': self.day_features['valid_drinking_curve_overlap'].sum(),
             'Total curve overlap hours across all days': self.day_features['total_curve_overlap_hours'].sum(),
+            'Total valid curve overlap hours across all days': self.day_features['valid_curve_overlap_hours'].sum(),
             'Average curve overlap hours per overlapping day': self.day_features[self.day_features['drinking_curve_overlap'] == 1]['total_curve_overlap_hours'].mean() if self.day_features['drinking_curve_overlap'].sum() > 0 else 0,
+            'Average valid curve overlap hours per overlapping day': self.day_features[self.day_features['valid_drinking_curve_overlap'] == 1]['valid_curve_overlap_hours'].mean() if self.day_features['valid_drinking_curve_overlap'].sum() > 0 else 0,
             'Maximum curves overlapping a single day': max_overlapping_curves
         }
         

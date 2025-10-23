@@ -686,6 +686,7 @@ class ReportGuide:
             'drinking_curve_overlap': 'Whether any drinking curve overlapped with this day (0/1)',
             'valid_drinking_curve_overlap': 'Whether any valid drinking curve overlapped with this day (0/1)',
             'total_curve_overlap_hours': 'Total hours of curve overlap with this day (sum across all curves)',
+            'valid_curve_overlap_hours': 'Total hours of valid curve overlap with this day (sum across valid curves only)',
             
             # Individual curve overlap details (dynamic based on max curves per day)
             'curve_1_id': 'ID of first curve that overlapped with this day',
