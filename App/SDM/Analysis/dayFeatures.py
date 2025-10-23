@@ -10,7 +10,8 @@ from openpyxl.drawing.image import Image
 class dayFeatures():
     def __init__(self, processed_data_folder, subids=None):
         print(f"Looking for files in: {processed_data_folder}")
-        files = [f for f in os.listdir(processed_data_folder) if 'processed' in f]
+        files = [f for f in os.listdir(processed_data_folder) 
+                 if 'processed' in f and not f.startswith('.')]
         
         # Filter files by subid if specified
         if subids is not None:

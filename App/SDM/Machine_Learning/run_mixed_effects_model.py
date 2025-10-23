@@ -1,5 +1,6 @@
-from .Machine_Learning.model import Model
-from sklearn.metrics import mean_absolute_error import pandas as pd
+from .model import Model
+from sklearn.metrics import mean_absolute_error
+import pandas as pd
 
 def run_mixed_effects_model(df, predictors, outcome, grouping_column):
     

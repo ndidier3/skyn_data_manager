@@ -1,15 +1,17 @@
-from .Analysis.statModel import statModel
-from .Analysis.featureFlagger import featureFlagger
-from .Configuration.file_management import load, save_to_computer
-from .Documenting.embed_graphs import embed_graphs_into_workbook_tab
+from .statModel import statModel
+from .featureFlagger import featureFlagger
+from ..Configuration.file_management import load, save_to_computer
+from ..Documenting.embed_graphs import embed_graphs_into_workbook_tab
 import os
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt import xlsxwriter
+import matplotlib.pyplot as plt
+import xlsxwriter
 
 class eventFeatures():
   def __init__(self, processed_data_folder, cohort_name, results_folder, search_flag_selections, curve_flag_selections, metadata_columns = []):
-    self.processors = [load(file[:-4], processed_data_folder) for file in os.listdir(processed_data_folder) if 'processed' in file]
+    self.processors = [load(file[:-4], processed_data_folder) for file in os.listdir(processed_data_folder) 
+                      if 'processed' in file and not file.startswith('.')]
     for processor in self.processors:
       if not hasattr(processor, 'events_with_no_skyn_data'):
         print(f"Processor with subid {processor.subid} does not have the 'events_with_no_skyn_data' attribute.")

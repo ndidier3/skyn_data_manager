@@ -20,10 +20,33 @@ def import_from_computer(filename):
   return object
 
 def import_model(name='RF_non_wear_CSDP'):
-  pickle_in = open(f'App/SDM/Trained_Models/{name}.sdma', "rb")
-  model = pickle.load(pickle_in)
-  pickle_in.close()
-  return model
+  # Temporarily patch the import system to handle old import paths in pickled models
+  import sys
+  from types import ModuleType
+  
+  # Create a mock module for the old import path
+  old_module = ModuleType('App.SDM.Machine_Learning.Machine_Learning')
+  sys.modules['App.SDM.Machine_Learning.Machine_Learning'] = old_module
+  
+  # Import the actual modules and make them available through the old path
+  try:
+    from App.SDM.Machine_Learning import model_optimization, cv_folds, get_feature_importances, metrics
+    old_module.model_optimization = model_optimization
+    old_module.cv_folds = cv_folds
+    old_module.get_feature_importances = get_feature_importances
+    old_module.metrics = metrics
+  except ImportError:
+    pass  # If imports fail, continue anyway
+  
+  try:
+    pickle_in = open(f'App/SDM/Trained_Models/{name}.sdma', "rb")
+    model = pickle.load(pickle_in)
+    pickle_in.close()
+    return model
+  finally:
+    # Clean up the temporary module
+    if 'App.SDM.Machine_Learning.Machine_Learning' in sys.modules:
+      del sys.modules['App.SDM.Machine_Learning.Machine_Learning']
 
 def save_to_computer(object, filename, folder, extension='sdm'):
 
@@ -36,40 +59,66 @@ def load(name, folder):
   try:
     extension = 'sdm'
     pickle_in = open(f'{folder}/{name}.{extension}', "rb")
-  except:
-    extension = 'pickle'
-    pickle_in = open(f'{folder}/{name}.{extension}', "rb") 
+  except FileNotFoundError:
+    try:
+      extension = 'pickle'
+      pickle_in = open(f'{folder}/{name}.{extension}', "rb")
+    except FileNotFoundError:
+      raise FileNotFoundError(f"Could not find file '{name}' with extensions 'sdm' or 'pickle' in folder '{folder}'. "
+                             f"Please check that the file exists and is not a hidden file (starting with '.').")
   object = pickle.load(pickle_in)
   pickle_in.close()
   return object
 
 def load_default_model(name='Alc_vs_Non', type='RF'):
-  for extension in ['sdmtm', 'pickle']:
-    try:
-      if name == 'Alc_vs_Non':
-        pickle_in = open(f'App/SDM/Trained_Models/MARS2C4{type}_Alc_vs_Non.{extension}', "rb")
-      if name == 'AUD':
-        pickle_in = open(f'App/SDM/Trained_Models/MARS2C4{type}_AUD.{extension}', "rb")
-      if name == 'Binge':
-        pickle_in = open(f'App/SDM/Trained_Models/MARS2C4{type}_Binge.{extension}', "rb")
-      if name=='worn_vs_removed':
-        pickle_in = open(f'App/SDM/Trained_Models/worn_vs_removed_{type}.{extension}', "rb")
-        # type='LinReg'
-      if name == 'fall_duration':
-        pickle_in = open(f'App/SDM/Trained_Models/fall_duration_CLN_LinearReg.{extension}', "rb")
-      if name == 'fall_rate':
-        pickle_in = open(f'App/SDM/Trained_Models/fall_rate_CLN_LinearReg.{extension}', "rb")
-      if name == 'rise_duration':
-        pickle_in = open(f'App/SDM/Trained_Models/rise_duration_CLN_LinearReg.{extension}', "rb")
-      if name == 'rise_rate':
-        pickle_in = open(f'App/SDM/Trained_Models/rise_rate_CLN_LinearReg.{extension}', "rb")
-    except:
-      pass
+  # Temporarily patch the import system to handle old import paths in pickled models
+  import sys
+  from types import ModuleType
+  
+  # Create a mock module for the old import path
+  old_module = ModuleType('App.SDM.Machine_Learning.Machine_Learning')
+  sys.modules['App.SDM.Machine_Learning.Machine_Learning'] = old_module
+  
+  # Import the actual modules and make them available through the old path
+  try:
+    from App.SDM.Machine_Learning import model_optimization, cv_folds, get_feature_importances, metrics
+    old_module.model_optimization = model_optimization
+    old_module.cv_folds = cv_folds
+    old_module.get_feature_importances = get_feature_importances
+    old_module.metrics = metrics
+  except ImportError:
+    pass  # If imports fail, continue anyway
+  
+  try:
+    for extension in ['sdmtm', 'pickle']:
+      try:
+        if name == 'Alc_vs_Non':
+          pickle_in = open(f'App/SDM/Trained_Models/MARS2C4{type}_Alc_vs_Non.{extension}', "rb")
+        if name == 'AUD':
+          pickle_in = open(f'App/SDM/Trained_Models/MARS2C4{type}_AUD.{extension}', "rb")
+        if name == 'Binge':
+          pickle_in = open(f'App/SDM/Trained_Models/MARS2C4{type}_Binge.{extension}', "rb")
+        if name=='worn_vs_removed':
+          pickle_in = open(f'App/SDM/Trained_Models/worn_vs_removed_{type}.{extension}', "rb")
+          # type='LinReg'
+        if name == 'fall_duration':
+          pickle_in = open(f'App/SDM/Trained_Models/fall_duration_CLN_LinearReg.{extension}', "rb")
+        if name == 'fall_rate':
+          pickle_in = open(f'App/SDM/Trained_Models/fall_rate_CLN_LinearReg.{extension}', "rb")
+        if name == 'rise_duration':
+          pickle_in = open(f'App/SDM/Trained_Models/rise_duration_CLN_LinearReg.{extension}', "rb")
+        if name == 'rise_rate':
+          pickle_in = open(f'App/SDM/Trained_Models/rise_rate_CLN_LinearReg.{extension}', "rb")
+      except:
+        pass
 
-  object = pickle.load(pickle_in)
-  pickle_in.close()
-
-  return object
+    object = pickle.load(pickle_in)
+    pickle_in.close()
+    return object
+  finally:
+    # Clean up the temporary module
+    if 'App.SDM.Machine_Learning.Machine_Learning' in sys.modules:
+      del sys.modules['App.SDM.Machine_Learning.Machine_Learning']
 
 
 

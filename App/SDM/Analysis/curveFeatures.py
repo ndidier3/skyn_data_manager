@@ -21,8 +21,9 @@ class curveFeatures():
       subids (list of str or int, optional): If provided, only load files for these subids.
       additional_processed_data_folders (list, optional): Additional folders to search for processed files.
     """
-    # Get list of processed files
-    processed_files = [file for file in os.listdir(processed_data_folder) if 'processed' in file]
+    # Get list of processed files (exclude hidden files)
+    processed_files = [file for file in os.listdir(processed_data_folder) 
+                      if 'processed' in file and not file.startswith('.')]
     
     # Filter files by subids if specified
     if subids is not None:
