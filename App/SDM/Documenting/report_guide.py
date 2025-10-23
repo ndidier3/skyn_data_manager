@@ -567,8 +567,142 @@ class ReportGuide:
             'low_quality_after': 'Low quality data points after the imputed region',
             'total_training_before': 'Total training data points before the imputed region',
             'total_training_after': 'Total training data points after the imputed region',
-            'subid': 'Subject identifier',
-            'dataset_identifier': 'Dataset identifier'
+        }
+
+        # Day feature descriptions (used in day-level analysis)
+        self._day_feature_descriptions = {
+            # Basic identifiers
+            'SubID': 'Subject identifier',
+            'Dataset_ID': 'Dataset identifier',
+            'day_no': 'Day number (sequential day in the study)',
+            'begin_day': 'Start time of the day (social day boundary)',
+            'end_day': 'End time of the day (social day boundary)',
+            
+            # Device information
+            'device_ids': 'List of device IDs present during this day',
+            'device_one': 'Primary device ID',
+            'device_two': 'Secondary device ID (if present)',
+            'device_count': 'Number of devices present during this day',
+            'firmware': 'Firmware version of the device(s)',
+            
+            # Day-level timing
+            'day_hours': 'Total hours in the day (always 24.0 for complete days)',
+            'device_turned_on_duration': 'Duration device was turned on (hours)',
+            'device_turned_on_percentage_of_day': 'Percentage of day device was turned on',
+            
+            # Device wear information
+            'device_worn_duration': 'Duration device was worn (hours) [using algorithm]',
+            'device_worn_percent_of_device_on': 'Percentage of device-on time that device was worn',
+            'device_worn_percent_of_day': 'Percentage of day that device was worn',
+            'device_worn_duration_cutoff': 'Duration device was worn [using 28 Celcius cutoff]',
+            'device_worn_cutoff_percent_of_device_on': 'Percentage of device-on time that device was worn (with cutoff)',
+            'device_worn_cutoff_percent_of_day': 'Percentage of day that device was worn (with cutoff)',
+            
+            # Data quality and imputation
+            'imputed_duration': 'Duration of imputed data (hours)',
+            'imputed_percent': 'Percentage of day that was imputed',
+            
+            # Low quality data
+            'low_quality_duration': 'Duration of low quality data (hours)',
+            'low_quality_percent': 'Percentage of day that was low quality',
+            'unimputed_low_quality_duration': 'Duration of unimputed low quality data (hours)',
+            'unimputed_low_quality_percent': 'Percentage of day that was unimputed low quality',
+            'imputed_low_quality_duration': 'Duration of imputed low quality data (hours)',
+            'imputed_low_quality_percent': 'Percentage of day that was imputed low quality',
+            
+            # Gap analysis
+            'gap_duration': 'Duration of data gaps (hours)',
+            'gap_percent': 'Percentage of day that had gaps',
+            'imputed_gap_duration': 'Duration of imputed gaps (hours)',
+            'imputed_gap_percent': 'Percentage of day that had imputed gaps',
+            'unimputed_gap_duration': 'Duration of unimputed gaps (hours)',
+            'unimputed_gap_percent': 'Percentage of day that had unimputed gaps',
+            'gap_imputation_ratio': 'Ratio of gaps that were imputed (0-1)',
+            
+            # Non-wear analysis
+            'non_wear_duration': 'Duration of non-wear periods (hours)',
+            'non_wear_percent': 'Percentage of day that was non-wear',
+            'imputed_non_wear_duration': 'Duration of imputed non-wear (hours)',
+            'imputed_non_wear_percent': 'Percentage of day that was imputed non-wear',
+            'unimputed_non_wear_duration': 'Duration of unimputed non-wear (hours)',
+            'unimputed_non_wear_percent': 'Percentage of day that was unimputed non-wear',
+            'non_wear_imputation_ratio': 'Ratio of non-wear that was imputed (0-1)',
+            
+            # Jump analysis
+            'jump_duration': 'Duration of jump artifacts (hours)',
+            'jump_percent': 'Percentage of day that had jump artifacts',
+            'imputed_jump_duration': 'Duration of imputed jump artifacts (hours)',
+            'imputed_jump_percent': 'Percentage of day that had imputed jump artifacts',
+            'unimputed_jump_duration': 'Duration of unimputed jump artifacts (hours)',
+            'unimputed_jump_percent': 'Percentage of day that had unimputed jump artifacts',
+            'jump_imputation_ratio': 'Ratio of jump artifacts that were imputed (0-1)',
+            
+            # Plummet analysis
+            'plummet_duration': 'Duration of plummet artifacts (hours)',
+            'plummet_percent': 'Percentage of day that had plummet artifacts',
+            'imputed_plummet_duration': 'Duration of imputed plummet artifacts (hours)',
+            'imputed_plummet_percent': 'Percentage of day that had imputed plummet artifacts',
+            'unimputed_plummet_duration': 'Duration of unimputed plummet artifacts (hours)',
+            'unimputed_plummet_percent': 'Percentage of day that had unimputed plummet artifacts',
+            'plummet_imputation_ratio': 'Ratio of plummet artifacts that were imputed (0-1)',
+            
+            # Negative value analysis
+            'negative_duration': 'Duration of negative TAC values (hours)',
+            'negative_percent': 'Percentage of day that had negative TAC values',
+            'extreme_negative_duration': 'Duration of extreme negative TAC values (hours)',
+            'extreme_negative_percent': 'Percentage of day that had extreme negative TAC values',
+            'extreme_negative_sum': 'Sum of extreme negative TAC values',
+            'imputed_extreme_negative_duration': 'Duration of imputed extreme negative values (hours)',
+            'imputed_extreme_negative_percent': 'Percentage of day that had imputed extreme negative values',
+            'unimputed_extreme_negative_duration': 'Duration of unimputed extreme negative values (hours)',
+            'unimputed_extreme_negative_percent': 'Percentage of day that had unimputed extreme negative values',
+            'extreme_negative_imputation_ratio': 'Ratio of extreme negative values that were imputed (0-1)',
+            
+            # Overall quality metrics
+            'low_quality_imputation_ratio': 'Overall ratio of low quality data that was imputed (0-1)',
+            'total_gaps_and_non_wear_percent': 'Total percentage of gaps and non-wear combined',
+            'below_threshold_percent': 'Percentage of data below detection threshold',
+            
+            # Signal characteristics
+            'flatline_max': 'Maximum duration of flatline periods (minutes)',
+            'flatlined_percent': 'Percentage of day that was flatlined',
+            
+            # Temperature statistics
+            'temp_mean': 'Mean temperature during the day',
+            'temp_sd': 'Standard deviation of temperature during the day',
+            'temp_min': 'Minimum temperature during the day',
+            'temp_max': 'Maximum temperature during the day',
+            
+            # Motion statistics
+            'motion_mean': 'Mean motion during the day',
+            'motion_sd': 'Standard deviation of motion during the day',
+            'motion_min': 'Minimum motion during the day',
+            'motion_max': 'Maximum motion during the day',
+            
+            # Date information
+            'date': 'Date of the day',
+            
+            # Drinking curve overlap detection
+            'drinking_curve_overlap': 'Whether any drinking curve overlapped with this day (0/1)',
+            'valid_drinking_curve_overlap': 'Whether any valid drinking curve overlapped with this day (0/1)',
+            'total_curve_overlap_hours': 'Total hours of curve overlap with this day (sum across all curves)',
+            
+            # Individual curve overlap details (dynamic based on max curves per day)
+            'curve_1_id': 'ID of first curve that overlapped with this day',
+            'curve_1_valid': 'Whether first overlapping curve was valid (0/1)',
+            'curve_1_overlap_hours': 'Hours of overlap between first curve and this day',
+            'curve_1_extends_prior_day': 'Whether first curve extends into prior day (0/1)',
+            'curve_1_extends_next_day': 'Whether first curve extends into next day (0/1)',
+            'curve_2_id': 'ID of second curve that overlapped with this day',
+            'curve_2_valid': 'Whether second overlapping curve was valid (0/1)',
+            'curve_2_overlap_hours': 'Hours of overlap between second curve and this day',
+            'curve_2_extends_prior_day': 'Whether second curve extends into prior day (0/1)',
+            'curve_2_extends_next_day': 'Whether second curve extends into next day (0/1)',
+            'curve_3_id': 'ID of third curve that overlapped with this day',
+            'curve_3_valid': 'Whether third overlapping curve was valid (0/1)',
+            'curve_3_overlap_hours': 'Hours of overlap between third curve and this day',
+            'curve_3_extends_prior_day': 'Whether third curve extends into prior day (0/1)',
+            'curve_3_extends_next_day': 'Whether third curve extends into next day (0/1)',
         }
 
         # Tab descriptions for different export types
@@ -880,6 +1014,11 @@ class ReportGuide:
         return self._imputation_feature_descriptions
 
     @property
+    def day_feature_descriptions(self):
+        """Get day feature descriptions."""
+        return self._day_feature_descriptions
+
+    @property
     def curve_features_with_events_descriptions(self):
         """Get all feature descriptions combined."""
         return {
@@ -994,6 +1133,16 @@ class ReportGuide:
         imputations_df.columns = pd.MultiIndex.from_product([['Imputations'], imputations_df.columns])
         dfs.append(('Imputations', imputations_df))
         
+        # Day Features tab
+        day_df = pd.DataFrame({
+            'Variable': list(instance.day_feature_descriptions.keys()),
+            'Description': list(instance.day_feature_descriptions.values())
+        })
+        day_df.set_index('Variable', inplace=True)
+        day_df.index.name = None
+        day_df.columns = pd.MultiIndex.from_product([['Day Features'], day_df.columns])
+        dfs.append(('Day Features', day_df))
+        
         return dfs
 
     @classmethod
@@ -1066,6 +1215,7 @@ curve_feature_descriptions = report_guide.curve_feature_descriptions
 event_feature_descriptions = report_guide.event_feature_descriptions
 person_level_feature_descriptions = report_guide.person_level_feature_descriptions
 imputation_feature_descriptions = report_guide.imputation_feature_descriptions
+day_feature_descriptions = report_guide.day_feature_descriptions
 curve_features_descriptions = report_guide.curve_features_descriptions
 curve_features_with_events_descriptions = report_guide.curve_features_with_events_descriptions
 person_level_feature_types = report_guide.person_level_feature_types

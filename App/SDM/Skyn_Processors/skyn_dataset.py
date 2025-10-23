@@ -26,6 +26,7 @@ from ..Event_Matching.match_curves_to_events import match_curves_to_events
 import pandas as pd
 import numpy as np
 import traceback
+from datetime import datetime
 from typing import Union, Dict
 
 class skynDataset:
@@ -556,8 +557,6 @@ class skynDataset:
       day_start_end_pairs = get_day_level_indices(self.dataset, day_start_hour)
       day_id = 0
       for start, end in day_start_end_pairs:
-        print(start, end)
-        print(self.dataset.index[0], self.dataset.index[-1])
         day = skynDay(self.dataset, start, end, non_wear_self_report_column = non_wear_self_report_column, day_start_hour = day_start_hour)
         self.days.append(day)
         if make_graphs:

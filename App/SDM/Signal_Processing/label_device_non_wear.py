@@ -56,11 +56,6 @@ def label_device_non_wear_using_model(df):
       (non_gap_rows.index.isin(remaining_indices)) & (pre_nan_indices & post_nan_indices)
   ].index.tolist()
 
-  print('INDICES FOR SECONDARY NON WEAR MODELS')
-  print(indices_pre_gap_list)
-  print(indices_post_gap_list)
-  print(indices_between_gaps_list)
-
   feature_data_for_complete_model = non_gap_rows.loc[indices_complete_model, all_features]
   feature_data_for_pre_gap = non_gap_rows.loc[indices_pre_gap_list, pre_features]
   feature_data_for_post_gap = non_gap_rows.loc[indices_post_gap_list, post_features]

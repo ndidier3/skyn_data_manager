@@ -375,6 +375,12 @@ class curveFeatures():
         (self.curve_features['subid'] <= last_subid)
       ]
     
+    # Sort by subid, dataset_id, curve_id for consistent ordering
+    sort_columns = ['subid', 'dataset_id', 'curve_id']
+    available_sort_columns = [col for col in sort_columns if col in filtered_features.columns]
+    if available_sort_columns:
+      filtered_features = filtered_features.sort_values(available_sort_columns)
+    
     with pd.ExcelWriter(file_name, engine = 'xlsxwriter', mode = 'w') as writer:
       # Add tab descriptions
       report_guide.get_tab_descriptions_dataframe(include_events=False).to_excel(writer, sheet_name='Tab Descriptions', index=False)
@@ -494,8 +500,10 @@ class curveFeatures():
         frame.to_excel(writer, sheet_name='Stats', startrow=row_index)
         row_index += len(frame) + 3
       
-      # Sort features
-      sorted_features = self.curve_features.sort_values(by=sort_column, ascending=ascending)
+      # Sort features by specified column, then by subid, dataset_id, curve_id for consistent ordering
+      sort_columns = [sort_column, 'subid', 'dataset_id', 'curve_id']
+      available_sort_columns = [col for col in sort_columns if col in self.curve_features.columns]
+      sorted_features = self.curve_features.sort_values(available_sort_columns, ascending=[ascending] + [True] * (len(available_sort_columns) - 1))
       
       # Use provided flag prefix if available, otherwise try to find it
       if flag_prefix and flag_prefix in sorted_features.columns:

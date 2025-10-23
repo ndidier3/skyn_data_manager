@@ -31,14 +31,8 @@ class dayFeatures():
         if len(self.processors) == 0:
             raise ValueError("No processors with day_level_data found")
             
-        # Print details about each processor
-        for i, processor in enumerate(self.processors):
-            print(f"\nProcessor {i}:")
-            print(f"  Type: {type(processor)}")
-            print(f"  Has day_level_data: {hasattr(processor, 'day_level_data')}")
-            print(f"  day_level_data type: {type(processor.day_level_data)}")
-            print(f"  day_level_data shape: {processor.day_level_data.shape if isinstance(processor.day_level_data, pd.DataFrame) else 'Not a DataFrame'}")
-            print(f"  day_level_data columns: {processor.day_level_data.columns.tolist() if isinstance(processor.day_level_data, pd.DataFrame) else 'Not a DataFrame'}")
+        # Print summary about processors
+        print(f"Loaded {len(self.processors)} processors with day-level data")
             
         self.day_features = pd.concat([processor.day_level_data for processor in self.processors])
             
@@ -138,7 +132,7 @@ class dayFeatures():
             return
         
         # Ensure required columns exist in curve features
-        required_curve_cols = ['subid', 'curve_id', 'begin_CURVE', 'end_CURVE', 'CURVE_VALID']
+        required_curve_cols = ['subid', 'dataset_id', 'curve_id', 'begin_CURVE', 'end_CURVE', 'CURVE_VALID']
         missing_curve_cols = [col for col in required_curve_cols if col not in curve_features_df.columns]
         if missing_curve_cols:
             print(f"Warning: Missing required columns in curve features: {missing_curve_cols}")
@@ -158,11 +152,15 @@ class dayFeatures():
         # Process each day to find overlapping curves
         for idx, day_row in self.day_features.iterrows():
             subid = day_row['SubID']
+            dataset_id = day_row['Dataset_ID']
             day_start = day_row['begin_day']
             day_end = day_row['end_day']
             
-            # Filter curves for this subject
-            subject_curves = curve_features_df[curve_features_df['subid'] == subid].copy()
+            # Filter curves for this subject and dataset
+            subject_curves = curve_features_df[
+                (curve_features_df['subid'] == subid) & 
+                (curve_features_df['dataset_id'] == dataset_id)
+            ].copy()
             
             if subject_curves.empty:
                 continue
@@ -186,11 +184,15 @@ class dayFeatures():
         # Process each day to populate curve overlap data
         for idx, day_row in self.day_features.iterrows():
             subid = day_row['SubID']
+            dataset_id = day_row['Dataset_ID']
             day_start = day_row['begin_day']
             day_end = day_row['end_day']
             
-            # Filter curves for this subject
-            subject_curves = curve_features_df[curve_features_df['subid'] == subid].copy()
+            # Filter curves for this subject and dataset
+            subject_curves = curve_features_df[
+                (curve_features_df['subid'] == subid) & 
+                (curve_features_df['dataset_id'] == dataset_id)
+            ].copy()
             
             if subject_curves.empty:
                 continue
@@ -261,9 +263,23 @@ class dayFeatures():
         print(f"File name: {file_name}")
         print(f"Day features columns: {self.day_features.columns.tolist()}")
         
+        # Import report guide for variable key
+        from App.SDM.Documenting.report_guide import report_guide
+        
         with pd.ExcelWriter(file_name, engine='xlsxwriter', mode='w') as writer:
+            # Add variable key
+            variable_key = pd.DataFrame({
+                'Variable': list(report_guide.day_feature_descriptions.keys()),
+                'Description': list(report_guide.day_feature_descriptions.values())
+            })
+            variable_key.to_excel(writer, sheet_name='Variable Key', index=False)
+            
+            # Filter out unwanted columns from features export
+            columns_to_exclude = ['quality_analyzer', 'device_removal_plot', 'signal_processing_plot']
+            filtered_features = self.day_features.drop(columns=columns_to_exclude, errors='ignore')
+            
             # Write the features sheet
-            self.day_features.to_excel(writer, sheet_name='Features', index=False)
+            filtered_features.to_excel(writer, sheet_name='Features', index=False)
             
             # Write the stats sheets
             row_index = 0
@@ -271,17 +287,18 @@ class dayFeatures():
                 frame.to_excel(writer, sheet_name='Stats', startrow=row_index)
                 row_index += len(frame) + 2
             
-            print(self.day_features['device_removal_plot'])
-            print(self.day_features['signal_processing_plot'])
-            # Embed the plots
-            embed_graphs_into_workbook_tab(
-                writer.book,
-                [
-                    self.day_features['device_removal_plot'].tolist(),
-                    self.day_features['signal_processing_plot'].tolist()
-                ],
-                worksheet_name = 'Day Plots',
-                plot_header_text = '',
-                missing_plot_path_text = 'No Plot Available'
-            )
+            # Embed the plots (only if plot columns exist)
+            if 'device_removal_plot' in self.day_features.columns and 'signal_processing_plot' in self.day_features.columns:
+                print(self.day_features['device_removal_plot'])
+                print(self.day_features['signal_processing_plot'])
+                embed_graphs_into_workbook_tab(
+                    writer.book,
+                    [
+                        self.day_features['device_removal_plot'].tolist(),
+                        self.day_features['signal_processing_plot'].tolist()
+                    ],
+                    worksheet_name = 'Day Plots',
+                    plot_header_text = '',
+                    missing_plot_path_text = 'No Plot Available'
+                )
             

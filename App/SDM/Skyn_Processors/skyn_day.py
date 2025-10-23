@@ -33,7 +33,14 @@ class skynDay:
     self.device_one = self.device_ids[0]
     self.device_two = self.device_ids[1] if len(self.device_ids) > 1 else None
     self.device_count = len(self.device_ids)
-    self.firmware = self.day_dataset['Firmware Version'].iloc[0] if 'Firmware Version' in self.day_dataset.columns else None
+    
+    # More robust firmware extraction
+    if 'Firmware Version' in self.day_dataset.columns and not self.day_dataset.empty:
+        # Get first non-null firmware value
+        firmware_values = self.day_dataset['Firmware Version'].dropna()
+        self.firmware = firmware_values.iloc[0] if not firmware_values.empty else None
+    else:
+        self.firmware = None
 
     self.day_hours = 24  # Always 24 hours with social day boundaries
     self.device_turned_on_duration = self.day_dataset['device_turned_on'].sum() / 60

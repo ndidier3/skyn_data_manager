@@ -30,7 +30,6 @@ def save_to_computer(object, filename, folder, extension='sdm'):
   out = open(f'{folder}/{filename}.{extension}', "wb")
   pickle.dump(object, out)
   out.close()
-  print(f'SAVE SUCCESSFUL: {folder}/{filename}.{extension}')
 
 
 def load(name, folder):
