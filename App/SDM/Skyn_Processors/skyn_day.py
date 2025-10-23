@@ -1,11 +1,33 @@
 from App.SDM.Feature_Engineering.quality_analyzer import DataQualityAnalyzer
+import pandas as pd
 
 class skynDay:
-  def __init__(self, dataset, start_index, end_index, non_wear_self_report_column = '', compare_non_wear_methods = False):
+  def __init__(self, dataset, start_index, end_index, non_wear_self_report_column = '', compare_non_wear_methods = False, day_start_hour = 0):
     self.day_dataset = dataset.loc[start_index:end_index]
 
-    self.begin_day = self.day_dataset['datetime'].iloc[0] if not self.day_dataset.empty else None
-    self.end_day = self.day_dataset['datetime'].iloc[-1] if not self.day_dataset.empty else None
+    # Set social day boundaries based on day_start_hour (default 0 = midnight)
+    # This ensures day_hours is always 24.0 for complete days
+    first_data_time = self.day_dataset['datetime'].iloc[0] if not self.day_dataset.empty else None
+    last_data_time = self.day_dataset['datetime'].iloc[-1] if not self.day_dataset.empty else None
+    
+    if first_data_time is not None:
+      # Determine which social day this data belongs to
+      # If data is before day_start_hour, it belongs to the previous day's period
+      if first_data_time.hour < day_start_hour:
+        # Data is before day_start_hour, so it belongs to the previous day's period
+        social_begin = first_data_time.replace(hour=day_start_hour, minute=0, second=0, microsecond=0) - pd.Timedelta(days=1)
+      else:
+        # Data is at or after day_start_hour, so it belongs to the current day's period
+        social_begin = first_data_time.replace(hour=day_start_hour, minute=0, second=0, microsecond=0)
+      
+      # Calculate social end_day: next day at day_start_hour
+      social_end = social_begin + pd.Timedelta(days=1)
+      
+      self.begin_day = social_begin
+      self.end_day = social_end
+    else:
+      self.begin_day = None
+      self.end_day = None
 
     self.device_ids = self.day_dataset['device_id'].unique().tolist()
     self.device_one = self.device_ids[0]
@@ -13,7 +35,7 @@ class skynDay:
     self.device_count = len(self.device_ids)
     self.firmware = self.day_dataset['Firmware Version'].iloc[0] if 'Firmware Version' in self.day_dataset.columns else None
 
-    self.day_hours = (self.end_day - self.begin_day).total_seconds() / 3600
+    self.day_hours = 24  # Always 24 hours with social day boundaries
     self.device_turned_on_duration = self.day_dataset['device_turned_on'].sum() / 60
     self.device_turned_on_percentage_of_day = self.device_turned_on_duration / self.day_hours
 

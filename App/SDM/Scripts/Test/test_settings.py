@@ -14,11 +14,14 @@ curve_attrs = DEFAULT_CURVE_ATTRS
 
 # Day settings
 day_attrs = {
-    'day_start_hour': 0,
+    'day_start_hour': 10,
     'make_graphs': True
 }
 
 # Gaps and non-wear settings
 gaps_and_non_wear_attrs = {
     'export_excel': False
-} 
+}
+
+# Event attributes (empty for Test data since no events)
+event_attrs = {} 

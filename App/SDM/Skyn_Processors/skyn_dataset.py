@@ -559,7 +559,7 @@ class skynDataset:
       for start, end in day_start_end_pairs:
         print(start, end)
         print(self.dataset.index[0], self.dataset.index[-1])
-        day = skynDay(self.dataset, start, end, non_wear_self_report_column = non_wear_self_report_column)
+        day = skynDay(self.dataset, start, end, non_wear_self_report_column = non_wear_self_report_column, day_start_hour = day_start_hour)
         self.days.append(day)
         if make_graphs:
           # Generate device removal plot
@@ -575,7 +575,7 @@ class skynDataset:
           signal_processing_plot = plot_signal_processing(
             day.day_dataset, self.plot_folder, self.subid, day_id, self.dataset_identifier, f'DAY{day_id}',
             self.curve_threshold, time_variable='datetime', title = f'Signal Processing',
-            subtitle_text = f'{self.subid} -- Day: {day_id}'
+            subtitle_text = f'{self.subid} -- Day: {day_id+1}'
           )
           self.plot_paths.append(signal_processing_plot)
           

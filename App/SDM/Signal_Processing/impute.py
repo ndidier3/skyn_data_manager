@@ -351,7 +351,6 @@ def generate_blended_imputation(df, low_quality_region_start, low_quality_region
     after_end = min(len(df), after_end)
     
     # Calculate means of surrounding high-quality regions
-    # Only use high-quality data (not in t_all means it's low quality)
     before_indices = range(before_start, low_quality_region_start)
     after_indices = range(low_quality_region_end + 1, after_end)
     
@@ -367,15 +366,38 @@ def generate_blended_imputation(df, low_quality_region_start, low_quality_region
     before_mean = df.loc[list(before_high_quality_indices), 'TAC'].mean() if before_high_quality_indices else 0
     after_mean = df.loc[list(after_high_quality_indices), 'TAC'].mean() if after_high_quality_indices else 0
     
-    # If no high-quality data in surrounding regions, use the mean of t_all
-    if not before_high_quality_indices and not after_high_quality_indices:
-        overall_mean = t_all['TAC'].mean()
-        before_mean = overall_mean
-        after_mean = overall_mean
-    elif not before_high_quality_indices:
-        before_mean = after_mean
-    elif not after_high_quality_indices:
-        after_mean = before_mean
+    # Find the actual adjacent high-quality values
+    before_actual = None
+    after_actual = None
+    
+    # Find the last high-quality point before imputation region
+    for i in range(low_quality_region_start - 1, max(0, low_quality_region_start - 60), -1):
+        if i in t_all.index:
+            before_actual = df.loc[i, 'TAC']
+            break
+    
+    # Find the first high-quality point after imputation region  
+    for i in range(low_quality_region_end + 1, min(len(df), low_quality_region_end + 60)):
+        if i in t_all.index:
+            after_actual = df.loc[i, 'TAC']
+            break
+    
+    # Calculate halfway points between actual values and means
+    if before_actual is not None:
+        before_target = (before_actual + before_mean) / 2
+    else:
+        before_target = before_mean
+        
+    if after_actual is not None:
+        after_target = (after_actual + after_mean) / 2
+    else:
+        after_target = after_mean
+    
+    # Final fallback to overall mean if no data found
+    if before_target == 0:
+        before_target = t_all['TAC'].mean()
+    if after_target == 0:
+        after_target = t_all['TAC'].mean()
     
     # Get the low quality region data for imputation
     low_quality_region_data = df.iloc[low_quality_region_start:low_quality_region_end + 1]
@@ -398,22 +420,22 @@ def generate_blended_imputation(df, low_quality_region_start, low_quality_region
     n_points = len(predictions)
     
     if n_points > 2:
-        # Blend start: from before_mean to predictions
+        # Blend start: from before_target to predictions
         actual_start_blend = min(start_blend_points, n_points // 3)
         if actual_start_blend > 0:
             start_weights = np.linspace(0, 1, actual_start_blend)
             for i in range(actual_start_blend):
                 alpha = start_weights[i]
-                predictions[i] = (1 - alpha) * before_mean + alpha * predictions[i]
+                predictions[i] = (1 - alpha) * before_target + alpha * predictions[i]
         
-        # Blend end: from predictions to after_mean
+        # Blend end: from predictions to after_target
         actual_end_blend = min(end_blend_points, n_points // 3)
         if actual_end_blend > 0:
             end_weights = np.linspace(1, 0, actual_end_blend)
             for i in range(actual_end_blend):
                 alpha = end_weights[i]
                 idx = n_points - actual_end_blend + i
-                predictions[idx] = (1 - alpha) * after_mean + alpha * predictions[idx]
+                predictions[idx] = (1 - alpha) * after_target + alpha * predictions[idx]
     
     return predictions
 
@@ -554,7 +576,7 @@ def impute_low_quality_data(df: pd.DataFrame):
       # Use the new blended imputation function
       predictions = generate_blended_imputation(
           df, low_quality_region_start, low_quality_region_end, t_all,
-          blend_window=30, start_blend_points=10, end_blend_points=10
+          blend_window=30, start_blend_points=5, end_blend_points=5
       )
       
       df.iloc[low_quality_region_start:low_quality_region_end+1, df.columns.get_loc('TAC')] = predictions
