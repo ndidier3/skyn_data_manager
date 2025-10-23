@@ -1,0 +1,70 @@
+FALL RATE FUNCTIONS SUMMARY
+============================
+
+OVERVIEW
+--------
+This document summarizes the four fall rate calculation methods implemented in the TACAnalyzer class.
+
+FUNCTIONS
+---------
+
+1. get_fall_rate() - Peak-to-End Fall Rate
+   Formula: (peak - curve_threshold) / fall_duration
+   Simplified: relative_peak / fall_duration
+   Baseline: Peak TAC value
+   End Point: Curve threshold (at curve end)
+   Time Period: Entire fall duration (peak to last TAC value)
+   Purpose: Overall fall rate from peak to curve end
+
+2. get_point_to_point_fall_rate() - Average Descending Segments
+   Formula: Average of all negative TAC differences (absolute values)
+   Baseline: Peak TAC value
+   Method: 
+     - Starts from peak onwards
+     - Calculates all consecutive point-to-point differences
+     - Only includes negative changes (descending segments)
+     - Returns average of all descending rates (absolute values)
+   Time: Each segment is 1 minute (simplified, no division)
+   Purpose: Captures overall "steepness" of descending segments
+
+3. get_fall_rate_1hr() - Last 1-Hour Window Fall Rate
+   Formula: (curve_threshold - median_first_5_values) / time_duration
+   Baseline: Median of first 5 values within 1-hour window
+   End Point: Curve threshold
+   Time Window: 1 hour (60 data points) before curve end
+   Boundary: Cannot start before peak time, limited by fall duration
+   Requirements: Must have ≥5 values in fall period
+   Purpose: Late fall rate within last hour (or full fall if <1hr)
+
+4. get_fall_rate_2hr() - Last 2-Hour Window Fall Rate
+   Formula: (curve_threshold - median_first_5_values) / time_duration
+   Baseline: Median of first 5 values within 2-hour window
+   End Point: Curve threshold
+   Time Window: 2 hours (120 data points) before curve end
+   Boundary: Cannot start before peak time, limited by fall duration
+   Requirements: Must have ≥5 values in fall period
+   Purpose: Extended fall rate within last 2 hours (or full fall if <2hr)
+
+COMPARISON TABLE
+----------------
+Method              | Baseline        | End Point           | Time Window        | Boundaries/Filters
+--------------------|-----------------|---------------------|--------------------|------------------
+Peak                | Peak TAC        | Curve threshold     | Full fall duration | NA
+Point-to-Point      | Peak            | Curve End           | Entire Curve       | Only descending segments
+1hr                 | Median of first 5 | Curve threshold   | 1 hour max         | *bounded by peak & fall duration*
+2hr                 | Median of first 5 | Curve threshold   | 2 hours max        | *bounded by peak & fall duration*
+
+USE CASES
+---------
+- Peak-to-End: Overall curve steepness decline
+- Point-to-Point: Granular descending behavior
+- 1hr: Late rapid fall detection
+- 2hr: Extended fall pattern analysis
+
+IMPLEMENTATION NOTES
+-------------------
+- All methods use caching for performance optimization
+- Methods 1, 3, and 4 use curve threshold as reference point for consistency
+- Method 2 (point-to-point) is unique in using peak as starting point
+- Methods 3 and 4 are bounded by peak time to prevent undershooting
+- Methods 3 and 4 require minimum 5 data points for statistical reliability

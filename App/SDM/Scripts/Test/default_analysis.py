@@ -1,93 +1,83 @@
 import pandas as pd
-from SDM.Run.process_many import *
-from SDM.Analysis.curveFeatures import curveFeatures
+import os
+from pathlib import Path
+from App.SDM.Run.process_many import *
+from App.SDM.Analysis.curveFeatures import curveFeatures
+from App.SDM.Analysis.dayFeatures import dayFeatures
+from App.SDM.Scripts.Test.test_settings import (
+    smooth_and_impute_attrs,
+    curve_attrs,
+    day_attrs,
+    gaps_and_non_wear_attrs,
+    event_attrs
+)
 
-user_root = '/Users/nathandidier/Desktop/Repositories/'
-project_root = f'{user_root}/skyn_data_manager' 
-data_input_folder = f'{project_root}/Inputs/Skyn_Data_RAW/TestData'
-processed_data_folder = f'{project_root}/Inputs/Skyn_Data_PROCESSED/TestData'
+curve_attrs['curve_threshold'] = 10
+
+# gaps_and_non_wear_attrs['export_excel'] = True
+
+# Dynamic path resolution - works regardless of where project is cloned
+# Get the project root by going up from this script's location
+script_dir = Path(__file__).parent.absolute()
+project_root = script_dir.parent.parent.parent.parent.absolute()
+
+# Alternative method using os.path (more compatible with older Python versions)
+# script_dir = os.path.dirname(os.path.abspath(__file__))
+# project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_dir))))
+
+print(f"Script directory: {script_dir}")
+print(f"Project root: {project_root}")
+
+# Path settings
+data_input_folder = project_root / 'Inputs' / 'Skyn_Data_RAW' / 'TestData'
+processed_data_folder = project_root / 'Inputs' / 'Skyn_Data_PROCESSED' / 'TestData'
 cohort_name = 'Test'
 
-smooth_and_impute_attrs={
-  'reset_tac': True,
-  'median_smooth': True,
-  'impute_gaps': True,
-  'impute_non_wear': True,
-  'impute_jumps': True,
-  'impute_plummets': True,
-  'savgol_smooth': False,
-  'export_excel': False #if you want to export the processed biosensor data 
-}
-
-curve_attrs = {
-  'curve_flags': {
-    'flag_extreme_rise_rate': {
-      'rise_rate_cutoff': 430
-    },
-    'flag_incomplete_curve_start': {
-      'percent_cutoff': 0.5
-    },
-    'flag_incomplete_curve_end': {
-      'percent_cutoff': 0.5
-    },
-    'flag_flatlined_peak': {
-      'flatline_percent_cutoff': 0.20,
-      'peak_above': 350
-    },
-    'flag_sub_negative_10_curve': {
-      'percent_cutoff': 0.20,
-      'duration_cutoff': 1.0,
-    },
-    'flag_unimputed_low_quality_percent': {
-      'percent_cutoff': 0.20 #maybe raise this
-    },
-    'flag_too_much_imputation': { 
-      'percent_cutoff': 0.4 #maybe raise this
-    },
-    'flag_low_quality': {},
-    'flag_device_non_wear_curve': {},
-    'flag_device_worn_duration_curve': {},
-    'flag_low_flat_curves': {},
-    'flag_curve_start_too_late': {},
-    'flag_device_turned_on_percent_curve': {},
-    'flag_starting_non_wear_perc_curve': {},
-    'flag_ending_non_wear_perc_curve': {}
-  }, 
-  'periphery_flags': { #maybe raise these
-    'flag_sub_negative_10_periphery': {'percent_cutoff': 0.80, 'duration_cutoff': 2},
-    'flag_sub_negative_20_periphery': {'percent_cutoff': 0.40, 'duration_cutoff': 1.5},
-    'flag_sub_negative_40_periphery': {'percent_cutoff': 0.20, 'duration_cutoff': 0.5},
-    'flag_non_wear_periphery': {'percent_cutoff': 0.40}, #maybe raise
-  },
-  'periphery_buffer_before': 2, 
-  'periphery_buffer_after': 2,
-  'merge_curves_within_duration': 1 #set to 0 to not merge
-}
-
-# dictionary for determining day level times
-day_attrs = {
-  'day_start_hour': 10, 
-  'make_graphs': True
-}
-
+# Process and analyze data with enhanced settings matching ARC analysis approach
 process_and_analyze_data(
-  project_root, data_input_folder, cohort_name,
-  curve_threshold = 'auto', #if you want to set this at a constant number, change this to the number of your choice (e.g., 5 or 10)
-  use_prior_save = False,
-  adjust_for_gaps_and_non_wear = True, 
-  smooth_and_impute = True, 
-  analyze_days = True, 
-  analyze_events = False,
-  identify_curves = True,
-  match_events_to_curves=False,
-  curve_attrs=curve_attrs,
-  smooth_and_impute_attrs=smooth_and_impute_attrs,
-  day_attrs=day_attrs
+    project_root, data_input_folder, cohort_name,
+    use_prior_save=False,  # Load previously processed data if available
+    adjust_for_gaps_and_non_wear=True,  # Remove gaps and non-wear periods
+    smooth_and_impute=True,  # Smooth signals and impute missing values
+    analyze_days=True,  # Perform day-level analysis
+    compute_curve_threshold=True,  # Auto-compute curve detection threshold
+    identify_curves=True,  # Detect drinking curves in the data
+    include_raw_curves=False,  # Compute curve features made from non-corrected data
+    match_events_to_curves=False,  # Match drinking events to detected curves
+    gaps_and_non_wear_attrs=gaps_and_non_wear_attrs,
+    smooth_and_impute_attrs=smooth_and_impute_attrs,
+    day_attrs=day_attrs,
+    curve_attrs=curve_attrs,
+    event_attrs=event_attrs
 )
 
 from datetime import datetime
 today = datetime.today().strftime('%m.%d.%Y')
 
-features = curveFeatures(processed_data_folder)
-features.run_stats()
-features.export_workbook_curves(f'{project_root}/Results/{cohort_name}/{cohort_name}_curve_stats_{today}.xlsx')
+# Initialize curveFeatures with processed data and settings
+curves = curveFeatures(processed_data_folder,
+                        smooth_and_impute_attrs=smooth_and_impute_attrs,
+                        curve_attrs=curve_attrs)
+output_dir = project_root / 'Results' / cohort_name
+curves.run_stats()
+curves.count_curve_flags()
+curves.compute_imputation_stats()
+# curves.identify_perfect_curves(output_dir)
+curves.export_workbook_curves(str(project_root / 'Results' / cohort_name / f'{cohort_name}_curve_stats_{today}.xlsx'))
+
+# Day-level analysis using dayFeatures
+print(f"\nRunning day-level analysis...")
+day_features_calculator = dayFeatures(processed_data_folder)
+day_features_calculator.compute_low_quality_stats()  # Computes stats and adds to day_stat_frames
+
+# Add curve overlap detection using curve features from the curves object
+day_features_calculator.add_curve_overlap_detection(curves.curve_features)
+
+day_features_calculator.export_workbook_days(
+    str(project_root / 'Results' / cohort_name / f'{cohort_name}_day_stats_{today}.xlsx')
+)
+
+print(f"\nTest analysis complete!")
+print(f"Results exported to: {project_root / 'Results' / cohort_name}")
+print(f"- {cohort_name}_curve_stats_{today}.xlsx (curve-level stats)")
+print(f"- {cohort_name}_day_stats_{today}.xlsx (comprehensive day-level workbook with features, stats, and plots)")

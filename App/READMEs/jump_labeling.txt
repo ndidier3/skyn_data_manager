@@ -1,0 +1,42 @@
+TAC JUMP LABELING PROCESSING
+============================
+
+OVERVIEW:
+Identifies sudden increases (jumps) in TAC values that represent potential artifacts 
+or sensor errors, and labels consecutive readings that continue to exceed realistic 
+TAC bounds based on the initial jump magnitude.
+
+PSEUDOCODE:
+===========
+
+For each reading (n) in a dataset:
+    Identify max TAC between TACn-60 and TACn+60 (centered 2-hour window)
+    
+    If (TACn+1 - TACn) > 100 μg/L, OR
+    If (TACn+1 - TACn) > (0.9 × Local Peak) AND Local Peak ≥ 40 μg/L:
+        Label reading n and n+1 as "jump"
+        Set Projected TAC = TACn
+        
+        For each subsequent reading (n+x), starting with x=2:
+            If TACn+x < Projected TAC OR x > 360:
+                STOP labeling
+            Else:
+                Label reading n+x as "jump"
+                Adjust Projected TAC by +1.0 μg/L
+
+DETECTION CRITERIA:
+==================
+- Absolute threshold: TAC increase > 100 μg/L between consecutive readings
+- Relative threshold: TAC increase > 90% of max TAC in 2-hour window (when max ≥ 40 μg/L)
+
+PROJECTION MECHANISM:
+====================
+- Creates an increasing upper bound starting at the initial TAC value
+- Increments bound by +1.0 μg/L each time a reading is labeled as jump
+- Stops when TAC readings fall below the projected bound
+
+STOPPING CONDITIONS:
+===================
+1. TACn+x < Projected TAC (reading fall within a realistic TAC range)
+2. x > 360 (maximum projection length of 6 hours reached)
+

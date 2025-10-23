@@ -1,0 +1,55 @@
+RISE RATE FUNCTIONS SUMMARY
+============================
+
+OVERVIEW
+--------
+This document summarizes the four rise rate calculation methods implemented in the TACAnalyzer class.
+
+FUNCTIONS
+---------
+
+1. get_rise_rate() - Threshold-to-Peak Rise Rate
+   Formula: (peak - curve_threshold) / rise_duration
+   Simplified: relative_peak / rise_duration
+   Baseline: Curve threshold
+   End Point: Peak TAC value
+   Time Period: Entire rise duration (first TAC value to peak)
+   Purpose: Overall rise rate from threshold to peak
+
+2. get_point_to_point_rise_rate() - Average Ascending Segments
+   Formula: Average of all positive TAC differences
+   Baseline: Value before curve start (unique among all methods)
+   Method: 
+     - Includes transition from baseline to first curve value
+     - Calculates all consecutive point-to-point differences
+     - Only includes positive changes (ascending segments)
+     - Returns average of all ascending rates
+   Time: Each segment is 1 minute (simplified, no division)
+   Purpose: Captures overall "steepness" of ascending segments
+
+3. get_rise_rate_1hr() - 1-Hour Window Rise Rate
+   Formula: (median_last_5_values - curve_threshold) / time_duration
+   Baseline: Curve threshold
+   End Point: Median of last 5 values within 1-hour window
+   Time Window: 1 hour (60 data points) from curve start
+   Boundary: Cannot exceed peak time
+   Requirements: Must have ≥5 values in rise period
+   Purpose: Early rise rate within first hour
+
+4. get_rise_rate_2hr() - 2-Hour Window Rise Rate
+   Formula: (median_last_5_values - curve_threshold) / time_duration
+   Baseline: Curve threshold
+   End Point: Median of last 5 values within 2-hour window
+   Time Window: 2 hours (120 data points) from curve start
+   Boundary: Cannot exceed peak time
+   Requirements: Must have ≥5 values in rise period
+   Purpose: Extended rise rate within first 2 hours
+
+COMPARISON TABLE
+----------------
+Method              | Baseline        | End Point           | Time Window        | Boundaries/Filters
+--------------------|-----------------|---------------------|--------------------|------------------
+Peak                | Curve threshold | Peak TAC            | Full rise duration | NA
+Point-to-Point      | First Value     | Curve End           | Entire Curve       | Only ascending segments
+1hr                 | Curve threshold | Median of last 5    | 1 hour max         | *bounded by peak*
+2hr                 | Curve threshold | Median of last 5    | 2 hours max        | *bounded by peak*

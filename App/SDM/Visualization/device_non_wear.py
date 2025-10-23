@@ -1,7 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from SDM.Visualization.plotting_utils import *
+from App.SDM.Visualization.plotting_utils import *
+import numpy as np
 
 def create_histogram_self_reported_non_wear(day_id_list, non_wear_duration_list, out_path, version):
   plt.bar(day_id_list, non_wear_duration_list)
@@ -19,16 +20,16 @@ def create_histogram_day_level_device_non_wear(day_level_quality_metric_path, ou
 
   df = pd.read_excel(day_level_quality_metric_path)
 
-  df = df.sort_values(by=['SubID', 'DayNo'])
+  df = df.sort_values(by=['SubID', 'day_no'])
 
-  # Step 2: Group by 'SubID' and filter first and last 'DayNo' for each group
+  # Step 2: Group by 'SubID' and filter first and last 'day_no' for each group
   first_last_df = df.groupby('SubID').agg(
-      first_day=('DayNo', 'first'),
-      last_day=('DayNo', 'last')
+      first_day=('day_no', 'first'),
+      last_day=('day_no', 'last')
   ).reset_index()
 
-  # Step 3: Filter the original DataFrame to retain only rows corresponding to the first and last DayNo
-  filtered_df = df[df['DayNo'].isin(first_last_df['first_day']) | df['DayNo'].isin(first_last_df['last_day'])]
+  # Step 3: Filter the original DataFrame to retain only rows corresponding to the first and last day_no
+  filtered_df = df[df['day_no'].isin(first_last_df['first_day']) | df['day_no'].isin(first_last_df['last_day'])]
 
   filtered_df = filtered_df[filtered_df['SubID']!=1006]
 
@@ -77,7 +78,7 @@ def plot_device_removal(df, plot_folder, subid, event_number, dataset_identifier
     ax.hlines(y=28, xmin = df[time_variable].min(), xmax = df[time_variable].max(), color='black', linestyle='--')
   
   if event_timestamps and all(value is not None for value in event_timestamps.values()):
-    plot_event_lines(df, ax, event_timestamps, time_variable, 'datetime', font_size=22)
+    plot_event_lines(df, ax, event_timestamps, time_variable, 'datetime')
 
   if motion_variable:
         ax2 = ax.twinx()
@@ -87,6 +88,17 @@ def plot_device_removal(df, plot_folder, subid, event_number, dataset_identifier
         ax2.set_ylabel('Motion (G)', fontsize=20, rotation=-90, labelpad=25)
         ax2.legend(("Motion (Wear)", 'Motion (Non-Wear)'), loc='upper right', fontsize=14)
         ax2.tick_params(axis='y', labelsize=16)
+        
+        # Set motion y-axis limits
+        max_motion = df[motion_variable].max()
+        if pd.isna(max_motion) or np.isinf(max_motion):
+            ax2.set_ylim(0, 1.0)  # Default to 0-1 range if max_motion is invalid
+        elif max_motion <= 1.0:
+            ax2.set_ylim(0, 1.0)
+        else:
+            # Calculate upper limit as next 0.2 interval above max_motion
+            upper_limit = ((max_motion // 0.2) + 1) * 0.2
+            ax2.set_ylim(0, upper_limit)
 
   path=f'{plot_folder}{subid}_{dataset_identifier}_{event_number}_device_removal_{method}_{df_version}.png'
 

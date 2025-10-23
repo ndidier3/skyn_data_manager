@@ -48,8 +48,8 @@ def create_day_level_dataframe(skyn_days, subid, dataset_identifier, morning_rep
   data = pd.DataFrame([{attr: value for attr, value in day.__dict__.items() if attr != 'day_dataset'} for day in skyn_days])
   data['SubID'] = subid
   data['Dataset_ID'] = dataset_identifier
-  data['DayNo'] = [i+1 for i in range(0, len(data))]
-  data = data[['SubID', 'Dataset_ID', 'DayNo'] + [col for col in data.columns if col not in ['SubID', 'Dataset_ID', 'DayNo']]]
+  data['day_no'] = [i+1 for i in range(0, len(data))]
+  data = data[['SubID', 'Dataset_ID', 'day_no'] + [col for col in data.columns if col not in ['SubID', 'Dataset_ID', 'day_no']]]
   data['date'] = data['begin_day'].dt.date
   if len(morning_report):
     morning_report = morning_report[morning_report['ID']==subid]

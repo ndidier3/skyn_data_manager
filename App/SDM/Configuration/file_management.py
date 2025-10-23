@@ -3,6 +3,9 @@ import pickle
 from datetime import date
 import xlsxwriter
 import os
+import re
+import numpy as np
+from collections import Counter
 
 def export_to_computer(object, filepath):
   out = open(filepath, "wb")
@@ -120,3 +123,61 @@ def create_feature_plot_folder(cohort_name):
   if not os.path.exists(path):
     os.mkdir(path)
   return path
+
+def extract_subid(input_string, validate=True):
+    pattern = re.compile(r'^(\d{3,6})')
+    match = pattern.findall(input_string)
+      
+    if match:
+      if validate:
+        return match[0] if is_subid_valid(match[0]) else ''
+      else:
+        return match[0]
+    else:
+      return ''
+
+def is_subid_valid(subid):
+  return (2 < len(str(subid))) and (7 > len(str(subid))) and (subid.isnumeric())
+
+def is_dataset_id_valid(episode_id, used_ids, assess_new=False):
+  try:
+    if assess_new and (used_ids != None):
+      id_already_used = (episode_id in used_ids) or (int(episode_id) in used_ids)
+      return (len(episode_id) == 3) and all([char.isdigit() for char in episode_id]) and (int(episode_id) != 0) and not id_already_used
+    elif used_ids != None: #to assess existing filename with dataset id
+      id_repeated = used_ids.count(episode_id) + used_ids.count(int(episode_id)) > 1
+      return (len(episode_id) == 3) and all([char.isdigit() for char in episode_id]) and (int(episode_id) != 0) and not id_repeated
+    else:
+      return (len(episode_id) == 3) and all([char.isdigit() for char in episode_id]) and (int(episode_id) != 0)
+  except:
+    return False
+
+def extract_dataset_identifier(filename, used_ids=None, validate = True, assess_new=False):
+  if validate:
+    try:
+        dataset_identifier = filename.split(".")[0].split("_")[1]
+        
+        return dataset_identifier if is_dataset_id_valid(dataset_identifier, used_ids, assess_new=assess_new) else ''
+    except:
+      return ''
+  else:
+    try:
+        dataset_identifier = str(filename.split(".")[0].split("_")[1])[:3]
+        
+        return dataset_identifier
+    except:
+      return ''
+  
+def matches_filename_convention(filename, used_ids, assess_new=False):
+  subid = extract_subid(filename)
+  dataset_id = extract_dataset_identifier(filename)
+  return (is_subid_valid(subid)) and (is_dataset_id_valid(dataset_id, used_ids, assess_new))
+
+def extract_additional_filename_text(filename):
+  try:
+    return str(filename.split(".")[0].split("_")[2])[:3]
+  except:
+    return ''
+  
+def stringify_dataset_id(dataset_identifier):
+  return "".join(['0' for i in range(0, 3 - len(str(dataset_identifier)))]) + str(dataset_identifier) #gaurantees 3 characters

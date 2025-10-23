@@ -1,0 +1,35 @@
+PROXIMAL LOW QUALITY REGION PROCESSING
+=====================================
+
+OVERVIEW:
+Creates buffer zones around low quality regions and merges nearby regions to ensure 
+comprehensive coverage of areas that may be affected by data quality issues, while 
+maintaining temporal relationships between adjacent problematic regions. A low-quality 
+region consists of a combined, consecutive set of gaps, non-wear, jumps, plummets, 
+and extreme negatives.
+
+PSEUDOCODE:
+===========
+
+For each low-quality region:
+    Calculate region_length = (end_n - start_n + 1)
+    Determine extension_length = min(15, max(3, 3 + round(region_length/7)))
+        - Minimum extension: 3 positions
+        - Maximum extension: 15 positions  
+        - Scales linearly: ~90 minutes required to reach max extension of 15
+    Label readings as proximal low-quality:
+        - From (start_n - extension_length) to start_n
+        - From end_n to (end_n + extension_length)
+
+For each pair of adjacent low-quality regions:
+    Calculate combined_length = (region1_length + region2_length)
+    Calculate region_distance = (region1_end_n - region2_start_n)
+    
+    Determine merge_distance:
+        If combined_length ≤ 10: merge_distance = 10
+        If combined_length ≥ 60: merge_distance = 20
+        Else: merge_distance = 10 + ((combined_length - 10) × (10/50))
+    
+    If region_distance ≤ merge_distance:
+        Label readings between low-quality regions as proximal low-quality, producing a single extended low-quality region
+

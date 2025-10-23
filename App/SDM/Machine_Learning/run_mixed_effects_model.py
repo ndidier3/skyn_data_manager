@@ -32,7 +32,7 @@ def run_mixed_effects_model(df, predictors, outcome, grouping_column):
 
     final_df.to_excel('Results/ARC_10/drink_total_preds.xlsx', index=False)
 
-    passed = final_df[final_df['peak_CURVE_VALID'] == 1]
+    passed = final_df[final_df['CURVE_VALID'] == 1]
     passed_not_null_idx = passed['y_pred_all'].notnull()
     passed_y_pred = passed.loc[passed_not_null_idx, 'y_pred_all']
     passed_y = passed.loc[passed_not_null_idx, 'drink_total']
@@ -40,7 +40,7 @@ def run_mixed_effects_model(df, predictors, outcome, grouping_column):
     print('high quality MAE:')
     print(passed_mae)
 
-    flagged = final_df[final_df['peak_CURVE_VALID'] != 1]
+    flagged = final_df[final_df['CURVE_VALID'] != 1]
     flagged_not_null_idx = flagged['y_pred_all'].notnull()
     flagged_y_pred = flagged.loc[flagged_not_null_idx, 'y_pred_all']
     flagged_y = flagged.loc[flagged_not_null_idx, 'drink_total']

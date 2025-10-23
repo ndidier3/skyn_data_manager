@@ -11,13 +11,13 @@ from SDM.Visualization.plotting_utils import *
 import numpy as np
 from sklearn.tree import plot_tree
 
-def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, peak, curve_threshold, title = "TAC Curve", event_timestamps = {}, df_version = 'SEARCH', subtitle_text = ''):
-  peak_time = df.loc[df[f'TAC']==peak, 'datetime']
+def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, peak, curve_threshold, title = "TAC Curve", event_timestamps = {}, df_version = 'SEARCH', subtitle_text = '', tac_column = 'TAC'):
+  peak_time = df.loc[df[tac_column]==peak, 'datetime']
   # graph_cutoff = curve_ends + ((len(df) - curve_ends)*0.25)
   # df = df.loc[:graph_cutoff]
   
   fig, ax = plt.subplots(figsize = (16, 7))
-  ax.plot(df['datetime'], df[f'TAC'], c='black')
+  ax.plot(df['datetime'], df[tac_column], c='black')
 
   #annotate with lines for curve threshold, peak, curve_begin, curve_end
   ax.vlines(peak_time, ymin=curve_threshold, ymax=peak, color='black', linestyle='--')
@@ -28,7 +28,7 @@ def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, 
   # )
 
   ax.set_xlabel('Time (hrs)', fontsize = 24)
-  ax.set_ylabel('TAC', fontsize = 24)
+  ax.set_ylabel('TAC' if 'TAC' in tac_column else 'TAC (Pre-Imputation)', fontsize = 24)
   ax.tick_params(axis='x', labelsize = 18)
   ax.tick_params(axis='y', labelsize = 20)
 
@@ -46,7 +46,7 @@ def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, 
 
   if event_timestamps and all(value is not None for value in event_timestamps.values()):
     plot_event_lines(df, ax, event_timestamps, 'datetime', 'datetime')
-
+  df_version = df_version if tac_column == 'TAC' else f'{df_version}_raw'
   path = f'{plot_path}{subid}_{dataset_identifier}_{event_number}_TAC_curve_{df_version}.png'
   plt.tight_layout()
   plt.savefig(path, bbox_inches='tight')
@@ -55,30 +55,24 @@ def plot_smoothed_curve(df, plot_path, subid, dataset_identifier, event_number, 
 
 def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifier, df_version, 
                            curve_threshold, time_variable='datetime', title='Signal Processing', 
-                           event_timestamps={}, subtitle_text=''):
-  
+                           event_timestamps={}, subtitle_text='', show_imputations = True):
   passed = df.loc[
-    (df['device_worn_model'] == 1) & 
-    (df['gap_buffered']==0) & 
-    (df['non_wear_buffered']==0) & 
-    (df['jump']==0) & 
-    (df['plummet']==0) &
-    (df['imputed']==0)
+    (df['imp_cand']==0)
   ]
-  gap = df.loc[df['gap_buffered'] == 1]
-  gap_imputed = df.loc[df['gap_imputed'] == 1]
-  non_wear = df.loc[(df['non_wear_buffered'] == 1)]
-  non_wear_imputed = df.loc[(df['non_wear_imputed'] == 1)]
-  jumps = df.loc[(df['jump'] == 1) & (df['non_wear_buffered'] == 0)]
-  jump_imputed= df.loc[df['jump_imputed'] == 1]
-  plummet = df.loc[(df['plummet'] == 1) & (df['jump'] == 0) & (df['non_wear_buffered'] == 0)]
-  plummet_imputed = df.loc[df['plummet_imputed'] == 1]
+
+  # For showing non-imputed data
+  gap = df.loc[df['gap'] == 1]
+  non_wear = df.loc[(df['non_wear'] == 1)]
+  jumps = df.loc[(df['jump_imp_cand'] == 1)]
+  plummet = df.loc[(df['plummet_imp_cand'] == 1)]
+  extreme_negative = df.loc[(df['extreme_negative_imp_cand'] == 1)]
+  proximal_low_quality = df.loc[(df['proximal_low_quality_imp_cand'] == 1)]
 
   # Create a figure and axis
   fig, ax = plt.subplots(figsize=(16, 7))
   
   #Smoothed Final TAC
-  ax.plot(df[time_variable], df['TAC'], label="TAC (Processed)", alpha=0.5, color="black", linewidth = 2.5)
+  ax.plot(df[time_variable], df['TAC' if show_imputations else 'TAC_pre_imputation'], label="TAC (Processed)", alpha=0.5, color="black", linewidth = 2)
   
   #Passed (high quality values)
   ax.scatter(passed[time_variable], passed['TAC_pre_imputation'], label='Passed', 
@@ -86,29 +80,50 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
   #Non Wear
   if not non_wear.empty:
     ax.scatter(non_wear[time_variable], non_wear['TAC_pre_imputation'], label='Non-Wear', 
-             color='lightpink', marker='x', alpha=0.7, s=12)
+             color='lightpink', marker='x', alpha=0.7, s=20)
+  #Extreme Negative
+  if not extreme_negative.empty:
+    ax.scatter(extreme_negative[time_variable], extreme_negative['TAC_pre_imputation'], label='Extreme Negative', 
+             color='lightsteelblue', marker='*', alpha=0.7, s=20)
   #Jumps
   if not jumps.empty:
     ax.scatter(jumps[time_variable], jumps['TAC_pre_imputation'], label='Jump', 
-              color='lightblue', marker='^', alpha=0.7, s=12)
+              color='lightblue', marker='^', alpha=0.7, s=20)
   #Plummet
   if not plummet.empty:
     ax.scatter(plummet[time_variable], plummet['TAC_pre_imputation'], label='Plummet', 
-              color='thistle', marker='v', alpha=0.7, s=12)
+              color='thistle', marker='v', alpha=0.7, s=20)
+  # Between low quality
+  if not proximal_low_quality.empty:
+    ax.scatter(proximal_low_quality[time_variable], proximal_low_quality['TAC_pre_imputation'],
+               label='Proximal Low Quality', color='gray', marker='s', alpha=0.7, s=20)
     
-  #Imputations (for gaps, non wear, jumps, plumments)
-  if not gap_imputed.empty:
-    ax.scatter(gap_imputed[time_variable], gap_imputed['TAC_pre_smoothed'], label='Imputed Gap', 
-              marker='o', alpha=1.0, facecolor='gray', edgecolors="black")
-  if not non_wear_imputed.empty:
-    ax.scatter(non_wear_imputed[time_variable], non_wear_imputed['TAC_pre_smoothed'], 
-               label='Imputed Non-Wear', facecolor='lightpink', edgecolors= "darkred", marker='o', alpha=1.0)
-  if not jump_imputed.empty:
-    ax.scatter(jump_imputed[time_variable], jump_imputed['TAC_pre_smoothed'], 
-              label='Imputed Jump', facecolor='lightblue', edgecolors= "darkblue", marker='o', alpha=1.0)
-  if not plummet_imputed.empty:
-    ax.scatter(plummet_imputed[time_variable], plummet_imputed['TAC_pre_smoothed'], 
-               label='Imputed Plummet', facecolor='thistle', edgecolors= "purple", marker='o', alpha=1.0)
+  # Imputed data
+  if show_imputations:
+    gap_imputed = df.loc[df['gap_imputed'] == 1]
+    non_wear_imputed = df.loc[(df['non_wear_imputed'] == 1)]
+    extreme_negative_imputed = df.loc[(df['extreme_negative_imputed'] == 1)]
+    jump_imputed = df.loc[df['jump_imputed'] == 1]
+    plummet_imputed = df.loc[df['plummet_imputed'] == 1]
+    proximal_low_quality_imputed = df.loc[df['proximal_low_quality_imputed'] == 1]
+    if not gap_imputed.empty:
+      ax.scatter(gap_imputed[time_variable], gap_imputed['TAC_pre_savgol'], label='Imputed Gap', 
+                marker='o', alpha=1.0, facecolor='gray', edgecolors="black")
+    if not non_wear_imputed.empty:
+      ax.scatter(non_wear_imputed[time_variable], non_wear_imputed['TAC_pre_savgol'], 
+                label='Imputed Non-Wear', facecolor='lightpink', edgecolors= "darkred", marker='o', alpha=1.0)
+    if not extreme_negative_imputed.empty:
+      ax.scatter(extreme_negative_imputed[time_variable], extreme_negative_imputed['TAC_pre_savgol'], 
+                label='Imputed Extreme Negative', facecolor='lightsteelblue', edgecolors= "purple", marker='o', alpha=1.0)
+    if not jump_imputed.empty:
+      ax.scatter(jump_imputed[time_variable], jump_imputed['TAC_pre_savgol'], 
+                label='Imputed Jump', facecolor='lightblue', edgecolors= "darkblue", marker='o', alpha=1.0)
+    if not plummet_imputed.empty:
+      ax.scatter(plummet_imputed[time_variable], plummet_imputed['TAC_pre_savgol'], 
+                label='Imputed Plummet', facecolor='thistle', edgecolors= "purple", marker='o', alpha=1.0)
+    if not proximal_low_quality_imputed.empty:
+      ax.scatter(proximal_low_quality_imputed[time_variable], proximal_low_quality_imputed['TAC_pre_savgol'],
+                label='Imputed Proximal Low Quality', facecolor='gray', edgecolors="darkgreen", marker='o', alpha=1.0)
   
   # Plot threshold line
   ax.hlines(curve_threshold, xmin=df['datetime'].min(), xmax=df['datetime'].max(), 
@@ -135,6 +150,7 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
           ha='center', va='center', transform=ax.transAxes)
   
   # Save the figure
+  df_version = df_version if show_imputations else f'{df_version}_raw'
   path = f'{plot_path}{subid}_{dataset_identifier}_{event_number}_TAC_processing_{df_version}.png'
   plt.tight_layout()
   plt.savefig(path, bbox_inches='tight')
@@ -399,7 +415,7 @@ def create_simple_histogram_of_feature(feature, save_folder, feature_name):
   #         'device_worn_duration_CURVE', 'device_worn_percent_CURVE', 'device_worn_percent_of_device_on_CURVE',
   #         'negative_duration_CURVE', 'sub_negative_10_duration_CURVE', 'duration_CURVE', 'first_tac_CURVE', 'last_tac_CURVE',
   #         'mean_tac_CURVE', 'peak_CURVE', 'auc_total_CURVE', 'rise_duration_CURVE', 'fall_duration_CURVE', 'rise_rate_CURVE', 
-  #         'fall_rate_CURVE', 'fall_complete_perc_CURVE', ''
+  #         'fall_rate_CURVE', 'fall_complete_percent_CURVE', ''
   #       ]
   #       for feature in feature_names:
   #         save_feature
@@ -467,4 +483,121 @@ def plot_rf_tree(rf, feature_names, cohort_name, model_figures_folder):
     filled=True, impurity=True, rounded=True)
   fig.savefig(f'{model_figures_folder}/Random Forest - {cohort_name} - Decision Tree.png')
   plt.close('all')
+
+
+def plot_cluster_analysis(df, plot_folder, subid, dataset_identifier, curve_threshold, title="TAC Cluster Analysis", subtitle_text=""):
+  """
+  Visualize the different clusters and excluded data in the TAC data.
+  
+  Args:
+    df (pd.DataFrame): Main dataframe with cluster labels
+    plot_folder (str): Path to save the plot
+    subid (str): Subject ID
+    dataset_identifier (str): Dataset identifier
+    curve_threshold (float): Curve threshold value
+    title (str): Plot title
+    subtitle_text (str): Subtitle text
+  """
+  # Check if cluster data exists
+  if 'labeled_cluster_data' not in df.attrs:
+    print("Warning: No cluster data found in dataframe attributes")
+    return None
+    
+  labeled_data = df.attrs['labeled_cluster_data']
+  
+  # Create figure and axis
+  fig, ax = plt.subplots(figsize=(16, 10))
+  
+  # Plot TAC data with different colors for each cluster
+  colors = {
+    'baseline': 'darkgreen',
+    'excluded': 'lightgray'
+  }
+  
+  # Generate colors for other clusters
+  cluster_ids = labeled_data['cluster_id'].dropna().unique()
+  if len(cluster_ids) > 0:
+    import matplotlib.cm as cm
+    cmap = cm.Set3
+    for i, cluster_id in enumerate(cluster_ids):
+      if cluster_id != labeled_data[labeled_data['is_baseline'] == True]['cluster_id'].iloc[0] if any(labeled_data['is_baseline']) else None:
+        colors[f'cluster_{int(cluster_id)}'] = cmap(i % cmap.N)
+  
+  # Plot each cluster type
+  for cluster_type in colors.keys():
+    if cluster_type == 'excluded':
+      # Plot excluded data
+      excluded_mask = labeled_data['cluster_label'] == 'excluded'
+      if excluded_mask.any():
+        excluded_data = labeled_data[excluded_mask]
+        ax.scatter(excluded_data['datetime'], excluded_data['TAC'], 
+                  c=colors[cluster_type], alpha=0.3, s=10, 
+                  label=f'Excluded ({excluded_mask.sum()} points)', marker='x')
+    else:
+      # Plot cluster data
+      cluster_mask = labeled_data['cluster_label'] == cluster_type
+      if cluster_mask.any():
+        cluster_data = labeled_data[cluster_mask]
+        ax.scatter(cluster_data['datetime'], cluster_data['TAC'], 
+                  c=colors[cluster_type], alpha=0.7, s=15, 
+                  label=f'{cluster_type.replace("_", " ").title()} ({cluster_mask.sum()} points)')
+  
+  # Add curve threshold line
+  ax.axhline(y=curve_threshold, color='red', linestyle='--', linewidth=2, 
+             label=f'Curve Threshold: {curve_threshold:.2f}')
+  
+  # Add zero line for reference
+  ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+  
+  # Add TAC = -5 line to show exclusion boundary
+  ax.axhline(y=-5, color='orange', linestyle=':', linewidth=1, alpha=0.7, 
+             label='TAC = -5 (Exclusion Boundary)')
+  
+  # Format the plot
+  ax.set_xlabel('Time', fontsize=14)
+  ax.set_ylabel('TAC (μg/L)', fontsize=14)
+  ax.set_title(title, fontsize=18, fontweight="semibold", pad=25)
+  
+  # Add subtitle
+  if subtitle_text:
+    ax.text(0.5, 1.025, subtitle_text, fontsize=12, style='italic',
+            ha='center', va='center', transform=ax.transAxes)
+  
+  # Format x-axis for time
+  ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+  ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+  
+  # Add legend
+  ax.legend(loc='upper right', bbox_to_anchor=(1.15, 1.0), 
+           frameon=True, framealpha=1, edgecolor='black', facecolor='white')
+  
+  # Set y-axis limits to show full range
+  y_min = labeled_data['TAC'].min()
+  y_max = labeled_data['TAC'].max()
+  y_range = y_max - y_min
+  ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.1 * y_range)
+  
+  # Add grid for better readability
+  ax.grid(True, alpha=0.3)
+  
+  # Add exclusion reason summary in text box
+  if 'exclusion_reason' in labeled_data.columns:
+    exclusion_counts = labeled_data['exclusion_reason'].value_counts()
+    exclusion_text = "Exclusion Reasons:\n"
+    for reason, count in exclusion_counts.items():
+      if reason != 'none':
+        exclusion_text += f"• {reason}: {count}\n"
+    
+    if exclusion_text != "Exclusion Reasons:\n":
+      ax.text(0.02, 0.98, exclusion_text, transform=ax.transAxes, 
+              verticalalignment='top', fontsize=10, 
+              bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+  
+  # Save the plot
+  path = f'{plot_folder}{subid}_{dataset_identifier}_cluster_analysis.png'
+  plt.tight_layout()
+  plt.savefig(path, bbox_inches='tight', dpi=300)
+  plt.close('all')
+  
+  return path
 

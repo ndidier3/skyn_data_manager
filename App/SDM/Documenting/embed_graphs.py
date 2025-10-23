@@ -1,4 +1,5 @@
 import xlsxwriter
+import traceback
 
 def embed_graphs_into_workbook_tab(
   workbook,
@@ -31,6 +32,7 @@ def embed_graphs_into_workbook_tab(
             'y_scale': y_scale
           })
         except Exception as e:
+          print(traceback.format_exc())
           error_cell = f"{col_name}{row_start + 1}"
           worksheet.write(error_cell, f"Invalid: {plot_path}")  # Insert text instead
       row_start += row_interval

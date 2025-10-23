@@ -1,0 +1,41 @@
+TAC PLUMMET LABELING PROCESSING
+===============================
+
+OVERVIEW:
+Identifies sudden decreases (plummets) in TAC values that represent potential artifacts, 
+undetected non-wear, or sensor errors; labels consecutive readings that continue to 
+fall below realistic TAC bounds.
+
+PSEUDOCODE:
+===========
+
+For each reading (n) in a dataset:
+    Identify max TAC between TACn-60 and TACn+60 (centered 2-hour window)
+    
+    If (TACn+1 - TACn) < -100 μg/L, OR
+    If (TACn+1 - TACn) < (-0.9 × Local Peak) AND Local Peak ≥ 40 μg/L:
+        Label reading n and n+1 as "plummet"
+        Set Projected TAC = TACn
+        
+        For each subsequent reading (n+x), starting with x=2:
+            If TACn+x ≥ Projected TAC OR x > 360:
+                STOP labeling
+            Else:
+                Label reading n+x as "plummet"
+                Adjust Projected TAC by -3.0 μg/L
+
+DETECTION CRITERIA:
+==================
+- Absolute threshold: TAC decrease < -100 μg/L between consecutive readings
+- Relative threshold: TAC decrease < -90% of max TAC in 2-hour window (when max ≥ 40 μg/L)
+
+PROJECTION MECHANISM:
+====================
+- Creates a decreasing lower bound starting at the initial TAC value
+- Decrements bound by -3.0 μg/L each time a reading is labeled as plummet
+- Stops when TAC readings rise above the projected bound
+
+STOPPING CONDITIONS:
+===================
+1. TACn+x ≥ Projected TAC (reading rises within realistic TAC range)
+2. x > 360 (maximum projection length of 6 hours reached)

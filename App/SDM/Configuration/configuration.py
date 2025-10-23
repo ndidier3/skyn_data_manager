@@ -6,7 +6,9 @@ from statistics import mode
 from sklearn import preprocessing
 import numpy as np
 import os
-from SDM.User_Interface.Utils.filename_tools import stringify_dataset_id
+import traceback
+from App.SDM.Configuration.file_management import stringify_dataset_id
+from App.SDM.Signal_Processing.sampling import get_sampling_rate_avg, reduce_sampling_rate as reduce_sampling_rate_new
 
 """
 this file contains utilies for loading the date, standardizing formats, retrieving unique identifiers, etc.
@@ -71,16 +73,6 @@ def configure_timestamp_column(df):
     df.drop(['datetime_with_timezone', 'datetime_without_timezone'], axis=1, inplace=True)
     df.reset_index(inplace=True, drop=True)
     return df['datetime']
-
-def get_sampling_rate(df, timestamp_column):
-
-    time_diff = df[timestamp_column].diff()
-
-    # Calculate the average time difference
-    average_sampling_rate = time_diff.mean().total_seconds()  # Get the average in seconds
-    average_sampling_rate_per_minute = round(60 / average_sampling_rate)  # Calculate samples per minute
-
-    return average_sampling_rate_per_minute
 
 def get_time_elapsed(df, timestamp_column):
     try:
@@ -218,7 +210,7 @@ def load_dataset(self):
     else:
       return pd.read_excel(self.path, index_col=False)
 
-def configure_raw_data(self):
+def configure_raw_data(self, error_logger=None):
     print(f'initializing \n{self.subid} \n{self.condition} {self.dataset_identifier}')
     print(self.path)
     self.unprocessed_dataset['SubID'] = self.subid
@@ -235,9 +227,9 @@ def configure_raw_data(self):
 
     df_raw = df_raw[['SubID', 'Dataset_Identifier', 'Episode_Identifier', 'Full_Identifier', 'Row_ID'] + [col for col in df_raw.columns.tolist() if col not in ['SubID', 'Dataset_Identifier', 'Episode_Identifier', 'Full_Identifier', 'Row_ID']]]
 
-    sampling_rate = get_sampling_rate(df_raw, 'datetime')
+    sampling_rate = get_sampling_rate_avg(df_raw, 'datetime')
     if sampling_rate > 1:
-        df_raw = reduce_sampling_rate(df_raw, 'datetime')
+        df_raw = reduce_sampling_rate_new(df_raw, 'datetime')
 
     df_raw = get_time_elapsed(df_raw, 'datetime')
 
@@ -341,18 +333,3 @@ def determine_post_cleaning_validity(self):
         return self.valid_occasion, self.invalid_reason
 
     return self.valid_occasion, self.invalid_reason
-
-def reduce_sampling_rate(raw_data, timestamp_column, cutoff_sec = 59):
-    last_index = 0
-    indices_to_keep = [last_index]
-
-    for i, row in raw_data.iterrows():
-        if i > 0:
-            duration_diff = (raw_data.loc[i, timestamp_column] - raw_data.loc[last_index, timestamp_column]).total_seconds()
-            if duration_diff >= cutoff_sec:
-                indices_to_keep.append(i)
-                last_index = i
-
-    reduced_data = raw_data.loc[indices_to_keep].reset_index(drop=True)
-
-    return reduced_data
