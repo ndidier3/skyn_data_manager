@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import datetime, timedelta
-from SDM.Configuration.configuration import configure_timestamp_column
+from .Configuration.configuration import configure_timestamp_column
 
 def split_skyn_dataset(data_to_split, split_time):
   data_to_split['datetime'] = configure_timestamp_column(data_to_split)

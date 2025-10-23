@@ -1,10 +1,9 @@
-from SDM.Analysis.statModel import statModel
-from SDM.Analysis.featureFlagger import featureFlagger
-from SDM.Configuration.file_management import load, save_to_computer, create_feature_plot_folder
+from .Analysis.statModel import statModel
+from .Analysis.featureFlagger import featureFlagger
+from .Configuration.file_management import load, save_to_computer, create_feature_plot_folder
 import os
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+import numpy as np import matplotlib.pyplot as plt
 
 """ ACE """
 def run_ace_processes():

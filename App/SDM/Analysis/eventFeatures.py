@@ -1,12 +1,11 @@
-from SDM.Analysis.statModel import statModel
-from SDM.Analysis.featureFlagger import featureFlagger
-from SDM.Configuration.file_management import load, save_to_computer
-from SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
+from .Analysis.statModel import statModel
+from .Analysis.featureFlagger import featureFlagger
+from .Configuration.file_management import load, save_to_computer
+from .Documenting.embed_graphs import embed_graphs_into_workbook_tab
 import os
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import xlsxwriter
+import matplotlib.pyplot as plt import xlsxwriter
 
 class eventFeatures():
   def __init__(self, processed_data_folder, cohort_name, results_folder, search_flag_selections, curve_flag_selections, metadata_columns = []):

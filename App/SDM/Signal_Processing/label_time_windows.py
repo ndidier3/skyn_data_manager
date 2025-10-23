@@ -1,5 +1,5 @@
 import pandas as pd
-from SDM.Configuration.configuration import get_closest_index_with_timestamp
+from ..Configuration.configuration import get_closest_index_with_timestamp
 
 def label_time_windows(df, start_time, end_time, column_name):
   """ if column does not exist, it will be created with all values as 1,

@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from SDM.Configuration.configuration import get_closest_index_after_timestamp, get_closest_index_with_timestamp
+from ..Configuration.configuration import get_closest_index_after_timestamp, get_closest_index_with_timestamp
 
 def plot_event_lines(data, ax, event_timestamp, x_variable, timestamp_column='datetime', font_size=16, text_adjustment=0.07, y_start = 0.95):
   text_start = 0

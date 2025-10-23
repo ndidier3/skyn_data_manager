@@ -1,4 +1,4 @@
-from SDM.EMA_Processors.morning_report import MorningReport
+from .EMA_Processors.morning_report import MorningReport
 
 def process_morning_report(path, data_out, plot_out_duration, plot_out_count):
   morning = MorningReport(path)
