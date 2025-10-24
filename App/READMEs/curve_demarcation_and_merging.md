@@ -17,7 +17,7 @@ This document describes how TAC (Transdermal Alcohol Concentration) curves are i
 4. Return start and end indices for each consecutive sequence
 
 **Filtering**: 
-- **Mini curves (<5 minutes)**: Filtered out immediately as too brief to be meaningful
+- **Blip curves (<5 minutes)**: Filtered out immediately as too brief to be meaningful
 - **Short curves (5-15 minutes)**: Retained for potential merging with longer curves
 - **Substantial curves (≥15 minutes)**: Always retained
 
@@ -57,7 +57,7 @@ After merging, the system applies intelligent filtering:
 
 ## Curve Classification
 
-### Mini Curves (<5 minutes)
+### Blip Curves (<5 minutes)
 - **Status**: Always filtered out
 - **Rationale**: Too brief to represent meaningful drinking events
 - **Processing**: Removed at initial detection stage
@@ -124,14 +124,14 @@ Result: Filtered out (no merging possible)
 Reason: Beyond half merge distance for short curves, no anchor available
 ```
 
-### Scenario 6: Mini Curve (Always Filtered)
+### Scenario 6: Blip Curve (Always Filtered)
 ```
-Curve A: 3 minutes (mini curve, <5 min)
+Curve A: 3 minutes (blip curve, <5 min)
 Curve B: 20 minutes (substantial anchor, ≥15 min)
 Gap: 30 minutes (0.5 hours, within merge distance)
 
 Result: Curve A filtered out immediately, Curve B kept
-Reason: Mini curves are filtered out before merging logic applies
+Reason: Blip curves are filtered out before merging logic applies
 ```
 
 ## Configuration Parameters
@@ -140,7 +140,7 @@ Reason: Mini curves are filtered out before merging logic applies
 |-----------|---------|-------------|
 | `merge_curves_within_duration` | 2 hours | Maximum gap between substantial curves (≥15 min) to consider for merging |
 | `curve_minutes_limit` | 24 hours | Maximum duration for a merged curve |
-| Mini curve threshold | 5 minutes | Minimum curve duration to consider |
+| Blip curve threshold | 5 minutes | Minimum curve duration to consider |
 | Short curve threshold | 15 minutes | Minimum duration for standalone curves |
 | Short curve merge distance | 1 hour | Half the configured merge distance for curves 5-15 minutes |
 

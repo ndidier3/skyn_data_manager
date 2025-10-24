@@ -542,7 +542,7 @@ def get_start_and_end_of_discrete_curves(df, curve_threshold, TAC_column = 'TAC'
   split_points = np.where(gaps > 1)[0]
   consecutive_sequences = np.split(above_threshold, split_points + 1)
   curve_start_and_end_indices = [[seq[0], seq[-1]] for seq in consecutive_sequences if len(seq) > 0]
-  # Filter out mini curves (<5 min) but keep short curves (5-15 min) for potential merging
+  # Filter out blip curves (<5 min) but keep short curves (5-15 min) for potential merging
   curve_start_and_end_indices = [
     sublist for sublist in curve_start_and_end_indices if (sublist[1] - sublist[0]) >= 5
   ]
