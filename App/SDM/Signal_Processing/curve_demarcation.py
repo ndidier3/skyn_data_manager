@@ -542,27 +542,77 @@ def get_start_and_end_of_discrete_curves(df, curve_threshold, TAC_column = 'TAC'
   split_points = np.where(gaps > 1)[0]
   consecutive_sequences = np.split(above_threshold, split_points + 1)
   curve_start_and_end_indices = [[seq[0], seq[-1]] for seq in consecutive_sequences if len(seq) > 0]
-  #filtering out curves that are less than 15 minutes long
+  # Filter out mini curves (<5 min) but keep short curves (5-15 min) for potential merging
   curve_start_and_end_indices = [
-    sublist for sublist in curve_start_and_end_indices if (sublist[1] - sublist[0]) > 15
+    sublist for sublist in curve_start_and_end_indices if (sublist[1] - sublist[0]) >= 5
   ]
   return curve_start_and_end_indices
 
 def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separation_minutes = 60, curve_minutes_limit = (60*24)):
+  # First, perform the merging operation as before
   merged_curve_start_and_end_indices = []
+  original_curve_mapping = []  # Track which original curves are merged together
+  
   for i, (curve_start, curve_end) in enumerate(approved_curve_start_and_end_indices):
     if i > 0:
-      prior_curve_start = merged_curve_start_and_end_indices[-1][1] 
+      prior_curve_start = merged_curve_start_and_end_indices[-1][0]  # Use start, not end
       prior_curve_end = merged_curve_start_and_end_indices[-1][1]
       merged_curve_minutes = curve_end - prior_curve_start
-      if (curve_start - prior_curve_end) < max_curve_separation_minutes and (merged_curve_minutes < curve_minutes_limit):
-        merged_curve_start_and_end_indices[-1][1] = curve_end
-        merged_curve_start_and_end_indices[-1][2] += 1 # ke
+      
+      # Determine merge distance based on curve length
+      # Short curves (5-15 min) use half the merge distance
+      current_curve_duration = curve_end - curve_start
+      if current_curve_duration < 15:
+        # Short curve: use half the merge distance
+        effective_merge_distance = max_curve_separation_minutes / 2
       else:
-        merged_curve_start_and_end_indices.append([curve_start, curve_end, 1])  
+        # Substantial curve: use full merge distance
+        effective_merge_distance = max_curve_separation_minutes
+      
+      if (curve_start - prior_curve_end) < effective_merge_distance and (merged_curve_minutes < curve_minutes_limit):
+        # Merge with previous curve
+        merged_curve_start_and_end_indices[-1][1] = curve_end
+        merged_curve_start_and_end_indices[-1][2] += 1
+        # Track that this curve was merged
+        original_curve_mapping[-1].append(i)
+      else:
+        # Start new curve
+        merged_curve_start_and_end_indices.append([curve_start, curve_end, 1])
+        original_curve_mapping.append([i])
     else:
-        merged_curve_start_and_end_indices.append([curve_start, curve_end, 1]) 
-  return merged_curve_start_and_end_indices 
+        # First curve
+        merged_curve_start_and_end_indices.append([curve_start, curve_end, 1])
+        original_curve_mapping.append([i])
+  
+  # Now filter out short standalone curves
+  filtered_merged_curves = []
+  min_curve_length = 15  # Minimum curve length in minutes
+  
+  for i, (merged_start, merged_end, curve_count) in enumerate(merged_curve_start_and_end_indices):
+    merged_duration = merged_end - merged_start
+    
+    # Check if this merged curve is substantial (≥15 min)
+    is_substantial = merged_duration >= min_curve_length
+    
+    # Check if any of the original curves that formed this merged curve were substantial
+    original_curve_indices = original_curve_mapping[i]
+    has_substantial_anchor = False
+    
+    for orig_idx in original_curve_indices:
+      if orig_idx < len(approved_curve_start_and_end_indices):
+        orig_start, orig_end = approved_curve_start_and_end_indices[orig_idx][:2]
+        orig_duration = orig_end - orig_start
+        if orig_duration >= min_curve_length:
+          has_substantial_anchor = True
+          break
+    
+    # Keep the curve if:
+    # 1. The merged curve itself is substantial (≥15 min), OR
+    # 2. It contains at least one substantial anchor curve (≥15 min)
+    if is_substantial or has_substantial_anchor:
+      filtered_merged_curves.append([merged_start, merged_end, curve_count])
+  
+  return filtered_merged_curves 
 
 def get_curve_threshold_from_method(df: pd.DataFrame, curve_threshold_method: Union[str, float, int], default_threshold: float = 10.0, 
                                   k_values: list = [3, 4, 5, 6], window_size: int = 15) -> Tuple[float, Dict]:

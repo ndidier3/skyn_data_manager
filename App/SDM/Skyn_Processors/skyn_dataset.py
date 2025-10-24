@@ -264,8 +264,10 @@ class skynDataset:
         )
       else:
         # Add curve_count = 1 to each curve if no merging
+        # Filter out curves that are less than 15 minutes long
         curve_start_and_end_indices_with_curve_count = [
-          [start, end, 1] for start, end in curve_start_and_end_indices
+          [start, end, 1] for start, end in curve_start_and_end_indices 
+          if (end - start) >= 15
         ]
       
       # Process each curve
