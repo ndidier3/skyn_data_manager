@@ -1,4 +1,3 @@
-from .skyn_datapoint import skynDatapoint
 from ..Configuration.configuration import *
 from ..Configuration.day_level import get_day_level_indices, create_day_level_dataframe
 from ..Configuration.event_level import get_event_level_indices, create_event_level_dataframe

@@ -8,7 +8,7 @@ import numpy as np
 import os
 import traceback
 from App.SDM.Configuration.file_management import stringify_dataset_id
-from App.SDM.Signal_Processing.sampling import get_sampling_rate_avg, reduce_sampling_rate as reduce_sampling_rate_new
+from App.SDM.Signal_Processing.sampling import get_sampling_rate_avg, reduce_sampling_rate
 
 """
 this file contains utilies for loading the date, standardizing formats, retrieving unique identifiers, etc.
@@ -229,7 +229,7 @@ def configure_raw_data(self, error_logger=None):
 
     sampling_rate = get_sampling_rate_avg(df_raw, 'datetime')
     if sampling_rate > 1:
-        df_raw = reduce_sampling_rate_new(df_raw, 'datetime')
+        df_raw = reduce_sampling_rate(df_raw, 'datetime')
 
     df_raw = get_time_elapsed(df_raw, 'datetime')
 

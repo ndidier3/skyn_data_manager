@@ -21,7 +21,24 @@ def label_device_non_wear_using_model(df):
   df['pred_method'] = np.nan
 
   # Filter only rows where the device was on (non-gap rows)
-  non_gap_rows = df[df['device_turned_on'] == 1]
+  eligible_mask = df['device_turned_on'] == 1
+
+  # Heuristic overrides using stable temperature windows
+  if 'temp_low_stable' in df.columns:
+    low_mask = eligible_mask & (df['temp_low_stable'] == 1)
+    df.loc[low_mask, 'device_worn_model'] = 0
+    df.loc[low_mask, 'pred_method'] = 'stable_low'
+  if 'temp_high_stable' in df.columns:
+    high_mask = eligible_mask & (df['temp_high_stable'] == 1)
+    df.loc[high_mask, 'device_worn_model'] = 1
+    df.loc[high_mask, 'pred_method'] = 'stable_high'
+
+  # Determine rows that still need model predictions
+  needs_model_mask = eligible_mask
+  if 'non_wear_pred_needed' in df.columns:
+    needs_model_mask = needs_model_mask & (df['non_wear_pred_needed'] == 1)
+  needs_model_mask = needs_model_mask & df['device_worn_model'].isna()
+  rows_to_predict = df.loc[needs_model_mask]
 
   # Import models
   device_worn_model = import_model(name='RF_non_wear_CSDP')
@@ -29,37 +46,40 @@ def label_device_non_wear_using_model(df):
   device_worn_model_post_gap = import_model(name='RF_non_wear_CSDP_post_gap')
   device_worn_model_between_gaps = import_model(name='RF_non_wear_CSDP_between_gaps')
 
-  # Identify feature sets
-  all_features = [col for col in df.columns if col in device_worn_model.predictors]
-  pre_features = [col for col in df.columns if col in device_worn_model_pre_gap.predictors]
-  post_features = [col for col in df.columns if col in device_worn_model_post_gap.predictors]
-  between_features = [col for col in df.columns if col in device_worn_model_between_gaps.predictors]
+  # Identify feature sets - use model.predictors directly to preserve training order
+  # Only include features that exist in the dataframe
+  all_features = [col for col in device_worn_model.predictors if col in df.columns]
+  pre_features = [col for col in device_worn_model_pre_gap.predictors if col in df.columns]
+  post_features = [col for col in device_worn_model_post_gap.predictors if col in df.columns]
+  between_features = [col for col in device_worn_model_between_gaps.predictors if col in df.columns]
 
-  # Identify where various models can make predictions
-  nan_indices = non_gap_rows[all_features].isna().any(axis=1) #
-  pre_nan_indices = non_gap_rows[pre_features].isna().any(axis=1) #pre model can't be used
-  post_nan_indices = non_gap_rows[post_features].isna().any(axis=1) #post model can't be used
+  # Identify where various models can make predictions (only for rows needing model)
+  nan_indices = rows_to_predict[all_features].isna().any(axis=1)
+  pre_nan_indices = rows_to_predict[pre_features].isna().any(axis=1)  # pre model can't be used
+  post_nan_indices = rows_to_predict[post_features].isna().any(axis=1)  # post model can't be used
 
   # Identify indices for each model
-  indices_complete_model = non_gap_rows.loc[~nan_indices].index  # No NaNs, use complete model
-  remaining_indices = non_gap_rows.loc[nan_indices].index  # Rows where the complete model cannot be used
+  indices_complete_model = rows_to_predict.loc[~nan_indices].index  # No NaNs, use complete model
+  remaining_indices = rows_to_predict.loc[nan_indices].index  # Rows where the complete model cannot be used
 
-  indices_post_gap_list = non_gap_rows.loc[
-    (non_gap_rows.index.isin(remaining_indices)) & (pre_nan_indices & ~post_nan_indices)
+  indices_post_gap_list = rows_to_predict.loc[
+    (rows_to_predict.index.isin(remaining_indices)) & (pre_nan_indices & ~post_nan_indices)
   ].index.tolist()
 
-  indices_pre_gap_list = non_gap_rows.loc[
-      (non_gap_rows.index.isin(remaining_indices)) & (post_nan_indices & ~pre_nan_indices)
+  indices_pre_gap_list = rows_to_predict.loc[
+      (rows_to_predict.index.isin(remaining_indices)) & (post_nan_indices & ~pre_nan_indices)
   ].index.tolist()
 
-  indices_between_gaps_list = non_gap_rows.loc[
-      (non_gap_rows.index.isin(remaining_indices)) & (pre_nan_indices & post_nan_indices)
+  indices_between_gaps_list = rows_to_predict.loc[
+      (rows_to_predict.index.isin(remaining_indices)) & (pre_nan_indices & post_nan_indices)
   ].index.tolist()
 
-  feature_data_for_complete_model = non_gap_rows.loc[indices_complete_model, all_features]
-  feature_data_for_pre_gap = non_gap_rows.loc[indices_pre_gap_list, pre_features]
-  feature_data_for_post_gap = non_gap_rows.loc[indices_post_gap_list, post_features]
-  feature_data_for_between_gaps = non_gap_rows.loc[indices_between_gaps_list, between_features]
+  # Extract feature data and ensure columns are in the exact order expected by the models
+  # Using reindex to guarantee the column order matches model.predictors order exactly
+  feature_data_for_complete_model = df.loc[indices_complete_model, all_features].reindex(columns=all_features)
+  feature_data_for_pre_gap = df.loc[indices_pre_gap_list, pre_features].reindex(columns=pre_features)
+  feature_data_for_post_gap = df.loc[indices_post_gap_list, post_features].reindex(columns=post_features)
+  feature_data_for_between_gaps = df.loc[indices_between_gaps_list, between_features].reindex(columns=between_features)
 
   if not feature_data_for_complete_model.empty:
     # Make predictions using the model where possible
