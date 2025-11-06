@@ -48,6 +48,7 @@ class ReportGuide:
             'rise_duration': 'Duration of TAC increase (hours)',
             'fall_duration': 'Duration of TAC decrease (hours)',
             'CURVE_VALID': 'Whether the curve meets validity criteria (1=valid)',
+            'REGION_VALID': 'Whether both the curve and periphery meet validity criteria (1=valid)',
             
             # Curve timing features
             'begin': 'Start time of the curve',
@@ -332,6 +333,7 @@ class ReportGuide:
             
             # Categorical features
             'CURVE_VALID': 'Whether the curve meets validity criteria (1=valid)',
+            'REGION_VALID': 'Whether both the curve and periphery meet validity criteria (1=valid)',
             'device_count_REGION': 'Number of devices in the region'
         }
 
@@ -385,6 +387,7 @@ class ReportGuide:
             # Categorical features
             'CURVE_VALID': 'categorical',
             'PERIPHERY_VALID': 'categorical',
+            'REGION_VALID': 'categorical',
             'device_count_REGION': 'categorical',
 
             # Region quality features

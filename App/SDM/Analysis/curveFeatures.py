@@ -88,8 +88,9 @@ class curveFeatures():
 
     self.default_tac_features = report_guide.stats_features
 
-    self.curve_valid = self.curve_features[self.curve_features['CURVE_VALID'] == 1]
-    self.curve_invalid = self.curve_features[self.curve_features['CURVE_VALID'] != 1]
+    validity_column = 'REGION_VALID' if 'REGION_VALID' in self.curve_features.columns else 'CURVE_VALID'
+    self.curve_valid = self.curve_features[self.curve_features[validity_column] == 1]
+    self.curve_invalid = self.curve_features[self.curve_features[validity_column] != 1]
 
     # Initialize quality visualizer
     self.quality_visualizer = QualityVisualizer()
@@ -102,6 +103,9 @@ class curveFeatures():
     flag_analysis = featureFlagger(self.curve_features, flag_settings)
     flags_result = flag_analysis.run_flags_and_validation()
     self.curve_features = flag_analysis.ftrs
+    validity_column = 'REGION_VALID' if 'REGION_VALID' in self.curve_features.columns else 'CURVE_VALID'
+    self.curve_valid = self.curve_features[self.curve_features[validity_column] == 1]
+    self.curve_invalid = self.curve_features[self.curve_features[validity_column] != 1]
     if export:
       flag_analysis.export_flag_analysis_workbooks(output_dir=output_dir, plot_columns=['smoothed_curve_plot', 'signal_processing_plot', 'device_removal_plot', 'signal_processing_plot_wide'])
 
@@ -551,9 +555,10 @@ class curveFeatures():
       
       sorted_features.to_excel(writer, sheet_name='Features', index=False)
       
-      # Split curves into valid and invalid based on CURVE_VALID
-      valid_curves = sorted_features[sorted_features['CURVE_VALID'] == 1]
-      invalid_curves = sorted_features[sorted_features['CURVE_VALID'] != 1]
+      validity_column = 'REGION_VALID' if 'REGION_VALID' in sorted_features.columns else 'CURVE_VALID'
+      # Split curves into valid and invalid based on REGION validity
+      valid_curves = sorted_features[sorted_features[validity_column] == 1]
+      invalid_curves = sorted_features[sorted_features[validity_column] != 1]
       
       # Add visualization tabs for valid and invalid curves
       if not invalid_curves.empty:

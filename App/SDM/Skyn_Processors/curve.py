@@ -365,7 +365,6 @@ class Curve:
     self.curve_flag_columns = flags['curve_flags']
     self.features = self.flagger.ftrs
     self.row = self.features.loc[0]
-    self.valid = self.row['CURVE_VALID']
     flag_columns = [col for col in self.row.index if col.startswith('FLAG_')]
     matching_flags = [col for col in flag_columns if self.row[col] == 1]
     self.flag_column = matching_flags[0] if len(matching_flags) == 1 else "None"

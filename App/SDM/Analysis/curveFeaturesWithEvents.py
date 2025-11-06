@@ -79,8 +79,9 @@ class curveFeaturesWithEvents(curveFeatures):
     self.unmatched_events = self.event_data[self.event_data['matched']!=1]
 
   def set_datasets_by_valid_and_match(self):
-    valid = (self.curve_features['CURVE_VALID'] == 1)
-    invalid = (self.curve_features['CURVE_VALID'] != 1)
+    validity_column = 'REGION_VALID' if 'REGION_VALID' in self.curve_features.columns else 'CURVE_VALID'
+    valid = (self.curve_features[validity_column] == 1)
+    invalid = (self.curve_features[validity_column] != 1)
     event_found = (self.curve_features['event_matched_1'].notna())
     event_not_found = (self.curve_features['event_matched_1'].isna())
 
@@ -727,9 +728,10 @@ class curveFeaturesWithEvents(curveFeatures):
           how='inner'
       )
       
-      # Split curves into valid and invalid based on CURVE_VALID
-      valid_curves = sorted_features_with_events[sorted_features_with_events['CURVE_VALID'] == 1]
-      invalid_curves = sorted_features_with_events[sorted_features_with_events['CURVE_VALID'] != 1]
+      validity_column = 'REGION_VALID' if 'REGION_VALID' in sorted_features_with_events.columns else 'CURVE_VALID'
+      # Split curves into valid and invalid based on REGION validity
+      valid_curves = sorted_features_with_events[sorted_features_with_events[validity_column] == 1]
+      invalid_curves = sorted_features_with_events[sorted_features_with_events[validity_column] != 1]
       
       # Add visualization tabs for valid and invalid curves
       if not invalid_curves.empty and flag_column:

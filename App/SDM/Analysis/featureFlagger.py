@@ -284,20 +284,22 @@ class featureFlagger:
     )))
 
   def validate_feature(self, new_column: str, flag_columns: List[str]) -> None:
-    """Validate feature based on flag columns and periphery validity"""
-    search_valid = self.ftrs['PERIPHERY_VALID'] 
+    """Validate feature based on flag columns only"""
+    flag_columns = [col for col in flag_columns if col in self.ftrs.columns]
+    if not flag_columns:
+      self.ftrs[new_column] = 1
+      return
     any_nan = self.ftrs[flag_columns].isna().any(axis=1)
     any_one = self.ftrs[flag_columns].eq(1).any(axis=1)
     all_zero = self.ftrs[flag_columns].fillna(0).eq(0).all(axis=1)
-
     self.ftrs[new_column] = np.where(
-      search_valid,
-        np.where(any_nan, np.nan, 
-          np.where(any_one, 0, 
-            np.where(all_zero, 1, 
-              np.nan
-        ))),
-      np.nan #if search invalid
+      any_nan,
+      np.nan,
+      np.where(
+        any_one,
+        0,
+        np.where(all_zero, 1, np.nan)
+      )
     )
 
   def run_flags_and_validation(self) -> Dict[str, List[str]]:
@@ -378,6 +380,24 @@ class featureFlagger:
       self.validate_feature('CURVE_VALID', curve_flags)
     else:
       self.ftrs['CURVE_VALID'] = 1  # If no curve flags are set, consider curve valid
+
+    # Combine periphery and curve validity into region validity
+    if 'CURVE_VALID' in self.ftrs.columns and 'PERIPHERY_VALID' in self.ftrs.columns:
+      curve_valid = self.ftrs['CURVE_VALID']
+      periphery_valid = self.ftrs['PERIPHERY_VALID']
+      region_mask_nan = curve_valid.isna() | periphery_valid.isna()
+      region_valid = np.where(
+        region_mask_nan,
+        np.nan,
+        np.where(
+          (curve_valid == 1) & (periphery_valid == 1),
+          1,
+          0
+        )
+      )
+      self.ftrs['REGION_VALID'] = region_valid
+    else:
+      self.ftrs['REGION_VALID'] = np.nan
 
     # Return the flags dictionary
     return {
