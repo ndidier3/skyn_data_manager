@@ -220,32 +220,106 @@ class TACAnalyzer:
             float: Average rise rate across all ascending segments
         """
         def compute():
-            if len(self.df) < 2:
-                return None
-            
-            rise_rates = []
-            tac_values = self.df[self.tac_column].dropna()
-            
-            if len(tac_values) < 2:
-                return None
-            
-            # Calculate point-to-point differences within the curve
-            for i in range(1, len(tac_values)):
-                current_tac = tac_values.iloc[i]
-                previous_tac = tac_values.iloc[i-1]
-                tac_diff = current_tac - previous_tac
-                
-                # Only include positive changes (ascending rates)
-                if tac_diff > 0:
-                    rise_rates.append(tac_diff)
-            
-            if len(rise_rates) == 0:
-                return 0  # No ascending segments found
-            
-            return np.mean(rise_rates)
+            tac_diff, _, mask = self._get_point_to_point_rise_components()
+            if mask.any():
+                return float(tac_diff[mask].mean())
+            return 0.0
         
         cache_key = f'point_to_point_rise_rate_{curve_start_index}'
         return self._get_cached(cache_key, compute)
+
+    def get_point_to_point_rise_duration(self, curve_start_index):
+        """Calculate total duration (hours) of ascending point-to-point TAC changes."""
+        def compute():
+            _, step_minutes, mask = self._get_point_to_point_rise_components()
+            if mask.any():
+                total_minutes = step_minutes[mask].sum()
+                return float(total_minutes / 60.0)
+            return 0.0
+
+        cache_key = f'point_to_point_rise_duration_{curve_start_index}'
+        return self._get_cached(cache_key, compute)
+
+    def _get_point_to_point_rise_components(self):
+        """Vectorized helper returning (tac_diff, step_minutes, mask) for rising pairs."""
+        tac_series = self.df[self.tac_column]
+        if tac_series.size < 2:
+            empty = tac_series.iloc[:0]
+            return empty, empty, empty.astype(bool)
+
+        tac_diff = tac_series.diff()
+
+        if 'Duration_Hrs' in self.df.columns:
+            step_minutes = self.df['Duration_Hrs'].diff() * 60.0
+        else:
+            index_series = pd.Series(self.df.index, index=self.df.index)
+            if np.issubdtype(index_series.dtype, np.number):
+                step_minutes = index_series.diff()
+            else:
+                step_minutes = pd.Series(1.0, index=self.df.index)
+
+        step_minutes = step_minutes.astype(float).fillna(1.0)
+        step_minutes = step_minutes.mask(step_minutes <= 0, 1.0)
+
+        mask = (
+            (tac_diff > 0)
+            & (~tac_series.isna())
+            & (~tac_series.shift(1).isna())
+        )
+
+        return tac_diff, step_minutes, mask
+
+    def get_point_to_point_fall_rate(self, peak_index):
+        """Calculate average of all descending point-to-point TAC rates."""
+        def compute():
+            tac_diff, _, mask = self._get_point_to_point_fall_components()
+            if mask.any():
+                return float((-tac_diff[mask]).mean())
+            return 0.0
+
+        cache_key = f'point_to_point_fall_rate_{peak_index}'
+        return self._get_cached(cache_key, compute)
+
+    def get_point_to_point_fall_duration(self, peak_index):
+        """Calculate total duration (hours) of descending point-to-point TAC changes."""
+        def compute():
+            _, step_minutes, mask = self._get_point_to_point_fall_components()
+            if mask.any():
+                total_minutes = step_minutes[mask].sum()
+                return float(total_minutes / 60.0)
+            return 0.0
+
+        cache_key = f'point_to_point_fall_duration_{peak_index}'
+        return self._get_cached(cache_key, compute)
+
+    def _get_point_to_point_fall_components(self):
+        """Vectorized helper returning (tac_diff, step_minutes, mask) for descending pairs."""
+        tac_series = self.df[self.tac_column]
+        if tac_series.size < 2:
+            empty = tac_series.iloc[:0]
+            return empty, empty, empty.astype(bool)
+
+        tac_diff = tac_series.diff()
+
+        if 'Duration_Hrs' in self.df.columns:
+            step_minutes = self.df['Duration_Hrs'].diff() * 60.0
+        else:
+            index_series = pd.Series(self.df.index, index=self.df.index)
+            if np.issubdtype(index_series.dtype, np.number):
+                step_minutes = index_series.diff()
+            else:
+                step_minutes = pd.Series(1.0, index=self.df.index)
+
+        step_minutes = step_minutes.astype(float).fillna(1.0)
+        step_minutes = step_minutes.mask(step_minutes <= 0, 1.0)
+
+        mask = (
+            (tac_diff < 0)
+            & (~tac_series.isna())
+            & (~tac_series.shift(1).isna())
+        )
+
+        return tac_diff, step_minutes, mask
 
     def get_rise_rate_1hr(self, curve_start_index, peak_index, curve_threshold):
         """Calculate rise rate over 1 hour period, bounded by peak time.

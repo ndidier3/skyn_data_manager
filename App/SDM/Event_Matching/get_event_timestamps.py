@@ -6,7 +6,9 @@ def process_event_timestamps(
     event_timestamp_columns: List[str],
     drink_total_column: str,
     ema_id_column: str,
-    max_event_duration: int = 6
+    max_event_duration: int = 12,
+    buffer_before_equal_timestamps: int = 1,
+    buffer_after_equal_timestamps: int = 8
 ) -> Tuple[pd.DataFrame, pd.DataFrame, List[Dict[str, Any]]]:
     """
     Process event timestamps and create event ranges with labels.
@@ -16,7 +18,9 @@ def process_event_timestamps(
         event_timestamp_columns: List of column names containing timestamp data
         drink_total_column: Column name for drink total data
         ema_id_column: Column name for EMA ID data
-        max_event_duration: Maximum duration in hours for events (default: 6)
+        max_event_duration: Maximum duration in hours for events (default: 12)
+        buffer_before_equal_timestamps: Hours to subtract before start when timestamps are equal (default: 1)
+        buffer_after_equal_timestamps: Hours to add after end when timestamps are equal (default: 8)
     
     Returns:
         Tuple containing:
@@ -73,15 +77,15 @@ def process_event_timestamps(
             
             # Check if earliest and latest timestamps are equal and adjust curve match timestamps if needed
             if earliest_timestamp == latest_timestamp:
-                event_match_start = earliest_timestamp - pd.Timedelta(hours=1)
-                event_match_end = latest_timestamp + pd.Timedelta(hours=8)
+                event_match_start = earliest_timestamp - pd.Timedelta(hours=buffer_before_equal_timestamps)
+                event_match_end = latest_timestamp + pd.Timedelta(hours=buffer_after_equal_timestamps)
                 timestamp_modified = True
-                modification_note = 'event_match_start adjusted -1 hour, event_match_end adjusted +8 hours; timestamps were equal'
-            # Ensure event_match_end is no longer than 12 hours after event_match_start
-            elif event_match_end > event_match_start + pd.Timedelta(hours=12):
-                event_match_end = event_match_start + pd.Timedelta(hours=12)
+                modification_note = f'event_match_start adjusted -{buffer_before_equal_timestamps} hour(s), event_match_end adjusted +{buffer_after_equal_timestamps} hour(s); timestamps were equal'
+            # Ensure event_match_end is no longer than max_event_duration hours after event_match_start
+            elif event_match_end > event_match_start + pd.Timedelta(hours=max_event_duration):
+                event_match_end = event_match_start + pd.Timedelta(hours=max_event_duration)
                 timestamp_modified = True
-                modification_note = 'event_match_end constrained to 12 hours from start'
+                modification_note = f'event_match_end constrained to {max_event_duration} hours from start'
             
             # Add timestamps to events_df
             events_df.loc[i, 'earliest_timestamp'] = earliest_timestamp

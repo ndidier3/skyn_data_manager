@@ -13,7 +13,8 @@ Low-Quality Data Types Identified:
 
 1. Recording GAPS (Null Values)
 2. NON-WEAR PERIODS
-3. JUMPS (Signal Artifacts)
+3. JUMPS (Signal Artifacts)  
+   • Rule Set: Detects >100 μg/L single-minute increases, relative surges >90% of the local 2-hour peak (when ≥40 μg/L), and multi-minute spikes where a 10-minute window shares the hour-peak, rises >30 μg/L per minute from its start, and is followed by a pronounced post-peak drop. The 10-minute check tolerates up to eight NaNs provided at least two readings remain.
 4. PLUMMETS (Signal Artifacts)
 5. EXTREME NEGATIVE VALUES
 6. PROXIMAL LOW-QUALITY

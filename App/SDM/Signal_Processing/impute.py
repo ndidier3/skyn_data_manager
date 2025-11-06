@@ -61,7 +61,6 @@ def get_artifact_indices(df, max_labeling_length=(60*6)):
     jumps_detected = 0
     plummets_detected = 0
     
-    
     while i < len(tac_values) - 1:
         total_processed += 1
         
@@ -75,6 +74,73 @@ def get_artifact_indices(df, max_labeling_length=(60*6)):
             
         value_diff = next_value - current_value
         current_max_tac = max_tac_in_hour.iloc[i]
+
+        # Prepare additional windows for multi-point jump detection
+        ten_minute_window = tac_values[i:min(i + 10, len(tac_values))]
+        hour_window = tac_values[i:min(i + 60 + 1, len(tac_values))]
+
+        # Build lists of indexed values (ignoring NaNs) for both windows so we
+        # can capture positions (offsets) as well as TAC magnitudes.
+        ten_minute_window_idx_value_pairs = [
+            (offset, value)
+            for offset, value in enumerate(ten_minute_window)
+            if not np.isnan(value)
+        ]
+        hour_window_idx_value_pairs = [
+            (offset, value)
+            for offset, value in enumerate(hour_window)
+            if not np.isnan(value)
+        ]
+        hour_window_values = [value for _, value in hour_window_idx_value_pairs]
+
+        ten_minute_window_valid = (
+            len(ten_minute_window) == 10 and
+            len(ten_minute_window_idx_value_pairs) >= 2 and
+            len(hour_window_idx_value_pairs) > 0
+        )
+
+        if ten_minute_window_valid:
+            ten_minute_window_max_offset, ten_minute_window_max = max(
+                ten_minute_window_idx_value_pairs, key=lambda item: item[1]
+            )
+            ten_minute_window_min_value = min(
+                ten_minute_window_idx_value_pairs, key=lambda item: item[1]
+            )[1]
+            hour_window_max = max(hour_window_values)
+            # Find where the hour-window peak occurs (relative to the start of the window)
+            hour_window_max_offset = next(
+                offset for offset, value in hour_window_idx_value_pairs
+                if round(value, 6) == round(hour_window_max, 6)
+            )
+            minutes_to_ten_minute_max = ten_minute_window_max_offset
+            ten_minute_window_ratio = (
+                (ten_minute_window_max - current_value) / minutes_to_ten_minute_max
+            ) if minutes_to_ten_minute_max > 0 else None
+            # Consider only the portion of the hour window after the peak to evaluate
+            # whether TAC values drop sufficiently (for the asymmetry condition).
+            post_max_values = [
+                value for offset, value in hour_window_idx_value_pairs
+                if offset > hour_window_max_offset
+            ]
+            if post_max_values:
+                # Require the hour-window minimum (post-peak) to be much closer to
+                # the ten-minute minimum than to its maximum (>= two-thirds bias toward min).
+                post_max_min = min(post_max_values)
+                min_distance_to_ten_min = abs(post_max_min - ten_minute_window_min_value)
+                min_distance_to_ten_max = abs(post_max_min - ten_minute_window_max)
+                if min_distance_to_ten_max == 0:
+                    min_bias_condition = False
+                else:
+                    min_bias_condition = min_distance_to_ten_min <= (1/3) * min_distance_to_ten_max
+            else:
+                min_bias_condition = False
+        else:
+            ten_minute_window_max = None
+            ten_minute_window_min_value = None
+            hour_window_max = None
+            minutes_to_ten_minute_max = None
+            ten_minute_window_ratio = None
+            min_bias_condition = False
         
         # Calculate actual max labeling length that won't exceed DataFrame boundaries
         actual_max_labeling_length = min(max_labeling_length, len(tac_values) - (i + 2))
@@ -106,6 +172,37 @@ def get_artifact_indices(df, max_labeling_length=(60*6)):
                 last_processed_idx = i + 1
             i = last_processed_idx  # Skip to the last processed index
                 
+        # Secondary jump detection: ten-minute surge that matches the hour-window peak
+        elif ten_minute_window_valid and round(ten_minute_window_max, 1) == round(hour_window_max, 1) \
+            and ten_minute_window_ratio is not None and ten_minute_window_ratio > 30 \
+            and min_bias_condition:
+            jumps_detected += 1
+
+            # Add indices up to the local maximum within the short window
+            max_idx_absolute = i + minutes_to_ten_minute_max
+            for idx in range(i, max_idx_absolute + 1):
+                if idx < len(df_indices):
+                    jump_indices.add(df_indices[idx])
+
+            # Project forward
+            projected_tac = tac_values[max_idx_absolute]
+            last_processed_idx = max_idx_absolute
+            for count in range(actual_max_labeling_length):
+                idx = max_idx_absolute + 1 + count
+                if idx >= len(tac_values):
+                    break
+
+                if tac_values[idx] < projected_tac:
+                    break
+
+                projected_tac += 1.0
+                jump_indices.add(df_indices[idx])
+                last_processed_idx = idx
+
+            if last_processed_idx <= i:
+                last_processed_idx = i + 1
+            i = last_processed_idx
+
         # Check for plummet (sudden decrease) - only if neither value is part of a jump
         elif (value_diff < -100 or (current_max_tac >= 40 and value_diff < -0.9 * current_max_tac)) and \
              df_indices[i] not in jump_indices and df_indices[i + 1] not in jump_indices:

@@ -11,23 +11,34 @@ PSEUDOCODE:
 
 For each reading (n) in a dataset:
     Identify max TAC between TACn-60 and TACn+60 (centered 2-hour window)
+    Build a 10-minute forward window (up to TACn+10) while ignoring NaNs
     
     If (TACn+1 - TACn) > 100 μg/L, OR
-    If (TACn+1 - TACn) > (0.9 × Local Peak) AND Local Peak ≥ 40 μg/L:
+    If (TACn+1 - TACn) > (0.9 × Local Peak) AND Local Peak ≥ 40 μg/L, OR
+    If 10-minute window meets ALL of the following:
+        • Contains ≥2 non-NaN readings
+        • Shares its maximum value with the hour window (to the nearest 0.1 μg/L)
+        • Average rise rate from TACn to that local peak > 30 μg/L per minute
+        • Hour-window minimum after the peak is at least two-thirds closer to the 10-minute minimum than its maximum
+      Then:
+        Label readings from n through the 10-minute local peak as "jump"
+        Set Projected TAC = TAC at that peak
+    Else (for the first two conditions above):
         Label reading n and n+1 as "jump"
         Set Projected TAC = TACn
-        
-        For each subsequent reading (n+x), starting with x=2:
-            If TACn+x < Projected TAC OR x > 360:
-                STOP labeling
-            Else:
-                Label reading n+x as "jump"
-                Adjust Projected TAC by +1.0 μg/L
+    
+    For each subsequent reading (n+x), starting immediately after the last labeled index:
+        If TACn+x < Projected TAC OR x > 360:
+            STOP labeling
+        Else:
+            Label reading n+x as "jump"
+            Adjust Projected TAC by +1.0 μg/L
 
 DETECTION CRITERIA:
 ==================
 - Absolute threshold: TAC increase > 100 μg/L between consecutive readings
 - Relative threshold: TAC increase > 90% of max TAC in 2-hour window (when max ≥ 40 μg/L)
+- Multi-minute surge: 10-minute window peak that matches the hour-window peak, rises > 30 μg/L per minute from the current value, and is followed by a pronounced post-peak drop (hour-window minimum after peak biased ≥ two-thirds toward the 10-minute minimum). Window tolerates NaNs provided at least two data points remain.
 
 PROJECTION MECHANISM:
 ====================

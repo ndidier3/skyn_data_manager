@@ -230,21 +230,21 @@ class featureFlagger:
     )
 
   # Rise/fall completion flag methods
-  def flag_incomplete_curve_start_curve(self, percent_cutoff: float) -> None:
+  def flag_incomplete_curve_start_curve(self, duration_cutoff: float) -> None:
     """
-    Flag a curve if the start is incomplete based on percent cutoff.
+    Flag a curve if the rise duration is shorter than the cutoff.
     """
     self.flag_data_below_cutoff(
-      'rise_complete_percent_CURVE', percent_cutoff,
+      'rise_duration_CURVE', duration_cutoff,
       'FLAG_incomplete_curve_start_curve'
     )
 
-  def flag_incomplete_curve_end_curve(self, percent_cutoff: float) -> None:
+  def flag_incomplete_curve_end_curve(self, duration_cutoff: float) -> None:
     """
-    Flag a curve if the end is incomplete based on percent cutoff.
+    Flag a curve if the fall duration is shorter than the cutoff.
     """
     self.flag_data_below_cutoff(
-      'fall_complete_percent_CURVE', percent_cutoff,
+      'fall_duration_CURVE', duration_cutoff,
       'FLAG_incomplete_curve_end_curve'
     )
 
@@ -312,9 +312,9 @@ class featureFlagger:
       'flag_below_threshold_curve': (self.flag_below_threshold_curve, ['percent_cutoff']),
       
       # Start / End flags
-      'flag_incomplete_curve_start_curve': (self.flag_incomplete_curve_start_curve, ['percent_cutoff']),
+      'flag_incomplete_curve_start_curve': (self.flag_incomplete_curve_start_curve, ['duration_cutoff']),
       'flag_imputed_rise_curve': (self.flag_imputed_rise_curve, ['percent_cutoff']),
-      'flag_incomplete_curve_end_curve': (self.flag_incomplete_curve_end_curve, ['percent_cutoff']),
+      'flag_incomplete_curve_end_curve': (self.flag_incomplete_curve_end_curve, ['duration_cutoff']),
       'flag_imputed_fall_curve': (self.flag_imputed_fall_curve, ['percent_cutoff']),
       
       # Periphery flags using dynamic methods
@@ -571,12 +571,10 @@ class featureFlagger:
       'FLAG_below_threshold_curve': 'below_threshold_percent_CURVE',
       
       # Start / End flags
-      'FLAG_incomplete_curve_start_curve': 'rise_complete_percent_CURVE',
+      'FLAG_incomplete_curve_start_curve': 'rise_duration_CURVE',
       'FLAG_imputed_rise_curve': 'rise_imputed_percent_CURVE',
-      'FLAG_incomplete_curve_end_curve': 'fall_complete_percent_CURVE',
+      'FLAG_incomplete_curve_end_curve': 'fall_duration_CURVE',
       'FLAG_imputed_fall_curve': 'fall_imputed_percent_CURVE',
-      
-
       
       # Periphery Before flags
       'FLAG_gaps_and_non_wear_periphery_before': 'total_gaps_and_non_wear_percent_PERIPHERY_BEFORE',
