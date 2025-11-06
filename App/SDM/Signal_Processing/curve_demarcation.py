@@ -562,11 +562,22 @@ def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separati
       # Determine merge distance based on curve length
       # Short curves (5-15 min) use half the merge distance
       current_curve_duration = curve_end - curve_start
-      if current_curve_duration < 15:
-        # Short curve: use half the merge distance
+      current_is_short = current_curve_duration < 15
+
+      # Determine if the prior merged curve contains any short curves
+      # Examine the most recent discrete curve that fed into the merged segment
+      prior_original_indices = original_curve_mapping[-1]
+      prior_is_short = False
+      if prior_original_indices:
+        last_orig_idx = prior_original_indices[-1]
+        last_orig_start, last_orig_end = approved_curve_start_and_end_indices[last_orig_idx][:2]
+        prior_is_short = (last_orig_end - last_orig_start) < 15
+
+      if current_is_short or prior_is_short:
+        # Any involvement of a short curve halves the allowable merge distance
         effective_merge_distance = max_curve_separation_minutes / 2
       else:
-        # Substantial curve: use full merge distance
+        # Only substantial curves involved: use full merge distance
         effective_merge_distance = max_curve_separation_minutes
       
       if (curve_start - prior_curve_end) < effective_merge_distance and (merged_curve_minutes < curve_minutes_limit):

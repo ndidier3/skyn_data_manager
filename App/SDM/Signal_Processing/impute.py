@@ -174,7 +174,7 @@ def get_artifact_indices(df, max_labeling_length=(60*6)):
                 
         # Secondary jump detection: ten-minute surge that matches the hour-window peak
         elif ten_minute_window_valid and round(ten_minute_window_max, 1) == round(hour_window_max, 1) \
-            and ten_minute_window_ratio is not None and ten_minute_window_ratio > 30 \
+            and ten_minute_window_ratio is not None and ten_minute_window_ratio > 25 \
             and min_bias_condition:
             jumps_detected += 1
 
@@ -185,7 +185,7 @@ def get_artifact_indices(df, max_labeling_length=(60*6)):
                     jump_indices.add(df_indices[idx])
 
             # Project forward
-            projected_tac = tac_values[max_idx_absolute]
+            projected_tac = current_value
             last_processed_idx = max_idx_absolute
             for count in range(actual_max_labeling_length):
                 idx = max_idx_absolute + 1 + count
