@@ -21,14 +21,14 @@ DEFAULT_FLAG_SELECTIONS = {
     },
     # Start / End flags (using only percent)
     'flag_incomplete_curve_start_curve': {
-        'duration_cutoff': 6 / 60
+        'duration_cutoff': 7 / 60
     },
     'flag_imputed_rise_curve': {
         'percent_cutoff_rise': 0.60,
         'percent_cutoff_asc': 0.60
     },
     'flag_incomplete_curve_end_curve': {
-        'duration_cutoff': 6 / 60
+        'duration_cutoff': 7 / 60
     },
     'flag_imputed_fall_curve': {
         'percent_cutoff_fall': 0.70,
