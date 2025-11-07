@@ -21,16 +21,18 @@ DEFAULT_FLAG_SELECTIONS = {
     },
     # Start / End flags (using only percent)
     'flag_incomplete_curve_start_curve': {
-        'duration_cutoff': 2 / 60
+        'duration_cutoff': 3 / 60
     },
     'flag_imputed_rise_curve': {
-        'percent_cutoff': 0.50
+        'percent_cutoff_rise': 0.60,
+        'percent_cutoff_asc': 0.45
     },
     'flag_incomplete_curve_end_curve': {
-        'duration_cutoff': 2 / 60
+        'duration_cutoff': 3 / 60
     },
     'flag_imputed_fall_curve': {
-        'percent_cutoff': 0.50
+        'percent_cutoff_fall': 0.60,
+        'percent_cutoff_desc': 0.45
     },
     # Periphery Before flags (using only percent)
     'flag_gaps_and_non_wear_periphery_before': {

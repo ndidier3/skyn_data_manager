@@ -12,8 +12,6 @@ from App.SDM.Scripts.Test.test_settings import (
     event_attrs
 )
 
-curve_attrs['curve_threshold'] = 10
-
 # gaps_and_non_wear_attrs['export_excel'] = True
 smooth_and_impute_attrs['export_excel'] = True
 

@@ -248,21 +248,23 @@ class featureFlagger:
       'FLAG_incomplete_curve_end_curve'
     )
 
-  def flag_imputed_rise_curve(self, percent_cutoff: float) -> None:
+  def flag_imputed_rise_curve(self, percent_cutoff_rise: float, percent_cutoff_asc: float) -> None:
     """
     Flag a curve if the rise portion has too much low quality data based on percent cutoff.
     """
-    self.flag_data_above_cutoff(
-      'rise_imputed_percent_CURVE', percent_cutoff,
+    self.flag_data_above_one_of_two_cutoffs(
+      'rise_imputed_percent_CURVE', percent_cutoff_rise, 
+      'ascending_imputed_percent_CURVE', percent_cutoff_asc, 
       'FLAG_imputed_rise_curve'
     )
 
-  def flag_imputed_fall_curve(self, percent_cutoff: float) -> None:
+  def flag_imputed_fall_curve(self, percent_cutoff_fall: float, percent_cutoff_desc: float) -> None:
     """
     Flag a curve if the fall portion has too much low quality data based on percent cutoff.
     """
-    self.flag_data_above_cutoff(
-      'fall_imputed_percent_CURVE', percent_cutoff,
+    self.flag_data_above_one_of_two_cutoffs(
+      'fall_imputed_percent_CURVE', percent_cutoff_fall,
+      'descending_imputed_percent_CURVE', percent_cutoff_desc,
       'FLAG_imputed_fall_curve'
     )
 
@@ -315,9 +317,9 @@ class featureFlagger:
       
       # Start / End flags
       'flag_incomplete_curve_start_curve': (self.flag_incomplete_curve_start_curve, ['duration_cutoff']),
-      'flag_imputed_rise_curve': (self.flag_imputed_rise_curve, ['percent_cutoff']),
+      'flag_imputed_rise_curve': (self.flag_imputed_rise_curve, ['percent_cutoff_rise', 'percent_cutoff_asc']),
       'flag_incomplete_curve_end_curve': (self.flag_incomplete_curve_end_curve, ['duration_cutoff']),
-      'flag_imputed_fall_curve': (self.flag_imputed_fall_curve, ['percent_cutoff']),
+      'flag_imputed_fall_curve': (self.flag_imputed_fall_curve, ['percent_cutoff_fall', 'percent_cutoff_desc']),
       
       # Periphery flags using dynamic methods
       'flag_gaps_and_non_wear_periphery_before': (self.flag_gaps_and_non_wear_periphery_dynamic, ['percent_cutoff']),

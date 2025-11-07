@@ -140,6 +140,8 @@ class Curve:
       'rise_imputed_percent_CURVE': DataQualityAnalyzer(rise_portion, self.TAC_column).get_rise_imputed_percent(),
       'fall_complete_percent_CURVE' : 1 if last_tac <= self.curve_threshold else (peak_tac - last_tac) / relative_peak,
       'fall_imputed_percent_CURVE': DataQualityAnalyzer(fall_portion, self.TAC_column).get_fall_imputed_percent(),
+      'ascending_imputed_percent_CURVE': self.curve_quality_analyzer.get_ascending_imputed_percent(),
+      'descending_imputed_percent_CURVE': self.curve_quality_analyzer.get_descending_imputed_percent(),
       'high_quality_duration_CURVE': self.curve_quality_analyzer.get_high_quality_duration(),
       'high_quality_percent_CURVE': self.curve_quality_analyzer.get_high_quality_percent(),
     }

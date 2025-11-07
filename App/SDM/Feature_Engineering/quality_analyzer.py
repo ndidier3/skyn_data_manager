@@ -316,6 +316,40 @@ class DataQualityAnalyzer:
         imputed_mask_fall = fall_portion['imputed'] == 1
         return imputed_mask_fall.sum() / len(fall_portion)
 
+    def get_ascending_imputed_percent(self):
+        """Calculate percentage of ascending TAC pairs that contain imputed values."""
+        if len(self.df) < 2:
+            return 0.0
+
+        tac_values = self.df[self.tac_column].to_numpy()
+        imputed_values = self.df['imputed'].to_numpy()
+
+        asc_mask = tac_values[1:] > tac_values[:-1]
+        if not asc_mask.any():
+            return 0.0
+
+        asc_total = asc_mask.sum()
+        asc_imputed = np.logical_or(imputed_values[1:], imputed_values[:-1])[asc_mask].sum()
+
+        return asc_imputed / asc_total if asc_total > 0 else 0.0
+
+    def get_descending_imputed_percent(self):
+        """Calculate percentage of descending TAC pairs that contain imputed values."""
+        if len(self.df) < 2:
+            return 0.0
+
+        tac_values = self.df[self.tac_column].to_numpy()
+        imputed_values = self.df['imputed'].to_numpy()
+
+        desc_mask = tac_values[1:] < tac_values[:-1]
+        if not desc_mask.any():
+            return 0.0
+
+        desc_total = desc_mask.sum()
+        desc_imputed = np.logical_or(imputed_values[1:], imputed_values[:-1])[desc_mask].sum()
+
+        return desc_imputed / desc_total if desc_total > 0 else 0.0
+
     def get_total_gaps_and_non_wear_percent(self):
         """Calculate the total percentage of data that is either a gap or non-wear period."""
         if len(self.df) == 0:

@@ -47,6 +47,8 @@ class ReportGuide:
             'fall_rate_2hr_CURVE': 'Rate of TAC decrease over last 2 hours, bounded by peak (µg/(L·h))',
             'rise_duration': 'Duration of TAC increase (hours)',
             'fall_duration': 'Duration of TAC decrease (hours)',
+            'ascending_imputed_percent_CURVE': 'Fraction of ascending TAC pairs containing imputed values',
+            'descending_imputed_percent_CURVE': 'Fraction of descending TAC pairs containing imputed values',
             'CURVE_VALID': 'Whether the curve meets validity criteria (1=valid)',
             'REGION_VALID': 'Whether both the curve and periphery meet validity criteria (1=valid)',
             
@@ -357,6 +359,8 @@ class ReportGuide:
             'fall_rate_2hr_CURVE': 'numeric',
             'rise_duration_CURVE': 'numeric',
             'fall_duration_CURVE': 'numeric',
+            'ascending_imputed_percent_CURVE': 'numeric',
+            'descending_imputed_percent_CURVE': 'numeric',
             
             # Quality features
             'total_duration_CURVE': 'numeric',
