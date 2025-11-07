@@ -71,6 +71,9 @@ class ReportGuide:
             'device_worn_percent': 'Percentage of time device was worn',
             'flatline_max': 'Maximum duration of flatline (hours)',
             'flatlined_percent': 'Percentage of flatlined data',
+            'high_quality_duration_CURVE': 'Duration of high-quality data in the curve (hours)',
+            'high_quality_percent_CURVE': 'Percentage of high-quality data in the curve',
+            'high_quality_above_threshold_duration_CURVE': 'Duration of high-quality TAC values at or above the curve threshold (hours)',
             
             # Low quality features
             'imputed_low_quality_duration': 'Duration of imputed low quality data (hours)',
@@ -324,6 +327,9 @@ class ReportGuide:
             'imputed_percent_CURVE': 'Percentage of imputed data',
             'total_low_quality_duration_CURVE': 'Duration of low quality data (hours)',
             'total_low_quality_percent_CURVE': 'Percentage of low quality data',
+            'high_quality_duration_CURVE': 'Duration of high-quality data in the curve (hours)',
+            'high_quality_percent_CURVE': 'Percentage of high-quality data in the curve',
+            'high_quality_above_threshold_duration_CURVE': 'Duration of high-quality TAC values at or above the curve threshold (hours)',
 
             # Imputation ratio features
             'jump_imputation_ratio_CURVE': 'Ratio of jump data that has been imputed (0-1)',
@@ -376,6 +382,9 @@ class ReportGuide:
             'imputed_percent_CURVE': 'numeric',
             'total_low_quality_duration_CURVE': 'numeric',
             'total_low_quality_percent_CURVE': 'numeric',
+            'high_quality_duration_CURVE': 'numeric',
+            'high_quality_percent_CURVE': 'numeric',
+            'high_quality_above_threshold_duration_CURVE': 'numeric',
 
             # Imputation ratio features
             'jump_imputation_ratio_CURVE': 'numeric',

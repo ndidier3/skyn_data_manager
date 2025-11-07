@@ -312,7 +312,7 @@ def identify_baseline_cluster(data: pd.DataFrame, features: list, k: int = 2) ->
     
     return baseline_cluster_id, data
 
-def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 10.0, 
+def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 8.0, 
                                 k_values: list = [3, 4, 5, 6], window_size: int = 15) -> Tuple[float, float, Union[float, None], Union[float, None]]:
     """
     Determine the curve threshold using k-means clustering with time-series features.
@@ -542,11 +542,45 @@ def get_start_and_end_of_discrete_curves(df, curve_threshold, TAC_column = 'TAC'
   split_points = np.where(gaps > 1)[0]
   consecutive_sequences = np.split(above_threshold, split_points + 1)
   curve_start_and_end_indices = [[seq[0], seq[-1]] for seq in consecutive_sequences if len(seq) > 0]
-  # Filter out blip curves (<5 min) but keep short curves (5-15 min) for potential merging
-  curve_start_and_end_indices = [
-    sublist for sublist in curve_start_and_end_indices if (sublist[1] - sublist[0]) >= 5
-  ]
-  return curve_start_and_end_indices
+  
+  # Filter out blip curves (<5 min) and short curves (<60 min) with quality issues
+  filtered_curves = []
+  
+  for start_idx, end_idx in curve_start_and_end_indices:
+    # Filter out blip curves
+    if (end_idx - start_idx) < 5:
+      continue
+    
+    # Apply additional quality filters to short curves (<60 min)
+    curve_length = end_idx - start_idx + 1
+    if curve_length < 60:
+      curve_data = df.loc[start_idx:end_idx].reset_index(drop=True)
+      
+      # Filter out curves where rise or fall is ≥90% imputed
+      if len(curve_data) > 0:
+        peak_index = curve_data[TAC_column].idxmax()
+        
+        # Check rise portion (start to peak)
+        rise_portion = curve_data.loc[:peak_index]
+        if len(rise_portion) > 0:
+          rise_imputed_count = (rise_portion['imputed'] == 1).sum()
+          rise_imputed_percent = rise_imputed_count / len(rise_portion)
+          
+          if rise_imputed_percent >= 0.90:
+            continue
+        
+        # Check fall portion (peak to end)
+        fall_portion = curve_data.loc[peak_index:]
+        if len(fall_portion) > 0:
+          fall_imputed_count = (fall_portion['imputed'] == 1).sum()
+          fall_imputed_percent = fall_imputed_count / len(fall_portion)
+          
+          if fall_imputed_percent >= 0.90:
+            continue
+    
+    filtered_curves.append([start_idx, end_idx])
+  
+  return filtered_curves
 
 def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separation_minutes = 60, curve_minutes_limit = (60*24)):
   # First, perform the merging operation as before
@@ -625,7 +659,7 @@ def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separati
   
   return filtered_merged_curves 
 
-def get_curve_threshold_from_method(df: pd.DataFrame, curve_threshold_method: Union[str, float, int], default_threshold: float = 10.0, 
+def get_curve_threshold_from_method(df: pd.DataFrame, curve_threshold_method: Union[str, float, int], default_threshold: float = 8.0, 
                                   k_values: list = [3, 4, 5, 6], window_size: int = 15) -> Tuple[float, Dict]:
     """
     Determine the curve threshold based on the specified method.

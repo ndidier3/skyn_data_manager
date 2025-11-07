@@ -130,20 +130,12 @@ class skynDataset:
       self.log_error()
       self.save_as_sdp(valid=False)  
   
-  def smooth_and_impute(self, median_smooth = True, impute_low_quality = True, savgol_smooth = False, export_excel = False):
+  def smooth_and_impute(self, impute_low_quality = True, savgol_smooth = False, export_excel = False):
     print(f'Processing Skyn Dataset: {self.subid} - {self.dataset_identifier}')  
     try:
       raw_dataset = configure_raw_data(self, error_logger=self.log_error)
       raw_dataset_gaps_filled = fill_device_off_gaps(raw_dataset)
       self.dataset['TAC'] = raw_dataset_gaps_filled['TAC'].copy()
-
-      #TAC_pre_smoothing keeps the original raw - TAC will be cleaned/smoothed and remain the highest quality set
-      self.dataset['TAC_pre_smoothed'] = self.dataset['TAC'].copy()
-
-      if median_smooth:
-        #Smooth signal with moving median
-        self.dataset['TAC'] = self.dataset['TAC'].rolling(window=30, min_periods=1, center=True).median()
-        self.dataset.loc[self.dataset['device_turned_on'] == 0, 'TAC'] = np.nan
 
       self.dataset['TAC_pre_imputation'] = self.dataset['TAC'].copy()  # Save original TAC values
       if impute_low_quality:
@@ -151,7 +143,7 @@ class skynDataset:
       
       self.dataset['TAC_pre_savgol'] = self.dataset['TAC'].copy()
       if savgol_smooth:
-        self.dataset = smooth_savgol(self.dataset, window_length=11, polyorder=3)
+        self.dataset = smooth_savgol(self.dataset, window_length=15, polyorder=2)
             
       if export_excel:
         self.dataset.to_excel(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', index=False)
@@ -173,6 +165,7 @@ class skynDataset:
     Args:
       curve_attrs (dict): Curve threshold attributes
         - curve_threshold (float | str): Either a numeric threshold or 'auto' to determine automatically
+        - default_threshold (float): Default threshold to use if auto-calculation fails (default: 8.0)
         
     Returns:
       None
@@ -181,35 +174,36 @@ class skynDataset:
       ValueError: If curve_threshold is invalid or automatic threshold determination fails
     """
     self.curve_threshold_method = curve_attrs.get('curve_threshold', 'auto')
+    default_threshold = curve_attrs.get('default_threshold', 8.0)
     
     try:
       # Get curve threshold using the new function
       self.curve_threshold, self.curve_threshold_results = get_curve_threshold_from_method(
-          self.dataset, self.curve_threshold_method
+          self.dataset, self.curve_threshold_method, default_threshold=default_threshold
       )
 
-      # Generate cluster analysis visualization
-      if hasattr(self.dataset, 'attrs') and 'labeled_cluster_data' in self.dataset.attrs:
-        cluster_plot_path = plot_cluster_analysis(
-          self.dataset, 
-          self.plot_folder, 
-          self.subid, 
-          self.dataset_identifier, 
-          self.curve_threshold,
-          title=f"TAC Cluster Analysis - {self.subid}",
-          subtitle_text=f"Dataset: {self.dataset_identifier} | Threshold: {self.curve_threshold:.2f}"
-        )
-        if cluster_plot_path:
-          self.plot_paths.append(cluster_plot_path)
-          print(f"Cluster analysis plot saved: {cluster_plot_path}")
+      # # Generate cluster analysis visualization
+      # if hasattr(self.dataset, 'attrs') and 'labeled_cluster_data' in self.dataset.attrs:
+      #   cluster_plot_path = plot_cluster_analysis(
+      #     self.dataset, 
+      #     self.plot_folder, 
+      #     self.subid, 
+      #     self.dataset_identifier, 
+      #     self.curve_threshold,
+      #     title=f"TAC Cluster Analysis - {self.subid}",
+      #     subtitle_text=f"Dataset: {self.dataset_identifier} | Threshold: {self.curve_threshold:.2f}"
+      #   )
+      #   if cluster_plot_path:
+      #     self.plot_paths.append(cluster_plot_path)
+      #     print(f"Cluster analysis plot saved: {cluster_plot_path}")
 
-      # Export curve threshold results to Excel
-      if hasattr(self, 'curve_threshold_results'):
-          threshold_results_df = pd.DataFrame([self.curve_threshold_results])
-          threshold_results_df.to_excel(
-              f'{self.data_out_folder}/curve_threshold_results_{self.subid}_{self.dataset_identifier}.xlsx', 
-              index=False
-          )
+      # # Export curve threshold results to Excel
+      # if hasattr(self, 'curve_threshold_results'):
+      #     threshold_results_df = pd.DataFrame([self.curve_threshold_results])
+      #     threshold_results_df.to_excel(
+      #         f'{self.data_out_folder}/curve_threshold_results_{self.subid}_{self.dataset_identifier}.xlsx', 
+      #         index=False
+      #     )
       
       self.curve_threshold_computed = True
       

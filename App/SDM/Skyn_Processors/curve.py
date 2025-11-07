@@ -144,6 +144,7 @@ class Curve:
       'descending_imputed_percent_CURVE': self.curve_quality_analyzer.get_descending_imputed_percent(),
       'high_quality_duration_CURVE': self.curve_quality_analyzer.get_high_quality_duration(),
       'high_quality_percent_CURVE': self.curve_quality_analyzer.get_high_quality_percent(),
+      'high_quality_above_threshold_duration_CURVE': self.curve_quality_analyzer.get_high_quality_above_threshold_duration(self.curve_threshold),
     }
 
     self.periphery_before_quality_features = {

@@ -74,8 +74,8 @@ def plot_signal_processing(df, plot_path, subid, event_number, dataset_identifie
   #Smoothed Final TAC
   ax.plot(df[time_variable], df['TAC' if show_imputations else 'TAC_pre_imputation'], label="TAC (Processed)", alpha=0.5, color="black", linewidth = 2)
   
-  #Passed (high quality values)
-  ax.scatter(passed[time_variable], passed['TAC_pre_imputation'], label='Passed', 
+  #Passed (high quality values) - use final TAC since passed data is not imputed
+  ax.scatter(passed[time_variable], passed['TAC' if show_imputations else 'TAC_pre_imputation'], label='Passed', 
              color='darkblue', marker='.', alpha=1.0)
   #Non Wear
   if not non_wear.empty:

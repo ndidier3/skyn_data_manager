@@ -435,3 +435,26 @@ class DataQualityAnalyzer:
             return percent
         
         return self._get_cached('high_quality_percent', compute) 
+
+    def get_high_quality_above_threshold_duration(self, threshold: float):
+        """Calculate duration (hours) of high-quality data at or above the provided TAC threshold."""
+        def compute():
+            if len(self.df) == 0:
+                return 0.0
+
+            high_quality_mask = (
+                (self.df.get('imputed', 0) == 0) &
+                (self.df.get('gap', 0) == 0) &
+                (self.df.get('non_wear', 0) == 0) &
+                (self.df.get('jump', 0) == 0) &
+                (self.df.get('plummet', 0) == 0) &
+                (self.df.get('extreme_negative', 0) == 0)
+            )
+
+            above_threshold_mask = self.df[self.tac_column] >= threshold
+            qualifying_mask = high_quality_mask & above_threshold_mask
+
+            return qualifying_mask.sum() / 60.0
+
+        cache_key = f'high_quality_above_threshold_duration_{float(threshold):.4f}'
+        return self._get_cached(cache_key, compute)

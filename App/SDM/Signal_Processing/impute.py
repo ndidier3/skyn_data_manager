@@ -423,7 +423,7 @@ def label_imputation_reason(df, low_quality_region_start, low_quality_region_end
     return df
 
 def generate_blended_imputation(df, low_quality_region_start, low_quality_region_end, t_all, 
-                               blend_window=20, start_blend_points=10, end_blend_points=10):
+                               blend_window=20, start_blend_points=10, end_blend_points=10, add_jitter=False):
     """
     Generate imputed values with smooth transitions to surrounding high-quality means.
     
@@ -533,6 +533,22 @@ def generate_blended_imputation(df, low_quality_region_start, low_quality_region
                 alpha = end_weights[i]
                 idx = n_points - actual_end_blend + i
                 predictions[idx] = (1 - alpha) * after_target + alpha * predictions[idx]
+        
+        # Add jitter to the non-blended (Gaussian-only) region
+        # Jitter range: [-3, 3] with 0 most common (normal distribution)
+        non_blend_start = actual_start_blend
+        non_blend_end = n_points - actual_end_blend
+        non_blend_length = non_blend_end - non_blend_start
+        
+        if add_jitter:
+          if non_blend_length > 0:
+              # Generate jitter from normal distribution (mean=0, std=1)
+              # Clip to [-3, 3] range to ensure bounds
+              jitter = np.random.normal(loc=0, scale=1, size=non_blend_length)
+              jitter = np.clip(jitter, -3, 3)
+              
+              # Apply jitter only to the non-blended region
+              predictions[non_blend_start:non_blend_end] += jitter
     
     return predictions
 
