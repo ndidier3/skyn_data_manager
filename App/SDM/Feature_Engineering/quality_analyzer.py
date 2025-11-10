@@ -379,80 +379,45 @@ class DataQualityAnalyzer:
         """Calculate duration of high-quality data (non-low quality) in hours.
         
         High-quality data is defined as data points that are NOT flagged as low quality.
-        This includes data that is not imputed, not gapped, not non-wear, not jumped, 
-        not plummeted, and not extreme negative.
+        This is the inverse of low_quality_mask. Imputation status does not affect
+        high quality classification.
         
         Returns:
             float: Duration of high-quality data in hours
         """
-        def compute():
-            if len(self.df) == 0:
-                return 0.0
-            
-            # Count high-quality data points (not flagged as any quality issue)
-            high_quality_mask = (
-                (self.df.get('imputed', 0) == 0) &  # Not imputed
-                (self.df.get('gap', 0) == 0) &      # Not gapped
-                (self.df.get('non_wear', 0) == 0) & # Not non-wear
-                (self.df.get('jump', 0) == 0) &     # Not jumped
-                (self.df.get('plummet', 0) == 0) &  # Not plummeted
-                (self.df.get('extreme_negative', 0) == 0)  # Not extreme negative
-            )
-            
-            high_quality_count = high_quality_mask.sum()
-            duration_hours = high_quality_count / 60.0  # Convert minutes to hours
-            
-            return duration_hours
-        
-        return self._get_cached('high_quality_duration', compute)
+        high_quality_count = (~self.low_quality_mask).sum()
+        duration_hours = high_quality_count / 60.0  # Convert minutes to hours
+        return duration_hours
 
     def get_high_quality_percent(self):
         """Calculate percentage of high-quality data within the curve.
         
         High-quality data is defined as data points that are NOT flagged as low quality.
+        This is the inverse of low_quality_mask. Imputation status does not affect
+        high quality classification.
         
         Returns:
             float: Percentage of high-quality data (0-100)
         """
-        def compute():
-            if len(self.df) == 0:
-                return 0.0
-            
-            # Count high-quality data points (not flagged as any quality issue)
-            high_quality_mask = (
-                (self.df.get('imputed', 0) == 0) &  # Not imputed
-                (self.df.get('gap', 0) == 0) &      # Not gapped
-                (self.df.get('non_wear', 0) == 0) & # Not non-wear
-                (self.df.get('jump', 0) == 0) &     # Not jumped
-                (self.df.get('plummet', 0) == 0) &  # Not plummeted
-                (self.df.get('extreme_negative', 0) == 0)  # Not extreme negative
-            )
-            
-            high_quality_count = high_quality_mask.sum()
-            total_count = len(self.df)
-            percent = (high_quality_count / total_count) * 100 if total_count > 0 else 0.0
-            
-            return percent
+        if len(self.df) == 0:
+            return 0.0
         
-        return self._get_cached('high_quality_percent', compute) 
+        high_quality_count = (~self.low_quality_mask).sum()
+        percent = (high_quality_count / len(self.df)) * 100
+        return percent 
 
     def get_high_quality_above_threshold_duration(self, threshold: float):
-        """Calculate duration (hours) of high-quality data at or above the provided TAC threshold."""
+        """Calculate duration (hours) of high-quality data at or above the provided TAC threshold.
+        
+        High-quality data is the inverse of low_quality_mask. Imputation status does not affect
+        high quality classification.
+        """
         def compute():
             if len(self.df) == 0:
                 return 0.0
 
-            high_quality_mask = (
-                (self.df.get('imputed', 0) == 0) &
-                (self.df.get('gap', 0) == 0) &
-                (self.df.get('non_wear', 0) == 0) &
-                (self.df.get('jump', 0) == 0) &
-                (self.df.get('plummet', 0) == 0) &
-                (self.df.get('extreme_negative', 0) == 0)
-            )
-
             above_threshold_mask = self.df[self.tac_column] >= threshold
-            qualifying_mask = high_quality_mask & above_threshold_mask
+            qualifying_mask = (~self.low_quality_mask) & above_threshold_mask
 
             return qualifying_mask.sum() / 60.0
 

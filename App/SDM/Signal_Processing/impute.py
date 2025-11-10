@@ -34,6 +34,40 @@ def get_non_wear_indices(df):
     non_wear_indices = set(df[df['device_worn_model'] == 0].index.tolist())
     return sorted(non_wear_indices, key=lambda idx: df.index.get_loc(idx))
 
+def check_upward_trajectory(tac_values, start_idx, lookforward=10):
+    """
+    Check if the next N data points show an upward trajectory.
+    
+    Args:
+        tac_values: Array of TAC values
+        start_idx: Index to start checking from
+        lookforward: Number of points to check ahead (default: 10)
+    
+    Returns:
+        bool: True if most points are moving upward compared to their prior value
+    """
+    end_idx = min(start_idx + lookforward, len(tac_values) - 1)
+    actual_lookforward = end_idx - start_idx
+    
+    if actual_lookforward < 2:
+        return False
+    
+    # Count how many consecutive pairs show upward movement
+    upward_count = 0
+    total_pairs = 0
+    
+    for i in range(start_idx, end_idx):
+        if not np.isnan(tac_values[i]) and not np.isnan(tac_values[i + 1]):
+            total_pairs += 1
+            if tac_values[i + 1] > tac_values[i]:
+                upward_count += 1
+    
+    if total_pairs == 0:
+        return False
+    
+    # Return True if most (>50%) pairs are ascending
+    return (upward_count / total_pairs) > 0.5
+
 def get_artifact_indices(df, max_labeling_length=(60*6)):
     """
     Detect both jumps (sudden increases) and plummets (sudden decreases) in TAC values
@@ -160,10 +194,13 @@ def get_artifact_indices(df, max_labeling_length=(60*6)):
                 if idx >= len(tac_values):
                     break
                     
-                if tac_values[idx] < projected_tac:
+                # Stop labeling if BOTH conditions are met:
+                # 1. TAC drops below projected slope
+                # 2. Next 10 points show upward trajectory
+                if tac_values[idx] < projected_tac and check_upward_trajectory(tac_values, idx, lookforward=10):
                     break
                     
-                projected_tac += 1.0  # Slightly increase acceptable TAC values
+                projected_tac += 2.0  # Slightly increase acceptable TAC values
                 jump_indices.add(df_indices[idx])
                 last_processed_idx = idx
             
@@ -192,7 +229,10 @@ def get_artifact_indices(df, max_labeling_length=(60*6)):
                 if idx >= len(tac_values):
                     break
 
-                if tac_values[idx] < projected_tac:
+                # Stop labeling if BOTH conditions are met:
+                # 1. TAC drops below projected slope
+                # 2. Next 10 points show upward trajectory
+                if tac_values[idx] < projected_tac and check_upward_trajectory(tac_values, idx, lookforward=10):
                     break
 
                 projected_tac += 1.0

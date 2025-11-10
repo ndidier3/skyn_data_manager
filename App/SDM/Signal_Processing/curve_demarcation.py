@@ -10,7 +10,6 @@ import traceback
 # Constants
 MIN_DATA_POINTS = 240  # 4 hours at 1-minute intervals
 MIN_THRESHOLD = 1.0    # Minimum allowed threshold value (μg/L)
-MAX_THRESHOLD = 10.0   # Maximum allowed threshold value (μg/L)
 SD_MULTIPLIER = 2.5    # Standard deviation multiplier for threshold calculation
 SAFETY_THRESHOLD = 10.0  # TAC threshold (μg/L) for safety rule activation
 
@@ -325,7 +324,7 @@ def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 8.0,
         
     Returns:
         tuple[float, float, float | None, float | None]: 
-            - First float: The actual threshold to use (capped between 1 and 10)
+            - First float: The actual threshold to use (capped between 1 and default_threshold)
             - Second float: The calculated threshold before capping
             - Third float: Baseline mean (None if calculation failed)
             - Fourth float: Always None (kept for compatibility)
@@ -426,8 +425,9 @@ def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 8.0,
         print(f"  Baseline Standard Deviation: {baseline_data['TAC'].std():.2f}")
         print(f"  Curve Threshold (Mean + {SD_MULTIPLIER}SD): {threshold:.2f}")
 
-        # Cap threshold between MIN_THRESHOLD and MAX_THRESHOLD
-        capped_threshold = max(MIN_THRESHOLD, min(MAX_THRESHOLD, threshold))
+        # Cap threshold between MIN_THRESHOLD and default_threshold
+        # This ensures the calculated threshold respects the analysis-specific upper bound
+        capped_threshold = max(MIN_THRESHOLD, min(default_threshold, threshold))
         
         return capped_threshold, threshold, baseline_mean, None
         
@@ -715,8 +715,8 @@ def get_curve_threshold_from_method(df: pd.DataFrame, curve_threshold_method: Un
             if capped_threshold != unadjusted_threshold:
                 if unadjusted_threshold < MIN_THRESHOLD:
                     results_dict['capped_reason'] = f'below_minimum_{MIN_THRESHOLD}'
-                elif unadjusted_threshold > MAX_THRESHOLD:
-                    results_dict['capped_reason'] = f'above_maximum_{MAX_THRESHOLD}'
+                elif unadjusted_threshold > default_threshold:
+                    results_dict['capped_reason'] = f'above_maximum_{default_threshold}'
             
             return capped_threshold, results_dict
             
