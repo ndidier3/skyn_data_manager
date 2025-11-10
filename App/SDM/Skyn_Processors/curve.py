@@ -331,6 +331,7 @@ class Curve:
       'rise_duration_CURVE' : rise_duration,
       'fall_duration_CURVE' : fall_duration,
       'relative_peak_CURVE' : relative_peak,
+      'rise_fall_rate_CURVE': ((self.curve['datetime'].iloc[-1] - self.curve['datetime'].iloc[0]).total_seconds() + 60) / 3600 / relative_peak if relative_peak > 0 else None,
       'rise_rate_CURVE' : self.curve_tac_analyzer.get_rise_rate(rise_duration, relative_peak, self.curve_threshold),
       'rise_rate_point_to_point_CURVE': self.curve_tac_analyzer.get_point_to_point_rise_rate(curve_start_index),
       'rise_duration_point_to_point_CURVE': self.curve_tac_analyzer.get_point_to_point_rise_duration(curve_start_index),

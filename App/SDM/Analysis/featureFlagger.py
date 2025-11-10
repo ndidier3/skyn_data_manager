@@ -15,6 +15,7 @@ class featureFlagger:
       'flag_imputed_limit_curve': {},
       'flag_unimputed_jump_curve': {},
       'flag_below_threshold_curve': {},
+      'flag_flat_curve': {},
       # Start / End flags (using only percent)
       'flag_incomplete_curve_start_curve': {},
       'flag_imputed_rise_curve': {},
@@ -229,6 +230,16 @@ class featureFlagger:
       'FLAG_below_threshold_curve'
     )
 
+  def flag_flat_curve(self, cutoff: float) -> None:
+    """
+    Flag a curve if the rise_fall_rate (duration/relative_peak) is below the cutoff.
+    Lower values indicate sharp, fast curves.
+    """
+    self.flag_data_below_cutoff(
+      'rise_fall_rate_CURVE', cutoff,
+      'FLAG_flat_curve'
+    )
+
   # Rise/fall completion flag methods
   def flag_incomplete_curve_start_curve(self, duration_cutoff: float) -> None:
     """
@@ -314,6 +325,7 @@ class featureFlagger:
       'flag_imputed_limit_curve': (self.flag_imputed_limit_curve, ['percent_cutoff', 'duration_cutoff']),
       'flag_unimputed_jump_curve': (self.flag_unimputed_jump_curve, ['percent_cutoff']),
       'flag_below_threshold_curve': (self.flag_below_threshold_curve, ['percent_cutoff']),
+      'flag_flat_curve': (self.flag_flat_curve, ['cutoff']),
       
       # Start / End flags
       'flag_incomplete_curve_start_curve': (self.flag_incomplete_curve_start_curve, ['duration_cutoff']),
@@ -591,6 +603,7 @@ class featureFlagger:
       'FLAG_imputed_limit_curve': 'imputed_percent_CURVE',
       'FLAG_unimputed_jump_curve': 'unimputed_jump_percent_CURVE',
       'FLAG_below_threshold_curve': 'below_threshold_percent_CURVE',
+      'FLAG_flat_curve': 'rise_fall_rate_CURVE',
       
       # Start / End flags
       'FLAG_incomplete_curve_start_curve': 'rise_duration_CURVE',
