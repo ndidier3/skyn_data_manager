@@ -155,13 +155,19 @@ class statModel:
   def continuous_stats_for_columns(self, column_list):
     all_stats = []
     for column in column_list:
+      # Skip columns that don't exist in the data
+      if column not in self.temp_data.columns:
+        continue
       stats_df = self.continuous_stats(column)
       stats_df = stats_df.set_index('Statistic')  # Set Statistic as the index
       stats_df.columns = [column]  # Rename the column with the specific column name
       all_stats.append(stats_df)
     
-    combined_stats_df = pd.concat(all_stats, axis=1)
-    return combined_stats_df
+    if all_stats:
+      combined_stats_df = pd.concat(all_stats, axis=1)
+      return combined_stats_df
+    else:
+      return pd.DataFrame()
 
   def get_pearson_correlation(self, col1, col2):
 
@@ -213,6 +219,10 @@ class statModel:
     all_stats = []
     
     for column, col_type in column_types_dict.items():
+        # Skip columns that don't exist in the data
+        if column not in self.temp_data.columns:
+            continue
+            
         if col_type == 'numeric':
             # For numeric columns, get continuous stats grouped by subid
             stats = self.temp_data.groupby('subid')[column].agg(['mean', 'std', 'sem', 'min', 'max', 'count', 'median'])

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import xlsxwriter
 
 class eventFeatures():
-  def __init__(self, processed_data_folder, cohort_name, results_folder, search_flag_selections, curve_flag_selections, metadata_columns = []):
+  def __init__(self, processed_data_folder, cohort_name, results_folder, metadata_columns = []):
     self.processors = [load(file[:-4], processed_data_folder) for file in os.listdir(processed_data_folder) 
                       if 'processed' in file and not file.startswith('.')]
     for processor in self.processors:
@@ -23,12 +23,16 @@ class eventFeatures():
     self.results_folder = results_folder
     self.plot_folder = f'Results/{cohort_name}/FeaturePlots' if len(self.processors) else 'Results/'
     
-    self.search_flag_selections = search_flag_selections
-    self.curve_flag_selections = curve_flag_selections
     self.metadata_columns = metadata_columns
 
     if not os.path.exists(self.plot_folder):
       os.mkdir(self.plot_folder)
+    
+    # Extract flag columns from the loaded data (flags are already in the processed data)
+    all_flag_columns = [col for col in self.event_features.columns if col.startswith('FLAG_')]
+    self.search_flag_columns = [col for col in all_flag_columns if 'SEARCH' in col]
+    self.curve_flag_columns = [col for col in all_flag_columns if 'CURVE' in col]
+    self.valid_tac_feature_columns = [col for col in self.event_features.columns if 'VALID' in col and col != 'SEARCH_VALID']
 
     self.feature_names = [
       'ending_non_wear_perc_CURVE', 'flatline_max_SEARCH', 'flatline_max_CURVE',
@@ -45,13 +49,6 @@ class eventFeatures():
       'fall_rate_CURVE',  'fall_duration_CURVE'
     ]
     self.tac_outlier_columns = []
-
-  def add_flags(self):
-    flagger = featureFlagger(self.event_features, self.search_flag_selections, self.curve_flag_selections)
-    self.search_flag_columns = flagger.run_search_flags_and_validation()
-    self.curve_flag_columns = flagger.run_curve_flags_and_validation()
-    self.event_features = flagger.ftrs
-    self.valid_tac_feature_columns = [col for col in self.event_features.columns if 'VALID' in col and col != 'SEARCH_VALID']
   
   def add_curve_status_column(self):
     self.event_features['CURVE_STATUS'] = np.where(
@@ -585,7 +582,7 @@ class eventFeatures():
 
   def run_all(self):
     
-    self.add_flags()
+    # Flags are already in the processed data, no need to add them
     self.add_curve_status_column()
     self.label_tac_feature_outliers(SD_threshold=3)
     self.set_events_with_no_features()

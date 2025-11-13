@@ -551,32 +551,32 @@ def get_start_and_end_of_discrete_curves(df, curve_threshold, TAC_column = 'TAC'
     if (end_idx - start_idx) < 5:
       continue
     
-    # Apply additional quality filters to short curves (<60 min)
-    curve_length = end_idx - start_idx + 1
-    if curve_length < 60:
-      curve_data = df.loc[start_idx:end_idx].reset_index(drop=True)
-      
-      # Filter out curves where rise or fall is ≥90% imputed
-      if len(curve_data) > 0:
-        peak_index = curve_data[TAC_column].idxmax()
-        
-        # Check rise portion (start to peak)
-        rise_portion = curve_data.loc[:peak_index]
-        if len(rise_portion) > 0:
-          rise_imputed_count = (rise_portion['imputed'] == 1).sum()
-          rise_imputed_percent = rise_imputed_count / len(rise_portion)
-          
-          if rise_imputed_percent >= 0.90:
-            continue
-        
-        # Check fall portion (peak to end)
-        fall_portion = curve_data.loc[peak_index:]
-        if len(fall_portion) > 0:
-          fall_imputed_count = (fall_portion['imputed'] == 1).sum()
-          fall_imputed_percent = fall_imputed_count / len(fall_portion)
-          
-          if fall_imputed_percent >= 0.90:
-            continue
+    # # Apply additional quality filters to short curves (<60 min)
+    # curve_length = end_idx - start_idx + 1
+    # if curve_length < 60:
+    #   curve_data = df.loc[start_idx:end_idx].reset_index(drop=True)
+    #   
+    #   # Filter out curves where rise or fall is ≥90% imputed
+    #   if len(curve_data) > 0:
+    #     peak_index = curve_data[TAC_column].idxmax()
+    #     
+    #     # Check rise portion (start to peak)
+    #     rise_portion = curve_data.loc[:peak_index]
+    #     if len(rise_portion) > 0:
+    #       rise_imputed_count = (rise_portion['imputed'] == 1).sum()
+    #       rise_imputed_percent = rise_imputed_count / len(rise_portion)
+    #       
+    #       if rise_imputed_percent >= 0.90:
+    #         continue
+    #     
+    #     # Check fall portion (peak to end)
+    #     fall_portion = curve_data.loc[peak_index:]
+    #     if len(fall_portion) > 0:
+    #       fall_imputed_count = (fall_portion['imputed'] == 1).sum()
+    #       fall_imputed_percent = fall_imputed_count / len(fall_portion)
+    #       
+    #       if fall_imputed_percent >= 0.90:
+    #         continue
     
     filtered_curves.append([start_idx, end_idx])
   

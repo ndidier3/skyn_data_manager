@@ -36,12 +36,162 @@ class dayFeatures():
         print(f"Loaded {len(self.processors)} processors with day-level data")
             
         self.day_features = pd.concat([processor.day_level_data for processor in self.processors])
-            
+        
+        # Drop rows with missing SubID, Dataset_ID, or day_no before converting to int
+        rows_before = len(self.day_features)
+        self.day_features.dropna(subset=['SubID', 'Dataset_ID', 'day_no'], inplace=True)
         self.day_features[['SubID', 'day_no']] = self.day_features[['SubID', 'day_no']].astype(int)
-        self.day_features.drop_duplicates(subset=['SubID', 'day_no'], inplace=True)
+        # Primary key: SubID + Dataset_ID + day_no
+        self.day_features.drop_duplicates(subset=['SubID', 'Dataset_ID', 'day_no'], inplace=True)
+        print(f"Day features: {len(self.day_features)} rows ({rows_before - len(self.day_features)} dropped)")
         self.day_stat_frames = []
 
         # Split data into valid and invalid days if there's a validity column
+        if 'DAY_VALID' in self.day_features.columns:
+            self.day_valid = self.day_features[self.day_features['DAY_VALID'] == 1]
+            self.day_invalid = self.day_features[self.day_features['DAY_VALID'] != 1]
+        else:
+            self.day_valid = self.day_features
+            self.day_invalid = pd.DataFrame()
+    
+    def filter_days_by_date_range(self, metadata_csv_path, first_date_column='Day 1', last_date_column='Day 14'):
+        """
+        Filter day-level data to only include days within the date range specified in a metadata CSV.
+        
+        This method reads a CSV file with ID, BURST, and date columns. It uses ID as SubID and 
+        BURST as Dataset_ID to filter days. Only days with timestamps between first_date_column 
+        and last_date_column (inclusive) are retained.
+        
+        Args:
+            metadata_csv_path (str): Path to the metadata CSV file
+            first_date_column (str): Column name for the start date (default: 'Day 1')
+            last_date_column (str): Column name for the end date (default: 'Day 14')
+        
+        Returns:
+            None (modifies self.day_features in place)
+        """
+        print(f"\nFiltering days by metadata date range...")
+        print(f"  Metadata file: {metadata_csv_path}")
+        print(f"  Date range: {first_date_column} to {last_date_column}")
+        
+        metadata = pd.read_csv(metadata_csv_path)
+        
+        # Strip whitespace from column names
+        metadata.columns = metadata.columns.str.strip()
+
+        # Check if required columns exist in metadata
+        required_meta_cols = ['ID', 'BURST', first_date_column, last_date_column]
+        missing_meta_cols = [col for col in required_meta_cols if col not in metadata.columns]
+        if missing_meta_cols:
+            print(f"Warning: Missing required columns in metadata: {missing_meta_cols}")
+            return
+        
+        # Forward-fill the ID column if there are null IDs (ID is only on the first row for each subject)
+        if metadata['ID'].isna().any():
+            print("  Detected null IDs in metadata - applying forward-fill...")
+            metadata['ID'] = metadata['ID'].ffill()
+        
+        # Remove rows where ID or BURST is still missing
+        metadata = metadata.dropna(subset=['ID', 'BURST'])
+        
+        # Convert date columns to datetime
+        metadata[first_date_column] = pd.to_datetime(metadata[first_date_column], errors='coerce')
+        metadata[last_date_column] = pd.to_datetime(metadata[last_date_column], errors='coerce')
+        
+        # Remove rows with invalid dates
+        metadata = metadata.dropna(subset=[first_date_column, last_date_column])
+        
+        # Convert begin_day and end_day to datetime if not already
+        self.day_features['begin_day'] = pd.to_datetime(self.day_features['begin_day'])
+        self.day_features['end_day'] = pd.to_datetime(self.day_features['end_day'])
+        
+        # Reset index to ensure sequential integer indices
+        self.day_features = self.day_features.reset_index(drop=True)
+        
+        # Create a list to track which rows to keep
+        rows_to_keep = []
+        rows_before = len(self.day_features)
+        
+        # Debug counters
+        total_processed = 0
+        matches_found = 0
+        date_overlap_passed = 0
+        
+        # Process each day in day_features
+        for idx, day_row in self.day_features.iterrows():
+            total_processed += 1
+            subid = str(day_row['SubID'])
+            dataset_id = str(day_row['Dataset_ID'])
+            day_start = day_row['begin_day']
+            day_end = day_row['end_day']
+            
+            # Find matching metadata row
+            # Convert Dataset_ID and BURST to int for comparison (Dataset_ID='001' should match BURST=1)
+            try:
+                dataset_id_int = int(dataset_id)
+            except ValueError:
+                # If Dataset_ID can't be converted to int, skip this row
+                continue
+            
+            # Convert SubID to int for robust matching (handles leading zeros)
+            try:
+                subid_int = int(subid)
+            except ValueError:
+                # If SubID can't be converted to int, skip this row
+                continue
+            
+            # Match on integer values to avoid string comparison issues
+            metadata_row = metadata[
+                (metadata['ID'].astype(int) == subid_int) &
+                (metadata['BURST'].astype(int) == dataset_id_int)
+            ]
+            
+            if metadata_row.empty:
+                # No matching metadata found - exclude this day
+                continue
+            
+            matches_found += 1
+            
+            # Get the date range for this SubID-Dataset_ID combination
+            start_date = metadata_row[first_date_column].iloc[0]
+            end_date = metadata_row[last_date_column].iloc[0]
+            
+            # The metadata dates represent the START of each included day
+            # CSV "Day 1" = 8/8/24 means include days starting on or after 8/8/24
+            # CSV "Day 14" = 8/21/24 means include days starting on or before 8/21/24
+            # So day_no=2 (begin_day=8/8) through day_no=15 (begin_day=8/21) will be kept
+            if day_start >= start_date and day_start <= end_date:
+                date_overlap_passed += 1
+                rows_to_keep.append(idx)
+        
+        # Debug output
+        print(f"  DEBUG - Total rows processed: {total_processed}")
+        print(f"  DEBUG - Metadata matches found: {matches_found}")
+        print(f"  DEBUG - Passed date overlap check: {date_overlap_passed}")
+        print(f"  DEBUG - Items in rows_to_keep before dedup: {len(rows_to_keep)}")
+        
+        # Filter dataframe to only keep matching rows
+        # Ensure unique indices (in case of duplicates)
+        duplicates_count = len(rows_to_keep) - len(set(rows_to_keep))
+        rows_to_keep = list(set(rows_to_keep))
+        print(f"  DEBUG - Duplicate indices removed: {duplicates_count}")
+        print(f"  DEBUG - Unique indices to keep: {len(rows_to_keep)}")
+        
+        if len(rows_to_keep) > 0:
+            self.day_features = self.day_features.loc[rows_to_keep]
+            self.day_features = self.day_features.reset_index(drop=True)
+        else:
+            # No rows to keep - empty the dataframe
+            self.day_features = self.day_features.iloc[0:0]
+        
+        rows_after = len(self.day_features)
+        rows_excluded = rows_before - rows_after
+        
+        print(f"  Days before filtering: {rows_before}")
+        print(f"  Days after filtering: {rows_after}")
+        print(f"  Days excluded: {rows_excluded}")
+        
+        # Update valid/invalid day splits if they exist
         if 'DAY_VALID' in self.day_features.columns:
             self.day_valid = self.day_features[self.day_features['DAY_VALID'] == 1]
             self.day_invalid = self.day_features[self.day_features['DAY_VALID'] != 1]

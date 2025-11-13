@@ -555,12 +555,15 @@ class skynDataset:
         day = skynDay(self.dataset, start, end, non_wear_self_report_column = non_wear_self_report_column, day_start_hour = day_start_hour)
         self.days.append(day)
         if make_graphs:
+          # Conditionally include Dataset_ID in subtitle if not '001'
+          dataset_id_text = f' -- Dataset: {self.dataset_identifier}' if str(self.dataset_identifier) != '001' else ''
+          
           # Generate device removal plot
           device_removal_plot = plot_device_removal(
             day.day_dataset, self.plot_folder, self.subid, day_id, self.dataset_identifier, 
             'Temperature_C', 'datetime', motion_variable='Motion', add_color=True, 
             method = 'Model Predictions', prediction_column = 'device_worn_model', df_version = f'DAY{day_id}',
-            subtitle_text = f'{self.subid} -- Day: {day_id+1} -- Algorithm Non-Wear Detection'
+            subtitle_text = f'{self.subid}{dataset_id_text} -- Day: {day_id+1} -- Algorithm Non-Wear Detection'
           )
           self.plot_paths.append(device_removal_plot)
           
@@ -568,7 +571,7 @@ class skynDataset:
           signal_processing_plot = plot_signal_processing(
             day.day_dataset, self.plot_folder, self.subid, day_id, self.dataset_identifier, f'DAY{day_id}',
             self.curve_threshold, time_variable='datetime', title = f'Signal Processing',
-            subtitle_text = f'{self.subid} -- Day: {day_id+1}'
+            subtitle_text = f'{self.subid}{dataset_id_text} -- Day: {day_id+1}'
           )
           self.plot_paths.append(signal_processing_plot)
           

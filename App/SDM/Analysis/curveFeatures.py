@@ -54,14 +54,18 @@ class curveFeatures():
     # Concatenate with consistent columns
     self.curve_features = pd.concat(dfs, ignore_index=True)
 
+    # Collect raw curve features if available
     raw_dfs = []
     for i, processor in enumerate(self.processors):
-
-      raw_df = processor.raw_curve_features.copy()
-      raw_dfs.append(raw_df)
+      if hasattr(processor, 'raw_curve_features'):
+        raw_df = processor.raw_curve_features.copy()
+        raw_dfs.append(raw_df)
     
-    # Concatenate with consistent columns
-    self.raw_curve_features = pd.concat(raw_dfs, ignore_index=True)
+    # Concatenate with consistent columns (or create empty DataFrame if none exist)
+    if raw_dfs:
+      self.raw_curve_features = pd.concat(raw_dfs, ignore_index=True)
+    else:
+      self.raw_curve_features = pd.DataFrame()
     
     # Convert subid and curve_id to int
     self.curve_features[['subid', 'curve_id']] = self.curve_features[['subid', 'curve_id']].astype(int)

@@ -342,6 +342,25 @@ class featureFlagger:
       'flag_unimputed_low_quality_periphery_after': (self.flag_unimputed_low_quality_periphery_dynamic, ['percent_cutoff'])
     }
     
+    # Create mapping from flag names to required data columns
+    flag_required_columns = {
+      'flag_unimputed_low_quality_curve': ['unimputed_low_quality_percent_CURVE', 'unimputed_low_quality_duration_CURVE'],
+      'flag_imputed_limit_curve': ['imputed_percent_CURVE', 'imputed_duration_CURVE'],
+      'flag_unimputed_jump_curve': ['unimputed_jump_percent_CURVE'],
+      'flag_below_threshold_curve': ['below_threshold_percent_CURVE'],
+      'flag_flat_curve': ['rise_fall_rate_CURVE'],
+      'flag_incomplete_curve_start_curve': ['rise_duration_CURVE'],
+      'flag_imputed_rise_curve': ['rise_imputed_percent_CURVE', 'ascending_imputed_percent_CURVE'],
+      'flag_incomplete_curve_end_curve': ['fall_duration_CURVE'],
+      'flag_imputed_fall_curve': ['fall_imputed_percent_CURVE', 'descending_imputed_percent_CURVE'],
+      'flag_gaps_and_non_wear_periphery_before': ['total_gap_percent_PERIPHERY_BEFORE', 'total_non_wear_percent_PERIPHERY_BEFORE'],
+      'flag_gaps_and_non_wear_periphery_after': ['total_gap_percent_PERIPHERY_AFTER', 'total_non_wear_percent_PERIPHERY_AFTER'],
+      'flag_extreme_negative_periphery_before': ['total_extreme_negative_percent_PERIPHERY_BEFORE'],
+      'flag_extreme_negative_periphery_after': ['total_extreme_negative_percent_PERIPHERY_AFTER'],
+      'flag_unimputed_low_quality_periphery_before': ['unimputed_low_quality_percent_PERIPHERY_BEFORE'],
+      'flag_unimputed_low_quality_periphery_after': ['unimputed_low_quality_percent_PERIPHERY_AFTER']
+    }
+    
     # Define which flags are periphery vs curve for validation
     periphery_flag_names = {
       'flag_gaps_and_non_wear_periphery_before', 'flag_extreme_negative_periphery_before',
@@ -358,6 +377,14 @@ class featureFlagger:
       if flag_name in self.flag_selections and self.flag_selections[flag_name]:
         if flag_name in flag_method_mapping:
           method, param_names = flag_method_mapping[flag_name]
+          
+          # Check if required data columns exist in the features DataFrame
+          if flag_name in flag_required_columns:
+            required_cols = flag_required_columns[flag_name]
+            missing_cols = [col for col in required_cols if col not in self.ftrs.columns]
+            if missing_cols:
+              print(f"Skipping flag '{flag_name}': missing required column(s): {', '.join(missing_cols)}")
+              continue
           
           # Build parameters from flag_selections
           params = []
