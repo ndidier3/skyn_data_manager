@@ -375,7 +375,18 @@ class curveFeatures():
     self.compute_person_level_stats_valid()
     self.compute_imputation_stats()
 
-  def export_workbook_curves(self, file_name, include_plots=True, export_imputations=False, first_subid=None, last_subid=None):
+  def export_workbook_curves(self, file_name, include_plots=True, export_imputations=False, first_subid=None, last_subid=None, split_plots_by='validity'):
+    """
+    Export workbook with curve features and optional plots.
+    
+    Args:
+      file_name (str): Path to output Excel file
+      include_plots (bool): Whether to include visualization tabs
+      export_imputations (bool): Whether to export imputation data
+      first_subid (int, optional): First subid in range filter
+      last_subid (int, optional): Last subid in range filter
+      split_plots_by (str): How to split visualization tabs - 'validity' (Valid/Invalid) or 'drinking_pred' (Drinking/Non-Drinking)
+    """
     # Filter data by subid range if specified
     filtered_features = self.curve_features
     if first_subid is not None and last_subid is not None:
@@ -418,47 +429,79 @@ class curveFeatures():
       
       # Add visualization tabs
       if include_plots:
-        # Filter invalid curves by subid range if specified
-        filtered_invalid = self.curve_invalid
-        if first_subid is not None and last_subid is not None:
-          filtered_invalid = self.curve_invalid[
-            (self.curve_invalid['subid'] >= first_subid) & 
-            (self.curve_invalid['subid'] <= last_subid)
-          ]
-        
-        if not filtered_invalid.empty:
-          embed_graphs_into_workbook_tab(
-            writer.book,
-            [
-              filtered_invalid['device_removal_plot'].tolist(),
-              filtered_invalid['signal_processing_plot'].tolist(),
-              filtered_invalid['signal_processing_plot_wide'].tolist()
-            ],
-            worksheet_name = 'Invalid Curves',
-            plot_header_text = '',
-            missing_plot_path_text = 'No Plot Available'
-          )
+        if split_plots_by == 'drinking_pred' and 'DRINKING_PRED' in filtered_features.columns:
+          # Split by drinking prediction
+          drinking_curves = filtered_features[filtered_features['DRINKING_PRED'] == 1]
+          non_drinking_curves = filtered_features[filtered_features['DRINKING_PRED'] == 0]
+          
+          if not non_drinking_curves.empty:
+            embed_graphs_into_workbook_tab(
+              writer.book,
+              [
+                non_drinking_curves['device_removal_plot'].tolist(),
+                non_drinking_curves['signal_processing_plot'].tolist(),
+                non_drinking_curves['signal_processing_plot_wide'].tolist()
+              ],
+              worksheet_name = 'Non-Drinking Curves',
+              plot_header_text = '',
+              missing_plot_path_text = 'No Plot Available'
+            )
+          
+          if not drinking_curves.empty:
+            embed_graphs_into_workbook_tab(
+              writer.book,
+              [
+                drinking_curves['device_removal_plot'].tolist(),
+                drinking_curves['signal_processing_plot'].tolist(),
+                drinking_curves['signal_processing_plot_wide'].tolist()
+              ],
+              worksheet_name = 'Drinking Curves',
+              plot_header_text = '',
+              missing_plot_path_text = 'No Plot Available'
+            )
+        else:
+          # Split by validity (default)
+          # Filter invalid curves by subid range if specified
+          filtered_invalid = self.curve_invalid
+          if first_subid is not None and last_subid is not None:
+            filtered_invalid = self.curve_invalid[
+              (self.curve_invalid['subid'] >= first_subid) & 
+              (self.curve_invalid['subid'] <= last_subid)
+            ]
+          
+          if not filtered_invalid.empty:
+            embed_graphs_into_workbook_tab(
+              writer.book,
+              [
+                filtered_invalid['device_removal_plot'].tolist(),
+                filtered_invalid['signal_processing_plot'].tolist(),
+                filtered_invalid['signal_processing_plot_wide'].tolist()
+              ],
+              worksheet_name = 'Invalid Curves',
+              plot_header_text = '',
+              missing_plot_path_text = 'No Plot Available'
+            )
 
-        # Filter valid curves by subid range if specified
-        filtered_valid = self.curve_valid
-        if first_subid is not None and last_subid is not None:
-          filtered_valid = self.curve_valid[
-            (self.curve_valid['subid'] >= first_subid) & 
-            (self.curve_valid['subid'] <= last_subid)
-          ]
-        
-        if not filtered_valid.empty:
-          embed_graphs_into_workbook_tab(
-            writer.book,
-            [
-              filtered_valid['device_removal_plot'].tolist(),
-              filtered_valid['signal_processing_plot'].tolist(),
-              filtered_valid['signal_processing_plot_wide'].tolist()
-            ],
-            worksheet_name = 'Valid Curves',
-            plot_header_text = '',
-            missing_plot_path_text = 'No Plot Available'
-          )
+          # Filter valid curves by subid range if specified
+          filtered_valid = self.curve_valid
+          if first_subid is not None and last_subid is not None:
+            filtered_valid = self.curve_valid[
+              (self.curve_valid['subid'] >= first_subid) & 
+              (self.curve_valid['subid'] <= last_subid)
+            ]
+          
+          if not filtered_valid.empty:
+            embed_graphs_into_workbook_tab(
+              writer.book,
+              [
+                filtered_valid['device_removal_plot'].tolist(),
+                filtered_valid['signal_processing_plot'].tolist(),
+                filtered_valid['signal_processing_plot_wide'].tolist()
+              ],
+              worksheet_name = 'Valid Curves',
+              plot_header_text = '',
+              missing_plot_path_text = 'No Plot Available'
+            )
       
       # Add imputations
       if export_imputations:
@@ -474,7 +517,7 @@ class curveFeatures():
       if run_settings_df is not None:
         run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
 
-  def export_sorted_workbook(self, file_name, sort_column, ascending=True, smooth_and_impute_attrs=None, curve_attrs=None, flag_prefix=None):
+  def export_sorted_workbook(self, file_name, sort_column, ascending=True, smooth_and_impute_attrs=None, curve_attrs=None, flag_prefix=None, split_plots_by='validity'):
     """
     Export a workbook with features and curves sorted by a specified column.
     Includes only rows that are uniquely flagged (have the specified flag but no other flags)
@@ -487,6 +530,7 @@ class curveFeatures():
       smooth_and_impute_attrs (dict, optional): Smoothing and imputation attributes
       curve_attrs (dict, optional): Curve attributes
       flag_prefix (str, optional): The exact flag column name to use for filtering
+      split_plots_by (str): How to split visualization tabs - 'validity' (Valid/Invalid) or 'drinking_pred' (Drinking/Non-Drinking)
     """
     # Ensure stats are computed
     if not self.curve_stat_frames:
@@ -559,53 +603,85 @@ class curveFeatures():
       
       sorted_features.to_excel(writer, sheet_name='Features', index=False)
       
-      validity_column = 'REGION_VALID' if 'REGION_VALID' in sorted_features.columns else 'CURVE_VALID'
-      # Split curves into valid and invalid based on REGION validity
-      valid_curves = sorted_features[sorted_features[validity_column] == 1]
-      invalid_curves = sorted_features[sorted_features[validity_column] != 1]
-      
-      # Add visualization tabs for valid and invalid curves
-      if not invalid_curves.empty:
-        if flag_column:
-          all_flag_cols = [col for col in invalid_curves.columns if col.startswith('FLAG_')]
-          uniquely_flagged = invalid_curves[invalid_curves[all_flag_cols].sum(axis=1) == 1]
-          if not uniquely_flagged.empty:
+      # Add visualization tabs - split by drinking_pred or validity
+      if split_plots_by == 'drinking_pred' and 'DRINKING_PRED' in sorted_features.columns:
+        # Split by drinking prediction
+        drinking_curves = sorted_features[sorted_features['DRINKING_PRED'] == 1]
+        non_drinking_curves = sorted_features[sorted_features['DRINKING_PRED'] == 0]
+        
+        if not non_drinking_curves.empty:
+          embed_graphs_into_workbook_tab(
+            writer.book,
+            [
+              non_drinking_curves['device_removal_plot'].tolist(),
+              non_drinking_curves['signal_processing_plot'].tolist(),
+              non_drinking_curves['signal_processing_plot_wide'].tolist()
+            ],
+            worksheet_name='Non-Drinking Curves',
+            plot_header_text='',
+            missing_plot_path_text='No Plot Available'
+          )
+        
+        if not drinking_curves.empty:
+          embed_graphs_into_workbook_tab(
+            writer.book,
+            [
+              drinking_curves['device_removal_plot'].tolist(),
+              drinking_curves['signal_processing_plot'].tolist(),
+              drinking_curves['signal_processing_plot_wide'].tolist()
+            ],
+            worksheet_name='Drinking Curves',
+            plot_header_text='',
+            missing_plot_path_text='No Plot Available'
+          )
+      else:
+        # Split by validity (default)
+        validity_column = 'REGION_VALID' if 'REGION_VALID' in sorted_features.columns else 'CURVE_VALID'
+        valid_curves = sorted_features[sorted_features[validity_column] == 1]
+        invalid_curves = sorted_features[sorted_features[validity_column] != 1]
+        
+        # Add visualization tabs for valid and invalid curves
+        if not invalid_curves.empty:
+          if flag_column:
+            all_flag_cols = [col for col in invalid_curves.columns if col.startswith('FLAG_')]
+            uniquely_flagged = invalid_curves[invalid_curves[all_flag_cols].sum(axis=1) == 1]
+            if not uniquely_flagged.empty:
+              embed_graphs_into_workbook_tab(
+                writer.book,
+                [
+                  uniquely_flagged['device_removal_plot'].tolist(),
+                  uniquely_flagged['signal_processing_plot'].tolist(),
+                  uniquely_flagged['signal_processing_plot_wide'].tolist()
+                ],
+                worksheet_name='Invalid Curves',
+                plot_header_text='',
+                missing_plot_path_text='No Plot Available'
+              )
+          else:
             embed_graphs_into_workbook_tab(
               writer.book,
               [
-                uniquely_flagged['device_removal_plot'].tolist(),
-                uniquely_flagged['signal_processing_plot'].tolist(),
-                uniquely_flagged['signal_processing_plot_wide'].tolist()
+                invalid_curves['device_removal_plot'].tolist(),
+                invalid_curves['signal_processing_plot'].tolist(),
+                invalid_curves['signal_processing_plot_wide'].tolist()
               ],
               worksheet_name='Invalid Curves',
               plot_header_text='',
               missing_plot_path_text='No Plot Available'
             )
-        else:
+        
+        if not valid_curves.empty:
           embed_graphs_into_workbook_tab(
             writer.book,
             [
-              invalid_curves['device_removal_plot'].tolist(),
-              invalid_curves['signal_processing_plot'].tolist(),
-              invalid_curves['signal_processing_plot_wide'].tolist()
+              valid_curves['device_removal_plot'].tolist(),
+              valid_curves['signal_processing_plot'].tolist(),
+              valid_curves['signal_processing_plot_wide'].tolist()
             ],
-            worksheet_name='Invalid Curves',
+            worksheet_name='Valid Curves',
             plot_header_text='',
             missing_plot_path_text='No Plot Available'
           )
-      
-      if not valid_curves.empty:
-        embed_graphs_into_workbook_tab(
-          writer.book,
-          [
-            valid_curves['device_removal_plot'].tolist(),
-            valid_curves['signal_processing_plot'].tolist(),
-            valid_curves['signal_processing_plot_wide'].tolist()
-          ],
-          worksheet_name='Valid Curves',
-          plot_header_text='',
-          missing_plot_path_text='No Plot Available'
-        )
       
       # Add run settings
       run_settings_df = report_guide.get_run_settings_dataframe(
@@ -614,6 +690,53 @@ class curveFeatures():
       )
       if run_settings_df is not None:
         run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
+
+  def identify_drinking_curves(self):
+    """
+    Identify curves likely to represent actual drinking events based on data quality and shape.
+    Sets a 'DRINKING_PRED' column to 1 for curves that meet all criteria:
+    - high_quality_duration_CURVE > required_HQ_duration (dynamic requirement based on curve length)
+    - FLAG_flat_curve == 0 (not flagged as flat)
+    - FLAG_incomplete_curve_start_curve == 0 (has complete rise phase) - ONLY for curves < 1 hour
+    
+    The incomplete rise flag is only applied to short curves (< 1 hour) because longer curves
+    may have legitimate reasons for short rise phases that don't indicate poor quality.
+    
+    Creates helper columns:
+    - high_quality_percent_DRK_THRESHOLD: Percentage threshold (100% at 30 min, -7.5% per 15 min, floor at 25%)
+    - required_HQ_duration: Absolute hours of HQ data required (duration * threshold percentage)
+    
+    Returns:
+        None (modifies self.curve_features in place)
+    """
+    # Initialize DRINKING_PRED column to 0
+    self.curve_features['DRINKING_PRED'] = 0
+    
+    # Compute dynamic high quality percentage threshold
+    # Formula: max(0.25, 1.15 - 0.3 * duration_CURVE)
+    # This creates -7.5% decrease per 15 minutes (0.25 hours)
+    self.curve_features['high_quality_percent_DRK_THRESHOLD'] = (
+      self.curve_features['duration_CURVE'].apply(lambda x: max(0.25, 1.15 - 0.3 * x))
+    )
+    
+    # Compute required high quality duration based on curve duration and threshold percentage
+    self.curve_features['required_HQ_duration'] = (
+      self.curve_features['duration_CURVE'] * self.curve_features['high_quality_percent_DRK_THRESHOLD']
+    )
+    
+    # Identify curves meeting drinking prediction criteria
+    # Base: high-quality duration threshold + not flat
+    # Rise phase: only required for curves < 1 hour
+    drinking_mask = (
+      (self.curve_features['high_quality_duration_CURVE'] > self.curve_features['required_HQ_duration']) &
+      (self.curve_features['FLAG_flat_curve'] == 0) &
+      (
+        (self.curve_features['duration_CURVE'] >= 1.0) | 
+        (self.curve_features['FLAG_incomplete_curve_start_curve'] == 0)
+      )
+    )
+    
+    self.curve_features.loc[drinking_mask, 'DRINKING_PRED'] = 1
 
   def identify_perfect_curves(self, output_dir):
     """

@@ -275,16 +275,16 @@ class dayFeatures():
         
         # Initialize curve overlap columns
         self.day_features['drinking_curve_overlap'] = 0
-        self.day_features['valid_drinking_curve_overlap'] = 0
+        self.day_features['predicted_drinking_curve_overlap'] = 0
         self.day_features['total_curve_overlap_hours'] = 0.0
-        self.day_features['valid_curve_overlap_hours'] = 0.0
+        self.day_features['predicted_drinking_overlap_hours'] = 0.0
         
         if curve_features_df is None or curve_features_df.empty:
             print("No curve features provided - curve overlap columns initialized with default values")
             return
         
         # Ensure required columns exist in curve features
-        required_curve_cols = ['subid', 'dataset_id', 'curve_id', 'begin_CURVE', 'end_CURVE', 'CURVE_VALID', 'high_quality_duration_CURVE']
+        required_curve_cols = ['subid', 'dataset_id', 'curve_id', 'begin_CURVE', 'end_CURVE', 'DRINKING_PRED', 'high_quality_duration_CURVE']
         missing_curve_cols = [col for col in required_curve_cols if col not in curve_features_df.columns]
         if missing_curve_cols:
             print(f"Warning: Missing required columns in curve features: {missing_curve_cols}")
@@ -332,7 +332,7 @@ class dayFeatures():
         # Initialize dynamic curve columns based on maximum overlapping curves
         for n in range(1, max_overlapping_curves + 1):
             self.day_features[f'curve_{n}_id'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
-            self.day_features[f'curve_{n}_valid'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
+            self.day_features[f'curve_{n}_predicted_drinking'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
             self.day_features[f'curve_{n}_overlap_hours'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
             self.day_features[f'curve_{n}_high_quality_duration'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
             self.day_features[f'curve_{n}_extends_prior_day'] = pd.Series([None] * len(self.day_features), index=self.day_features.index)
@@ -365,14 +365,14 @@ class dayFeatures():
                 # Update summary columns
                 self.day_features.loc[day_row.name, 'drinking_curve_overlap'] = 1
                 
-                # Check if any overlapping curves are valid
-                valid_curves = overlapping_curves[overlapping_curves['CURVE_VALID'] == 1]
-                if not valid_curves.empty:
-                    self.day_features.loc[day_row.name, 'valid_drinking_curve_overlap'] = 1
+                # Check if any overlapping curves are predicted drinking
+                predicted_drinking_curves = overlapping_curves[overlapping_curves['DRINKING_PRED'] == 1]
+                if not predicted_drinking_curves.empty:
+                    self.day_features.loc[day_row.name, 'predicted_drinking_curve_overlap'] = 1
                 
                 # Calculate total overlap hours
                 total_overlap = 0
-                valid_overlap = 0
+                predicted_drinking_overlap = 0
                 for curve_idx, curve_row in overlapping_curves.iterrows():
                     # Calculate overlap duration
                     overlap_start = max(curve_row['begin_CURVE'], day_start)
@@ -380,12 +380,12 @@ class dayFeatures():
                     overlap_hours = (overlap_end - overlap_start).total_seconds() / 3600
                     total_overlap += overlap_hours
                     
-                    # Add to valid overlap only if curve is valid
-                    if curve_row['CURVE_VALID'] == 1:
-                        valid_overlap += overlap_hours
+                    # Add to predicted drinking overlap only if curve is predicted drinking
+                    if curve_row['DRINKING_PRED'] == 1:
+                        predicted_drinking_overlap += overlap_hours
                 
                 self.day_features.loc[day_row.name, 'total_curve_overlap_hours'] = total_overlap
-                self.day_features.loc[day_row.name, 'valid_curve_overlap_hours'] = valid_overlap
+                self.day_features.loc[day_row.name, 'predicted_drinking_overlap_hours'] = predicted_drinking_overlap
                 
                 # Populate individual curve columns
                 for n, (curve_idx, curve_row) in enumerate(overlapping_curves.iterrows(), 1):
@@ -401,22 +401,22 @@ class dayFeatures():
                         
                         # Populate curve columns
                         self.day_features.loc[day_row.name, f'curve_{n}_id'] = curve_row['curve_id']
-                        self.day_features.loc[day_row.name, f'curve_{n}_valid'] = int(curve_row['CURVE_VALID'] == 1)
+                        self.day_features.loc[day_row.name, f'curve_{n}_predicted_drinking'] = int(curve_row['DRINKING_PRED'] == 1)
                         self.day_features.loc[day_row.name, f'curve_{n}_overlap_hours'] = overlap_hours
                         self.day_features.loc[day_row.name, f'curve_{n}_high_quality_duration'] = curve_row.get('high_quality_duration_CURVE', 0)
                         self.day_features.loc[day_row.name, f'curve_{n}_extends_prior_day'] = int(extends_prior)
                         self.day_features.loc[day_row.name, f'curve_{n}_extends_next_day'] = int(extends_next)
-        
+
         print(f"Curve overlap detection completed. Found curve overlaps on {self.day_features['drinking_curve_overlap'].sum()} days.")
         
         # Add curve overlap statistics to stats frames
         curve_stats = {
             'Days with curve overlap': self.day_features['drinking_curve_overlap'].sum(),
-            'Days with valid curve overlap': self.day_features['valid_drinking_curve_overlap'].sum(),
+            'Days with predicted drinking curve overlap': self.day_features['predicted_drinking_curve_overlap'].sum(),
             'Total curve overlap hours across all days': self.day_features['total_curve_overlap_hours'].sum(),
-            'Total valid curve overlap hours across all days': self.day_features['valid_curve_overlap_hours'].sum(),
+            'Total predicted drinking overlap hours across all days': self.day_features['predicted_drinking_overlap_hours'].sum(),
             'Average curve overlap hours per overlapping day': self.day_features[self.day_features['drinking_curve_overlap'] == 1]['total_curve_overlap_hours'].mean() if self.day_features['drinking_curve_overlap'].sum() > 0 else 0,
-            'Average valid curve overlap hours per overlapping day': self.day_features[self.day_features['valid_drinking_curve_overlap'] == 1]['valid_curve_overlap_hours'].mean() if self.day_features['valid_drinking_curve_overlap'].sum() > 0 else 0,
+            'Average predicted drinking overlap hours per overlapping day': self.day_features[self.day_features['predicted_drinking_curve_overlap'] == 1]['predicted_drinking_overlap_hours'].mean() if self.day_features['predicted_drinking_curve_overlap'].sum() > 0 else 0,
             'Maximum curves overlapping a single day': max_overlapping_curves
         }
         
@@ -425,8 +425,16 @@ class dayFeatures():
         
         print("Curve overlap statistics added to stats frames.")
 
-    def export_workbook_days(self, file_name):
-        """Export day features to an Excel workbook with plots."""
+    def export_workbook_days(self, file_name, split_plots_by=None):
+        """
+        Export day features to an Excel workbook with plots.
+        
+        Args:
+            file_name (str): Path to output Excel file
+            split_plots_by (str, optional): How to split visualization tabs:
+                - None (default): All plots in one 'Day Plots' tab
+                - 'drinking': Split into 'Drinking Days' and 'Non-Drinking Days' tabs
+        """
         print("\nExporting workbook...")
         print(f"File name: {file_name}")
         print(f"Day features columns: {self.day_features.columns.tolist()}")
@@ -459,14 +467,45 @@ class dayFeatures():
             if 'device_removal_plot' in self.day_features.columns and 'signal_processing_plot' in self.day_features.columns:
                 print(self.day_features['device_removal_plot'])
                 print(self.day_features['signal_processing_plot'])
-                embed_graphs_into_workbook_tab(
-                    writer.book,
-                    [
-                        self.day_features['device_removal_plot'].tolist(),
-                        self.day_features['signal_processing_plot'].tolist()
-                    ],
-                    worksheet_name = 'Day Plots',
-                    plot_header_text = '',
-                    missing_plot_path_text = 'No Plot Available'
-                )
+                
+                if split_plots_by == 'drinking' and 'predicted_drinking_curve_overlap' in self.day_features.columns:
+                    # Split by drinking days
+                    drinking_days = self.day_features[self.day_features['predicted_drinking_curve_overlap'] == 1]
+                    non_drinking_days = self.day_features[self.day_features['predicted_drinking_curve_overlap'] == 0]
+                    
+                    if not non_drinking_days.empty:
+                        embed_graphs_into_workbook_tab(
+                            writer.book,
+                            [
+                                non_drinking_days['device_removal_plot'].tolist(),
+                                non_drinking_days['signal_processing_plot'].tolist()
+                            ],
+                            worksheet_name = 'Non-Drinking Days',
+                            plot_header_text = '',
+                            missing_plot_path_text = 'No Plot Available'
+                        )
+                    
+                    if not drinking_days.empty:
+                        embed_graphs_into_workbook_tab(
+                            writer.book,
+                            [
+                                drinking_days['device_removal_plot'].tolist(),
+                                drinking_days['signal_processing_plot'].tolist()
+                            ],
+                            worksheet_name = 'Drinking Days',
+                            plot_header_text = '',
+                            missing_plot_path_text = 'No Plot Available'
+                        )
+                else:
+                    # Default: all plots in one tab
+                    embed_graphs_into_workbook_tab(
+                        writer.book,
+                        [
+                            self.day_features['device_removal_plot'].tolist(),
+                            self.day_features['signal_processing_plot'].tolist()
+                        ],
+                        worksheet_name = 'Day Plots',
+                        plot_header_text = '',
+                        missing_plot_path_text = 'No Plot Available'
+                    )
             

@@ -1,3 +1,19 @@
+"""
+Test Analysis Script with Drinking Detection
+
+This script processes SKYN data and performs curve-level and day-level analysis
+with automated drinking curve identification based on quality and shape criteria.
+
+Drinking Detection Implementation:
+- Identifies curves likely to represent drinking events using:
+  1. Dynamic high-quality duration threshold (100% at 30 min, -7.5% per 15 min, floor at 25%)
+  2. Not flagged as flat curve (FLAG_flat_curve == 0)
+  3. Has complete rise phase (FLAG_incomplete_curve_start_curve == 0) - ONLY for curves < 1 hour
+- Creates DRINKING_PRED column for curves
+- Creates predicted_drinking_curve_overlap column for days
+- Exports separate visualization tabs for drinking vs. non-drinking curves/days
+"""
+
 import pandas as pd
 import os
 from pathlib import Path
@@ -58,11 +74,22 @@ curves = curveFeatures(processed_data_folder,
                         smooth_and_impute_attrs=smooth_and_impute_attrs,
                         curve_attrs=curve_attrs)
 output_dir = project_root / 'Results' / cohort_name
+
+# Identify drinking curves using quality and shape criteria
+print(f"\nIdentifying drinking curves...")
+curves.identify_drinking_curves()
+
+# Run statistics
 curves.run_stats()
 curves.count_curve_flags()
 curves.compute_imputation_stats()
 # curves.identify_perfect_curves(output_dir)
-curves.export_workbook_curves(str(project_root / 'Results' / cohort_name / f'{cohort_name}_curve_stats_{today}.xlsx'))
+
+# Export curve workbook with drinking prediction splits
+curves.export_workbook_curves(
+    str(project_root / 'Results' / cohort_name / f'{cohort_name}_curve_stats_{today}.xlsx'),
+    split_plots_by='drinking_pred'  # Split plots by drinking prediction
+)
 
 # Day-level analysis using dayFeatures
 print(f"\nRunning day-level analysis...")
@@ -70,13 +97,20 @@ day_features_calculator = dayFeatures(processed_data_folder)
 day_features_calculator.compute_low_quality_stats()  # Computes stats and adds to day_stat_frames
 
 # Add curve overlap detection using curve features from the curves object
+# This will use the DRINKING_PRED column to identify drinking days
 day_features_calculator.add_curve_overlap_detection(curves.curve_features)
 
+# Export day workbook with drinking day splits
 day_features_calculator.export_workbook_days(
-    str(project_root / 'Results' / cohort_name / f'{cohort_name}_day_stats_{today}.xlsx')
+    str(project_root / 'Results' / cohort_name / f'{cohort_name}_day_stats_{today}.xlsx'),
+    split_plots_by='drinking'  # Split plots by drinking days
 )
 
 print(f"\nTest analysis complete!")
 print(f"Results exported to: {project_root / 'Results' / cohort_name}")
-print(f"- {cohort_name}_curve_stats_{today}.xlsx (curve-level stats)")
-print(f"- {cohort_name}_day_stats_{today}.xlsx (comprehensive day-level workbook with features, stats, and plots)")
+print(f"- {cohort_name}_curve_stats_{today}.xlsx (curve-level stats with 'Drinking Curves' and 'Non-Drinking Curves' tabs)")
+print(f"- {cohort_name}_day_stats_{today}.xlsx (day-level stats with 'Drinking Days' and 'Non-Drinking Days' tabs)")
+print(f"\nDrinking detection criteria:")
+print(f"  - High-quality duration > required threshold (dynamic: 100% at 30 min, -7.5% per 15 min, floor at 25%)")
+print(f"  - FLAG_flat_curve == 0 (not flat)")
+print(f"  - FLAG_incomplete_curve_start_curve == 0 (complete rise phase) - ONLY for curves < 1 hour")

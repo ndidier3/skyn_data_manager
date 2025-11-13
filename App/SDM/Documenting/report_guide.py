@@ -52,6 +52,7 @@ class ReportGuide:
             'descending_imputed_percent_CURVE': 'Fraction of descending TAC pairs containing imputed values',
             'CURVE_VALID': 'Whether the curve meets validity criteria (1=valid)',
             'REGION_VALID': 'Whether both the curve and periphery meet validity criteria (1=valid)',
+            'DRINKING_PRED': 'Predicted drinking curve based on quality and shape criteria: high_quality_duration_CURVE > required_HQ_duration (dynamic based on curve length) AND not flat AND complete rise phase (only for curves < 1 hour) (1=likely drinking)',
             
             # Curve timing features
             'begin': 'Start time of the curve',
@@ -74,6 +75,8 @@ class ReportGuide:
             'flatlined_percent': 'Percentage of flatlined data',
             'high_quality_duration_CURVE': 'Duration of high-quality data in the curve (hours)',
             'high_quality_percent_CURVE': 'Percentage of high-quality data in the curve',
+            'high_quality_percent_DRK_THRESHOLD': 'Dynamic threshold for high-quality percentage used in drinking prediction: starts at 100% for 30-min curves, decreases by 7.5% per 15 minutes, floors at 25% (reached at 3 hours)',
+            'required_HQ_duration': 'Required high-quality duration for drinking prediction (hours): computed as duration_CURVE * high_quality_percent_DRK_THRESHOLD',
             'high_quality_above_threshold_duration_CURVE': 'Duration of high-quality TAC values at or above the curve threshold (hours)',
             
             # Low quality features
@@ -709,25 +712,25 @@ class ReportGuide:
             
             # Drinking curve overlap detection
             'drinking_curve_overlap': 'Whether any drinking curve overlapped with this day (0/1)',
-            'valid_drinking_curve_overlap': 'Whether any valid drinking curve overlapped with this day (0/1)',
+            'predicted_drinking_curve_overlap': 'Whether any predicted drinking curve overlapped with this day based on DRINKING_PRED (0/1)',
             'total_curve_overlap_hours': 'Total hours of curve overlap with this day (sum across all curves)',
-            'valid_curve_overlap_hours': 'Total hours of valid curve overlap with this day (sum across valid curves only)',
+            'predicted_drinking_overlap_hours': 'Total hours of predicted drinking curve overlap with this day (sum across DRINKING_PRED=1 curves only)',
             
             # Individual curve overlap details (dynamic based on max curves per day)
             'curve_1_id': 'ID of first curve that overlapped with this day',
-            'curve_1_valid': 'Whether first overlapping curve was valid (0/1)',
+            'curve_1_predicted_drinking': 'Whether first overlapping curve was predicted drinking (DRINKING_PRED=1)',
             'curve_1_overlap_hours': 'Hours of overlap between first curve and this day',
             'curve_1_high_quality_duration': 'High-quality duration from first overlapping curve (carried forward from curve features)',
             'curve_1_extends_prior_day': 'Whether first curve extends into prior day (0/1)',
             'curve_1_extends_next_day': 'Whether first curve extends into next day (0/1)',
             'curve_2_id': 'ID of second curve that overlapped with this day',
-            'curve_2_valid': 'Whether second overlapping curve was valid (0/1)',
+            'curve_2_predicted_drinking': 'Whether second overlapping curve was predicted drinking (DRINKING_PRED=1)',
             'curve_2_overlap_hours': 'Hours of overlap between second curve and this day',
             'curve_2_high_quality_duration': 'High-quality duration from second overlapping curve (carried forward from curve features)',
             'curve_2_extends_prior_day': 'Whether second curve extends into prior day (0/1)',
             'curve_2_extends_next_day': 'Whether second curve extends into next day (0/1)',
             'curve_3_id': 'ID of third curve that overlapped with this day',
-            'curve_3_valid': 'Whether third overlapping curve was valid (0/1)',
+            'curve_3_predicted_drinking': 'Whether third overlapping curve was predicted drinking (DRINKING_PRED=1)',
             'curve_3_overlap_hours': 'Hours of overlap between third curve and this day',
             'curve_3_high_quality_duration': 'High-quality duration from third overlapping curve (carried forward from curve features)',
             'curve_3_extends_prior_day': 'Whether third curve extends into prior day (0/1)',
