@@ -31,7 +31,7 @@ from App.SDM.Scripts.Test.test_settings import (
 )
 
 # gaps_and_non_wear_attrs['export_excel'] = True
-smooth_and_impute_attrs['export_excel'] = True
+smooth_and_impute_attrs['export_excel'] = False
 
 # Dynamic path resolution - works regardless of where project is cloned
 # Get the project root by going up from this script's location
@@ -85,7 +85,6 @@ curves.identify_drinking_curves()
 curves.run_stats()
 curves.count_curve_flags()
 curves.compute_imputation_stats()
-# curves.identify_perfect_curves(output_dir)
 
 # Export curve workbook with drinking prediction splits
 curves.export_workbook_curves(
