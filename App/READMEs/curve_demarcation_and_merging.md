@@ -31,10 +31,16 @@ This document describes how TAC (Transdermal Alcohol Concentration) curves are i
 
 **Merging Logic**:
 1. **Distance Check**: 
-   - **Short curves (5-15 min)**: Use half the merge distance (e.g., 1 hour if configured for 2 hours)
-   - **Substantial curves (≥15 min)**: Use full merge distance
-2. **Duration Check**: If merged curve would be < `curve_minutes_limit` minutes
+   - Uses **sum-based approach**: `most_recent_discrete_curve + current_curve`
+   - Only considers the **two neighboring curves** on either side of the gap
+   - Capped at `max_curve_separation_minutes` (default: 60 minutes when configured for 2 hours)
+   - **Examples**:
+     - [10 min] + [8 min] → 18 min merge distance allowed
+     - [20 min] + [15 min] → 35 min merge distance allowed
+     - [30 min] + [35 min] → 60 min merge distance (hits cap)
+2. **Duration Check**: If merged curve would be < `curve_minutes_limit` minutes (24 hours)
 3. **Merge**: Combine curves by extending the end time of the previous curve
+4. **Anti-Accumulation**: Each merge decision only considers immediate neighbors, preventing quality degradation from distant curves
 
 **Post-Merge Filtering**:
 After merging, the system applies intelligent filtering:
@@ -66,7 +72,7 @@ After merging, the system applies intelligent filtering:
 - **Status**: Conditionally kept
 - **Keep if**: Merges with a substantial anchor curve (≥15 minutes)
 - **Remove if**: Standalone or only merges with other short curves
-- **Merge Distance**: Uses half the configured merge distance (e.g., 1 hour instead of 2 hours)
+- **Merge Distance**: Calculated as sum of the two neighboring curves (e.g., 10 min + 8 min = 18 min allowed)
 - **Rationale**: May represent brief drinking episodes that are part of larger events
 
 ### Substantial Curves (≥15 minutes)
@@ -75,53 +81,71 @@ After merging, the system applies intelligent filtering:
 
 ## Example Scenarios
 
-### Scenario 1: Two Substantial Curves (Most Obvious Success)
+### Scenario 1: Two Substantial Curves
 ```
 Curve A: 25 minutes (substantial, ≥15 min)
 Curve B: 30 minutes (substantial, ≥15 min)
-Gap: 90 minutes (1.5 hours, < 2 hours full merge distance)
+Gap: 50 minutes
 
-Result: Merged into 145-minute curve (kept)
-Reason: Both curves are substantial, gap is within full merge distance
+Merge distance allowed: 25 + 30 = 55 minutes
+Gap (50) < Allowed (55) → MERGE ✓
+
+Result: Merged into 105-minute curve (kept)
+Reason: Both curves are substantial, gap within sum threshold
 ```
 
 ### Scenario 2: Short Curve Merged with Substantial Anchor
 ```
 Curve A: 10 minutes (short, 5-15 min range)
 Curve B: 20 minutes (substantial anchor, ≥15 min)
-Gap: 30 minutes (0.5 hours, < 1 hour half merge distance)
+Gap: 25 minutes
 
-Result: Merged into single 60-minute curve (kept)
-Reason: Short curve within half merge distance of substantial anchor
+Merge distance allowed: 10 + 20 = 30 minutes
+Gap (25) < Allowed (30) → MERGE ✓
+
+Result: Merged into single 55-minute curve (kept)
+Reason: Short curve within sum threshold of substantial anchor
 ```
 
 ### Scenario 3: Short Curve Too Far from Substantial Anchor
 ```
 Curve A: 10 minutes (short, 5-15 min range)
 Curve B: 20 minutes (substantial anchor, ≥15 min)
-Gap: 90 minutes (1.5 hours, > 1 hour half merge distance)
+Gap: 35 minutes
+
+Merge distance allowed: 10 + 20 = 30 minutes
+Gap (35) > Allowed (30) → DON'T MERGE ✗
 
 Result: Curve A filtered out, Curve B kept as standalone
-Reason: Short curve beyond half merge distance, no merging occurs
+Reason: Gap exceeds sum threshold, no merging occurs
 ```
 
-### Scenario 4: Multiple Short Curves Merged Together
+### Scenario 4: Multiple Short Curves - Cannot Accumulate
 ```
-Curve A: 8 minutes (short, 5-15 min range)
-Curve B: 12 minutes (short, 5-15 min range)
-Gap: 45 minutes (0.75 hours, < 1 hour half merge distance)
+Step 1: Curve A: 8 min, Curve B: 12 min, Gap: 18 min
+  Allowed: 8 + 12 = 20 → MERGE ✓
+  Result: [8] + [18 gap] + [12]
 
-Result: Merged into 65-minute curve, but filtered out
-Reason: No substantial anchor curve present (both <15 min)
+Step 2: Curve C: 10 min, Gap from B: 25 min
+  Allowed: 12 + 10 = 22 (only uses most recent discrete curve B)
+  Gap (25) > Allowed (22) → DON'T MERGE ✗
+  
+Result: [8]+[18]+[12] merged (38 min total), but filtered out (no ≥15 min anchor)
+        Curve C kept separately (10 min → filtered out if standalone)
+Reason: Anti-accumulation prevents progressive merging of weak signals
 ```
 
 ### Scenario 5: Short Standalone Curve
 ```
 Curve A: 10 minutes (short, 5-15 min range)
-Nearest curve: 90 minutes away (1.5 hours, > 1 hour half merge distance)
+Curve B: 20 minutes (next curve)
+Gap: 40 minutes
 
-Result: Filtered out (no merging possible)
-Reason: Beyond half merge distance for short curves, no anchor available
+Merge distance allowed: 10 + 20 = 30 minutes
+Gap (40) > Allowed (30) → DON'T MERGE ✗
+
+Result: Curve A filtered out (no merging possible)
+Reason: Gap exceeds sum threshold, no anchor available
 ```
 
 ### Scenario 6: Blip Curve (Always Filtered)
@@ -138,11 +162,50 @@ Reason: Blip curves are filtered out before merging logic applies
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `merge_curves_within_duration` | 2 hours | Maximum gap between substantial curves (≥15 min) to consider for merging |
+| `merge_curves_within_duration` | 2 hours | Converted to `max_curve_separation_minutes` (60 min cap) |
+| `max_curve_separation_minutes` | 60 minutes | Hard cap on merge distance regardless of curve sizes |
 | `curve_minutes_limit` | 24 hours | Maximum duration for a merged curve |
 | Blip curve threshold | 5 minutes | Minimum curve duration to consider |
 | Short curve threshold | 15 minutes | Minimum duration for standalone curves |
-| Short curve merge distance | 1 hour | Half the configured merge distance for curves 5-15 minutes |
+| Merge distance formula | `min(curve_A + curve_B, 60)` | Sum of neighboring curves, capped at 60 minutes |
+
+## Sum-Based Merge Distance Algorithm
+
+### Key Innovation: Anti-Accumulation Design
+
+The merge distance calculation uses a **sum-based approach** that prevents quality degradation:
+
+```python
+most_recent_discrete_curve + current_incoming_curve = effective_merge_distance
+```
+
+**Why this matters:**
+- **Local decisions only**: Each merge considers only the two curves immediately adjacent to the gap
+- **Prevents accumulation**: Old distant curves don't inflate the merge allowance
+- **Natural quality control**: Long merged segments don't automatically gain more "merge power"
+
+### Example: Anti-Accumulation in Action
+
+```
+Step 1: [10 min] + [8 min], gap = 15 min
+  Allowed: 10 + 8 = 18 → MERGE ✓
+  Result: [10] + [15 gap] + [8]
+
+Step 2: Try to add [12 min], gap from [8] = 25 min
+  Allowed: 8 + 12 = 20 (only uses most recent [8], not [10])
+  Gap (25) > Allowed (20) → DON'T MERGE ✗
+```
+
+**Without anti-accumulation**, step 2 would calculate: 10 + 8 + 12 = 30, allowing the merge and creating a curve that's 57% gap.
+
+**With anti-accumulation**, step 2 only considers: 8 + 12 = 20, preventing the low-quality merge.
+
+### Benefits
+
+✅ Prevents merged curves from becoming mostly gaps  
+✅ Each gap evaluated against its immediate neighbors  
+✅ Simple, transparent calculation  
+✅ Scales naturally with curve quality  
 
 ## Integration with Threshold Detection
 

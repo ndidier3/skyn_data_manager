@@ -702,12 +702,14 @@ class curveFeatures():
     The incomplete rise flag is only applied to short curves (< 1 hour) because longer curves
     may have legitimate reasons for short rise phases that don't indicate poor quality.
     
-    Required HQ duration uses a two-phase algorithm:
-    - Phase 1 (30-60 min): 9 non-HQ minutes allowed per 15-minute block (strict for short curves)
-    - Phase 2 (60+ min): Only 5 additional HQ minutes required per 15-minute block (more lenient for long curves)
+    Required HQ duration uses a four-phase algorithm:
+    - Phase 1 (≤30 min): 100% HQ required (strictest for very short curves)
+    - Phase 2 (30-60 min): 6 additional HQ minutes per 15-min block beyond 30 min
+    - Phase 3 (60-150 min): 7 additional HQ minutes per 15-min block beyond 60 min
+    - Phase 4 (150+ min): Percentage-based, starts at 56%, declines 2% per 30 min, floors at 40%
     
     Creates helper column:
-    - required_HQ_duration: Absolute hours of HQ data required based on two-phase algorithm
+    - required_HQ_duration: Absolute hours of HQ data required based on four-phase algorithm
     
     Returns:
         None (modifies self.curve_features in place)
@@ -723,18 +725,25 @@ class curveFeatures():
       if duration_min <= 30:
         return duration_hours
       
-      # Phase 2: 30-60 minutes (9 non-HQ allowed per 15-min block)
+      # Phase 2: 30-60 minutes (6 additional HQ minutes per 15-min block)
       elif duration_min <= 60:
-        n_blocks = int((duration_min - 30) / 15)
-        non_hq_allowed_min = 9 * n_blocks
-        hq_required_min = duration_min - non_hq_allowed_min
+        base_hq_min = 30  # HQ required at 30 minutes
+        n_blocks_beyond_30 = int((duration_min - 30) / 15)
+        hq_required_min = base_hq_min + (6 * n_blocks_beyond_30)
         return hq_required_min / 60  # Convert to hours
       
-      # Phase 3: > 60 minutes (5 additional HQ minutes per 15-min block)
-      else:
+      # Phase 3: 60-150 minutes (7 additional HQ minutes per 15-min block)
+      elif duration_min <= 150:
         base_hq_min = 42  # HQ required at 60 minutes
         n_blocks_beyond_60 = int((duration_min - 60) / 15)
-        hq_required_min = base_hq_min + (5 * n_blocks_beyond_60)
+        hq_required_min = base_hq_min + (7 * n_blocks_beyond_60)
+        return hq_required_min / 60  # Convert to hours
+      
+      # Phase 4: > 150 minutes (percentage-based, declining 2% per 30 min, floor at 40%)
+      else:
+        n_intervals = (duration_min - 150) / 30
+        percent_required = max(0.40, 0.56 - (0.02 * n_intervals))
+        hq_required_min = duration_min * percent_required
         return hq_required_min / 60  # Convert to hours
     
     self.curve_features['required_HQ_duration'] = (

@@ -75,7 +75,7 @@ class ReportGuide:
             'flatlined_percent': 'Percentage of flatlined data',
             'high_quality_duration_CURVE': 'Duration of high-quality data in the curve (hours)',
             'high_quality_percent_CURVE': 'Percentage of high-quality data in the curve',
-            'required_HQ_duration': 'Required high-quality duration for drinking prediction (hours): two-phase algorithm - Phase 1 (30-60 min): 9 non-HQ minutes allowed per 15-min block; Phase 2 (60+ min): 5 additional HQ minutes required per 15-min block',
+            'required_HQ_duration': 'Required high-quality duration for drinking prediction (hours): four-phase algorithm - Phase 1 (≤30 min): 100% HQ required; Phase 2 (30-60 min): 6 additional HQ minutes per 15-min block; Phase 3 (60-150 min): 7 additional HQ minutes per 15-min block; Phase 4 (150+ min): percentage-based starting at 56%, declining 2% per 30 min, floor at 40%',
             'high_quality_above_threshold_duration_CURVE': 'Duration of high-quality TAC values at or above the curve threshold (hours)',
             
             # Low quality features
