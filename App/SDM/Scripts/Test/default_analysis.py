@@ -6,7 +6,9 @@ with automated drinking curve identification based on quality and shape criteria
 
 Drinking Detection Implementation:
 - Identifies curves likely to represent drinking events using:
-  1. Dynamic high-quality duration threshold (100% at 30 min, -7.5% per 15 min, floor at 25%)
+  1. Two-phase high-quality duration threshold:
+     Phase 1 (30-60 min): 9 non-HQ minutes allowed per 15-min block
+     Phase 2 (60+ min): 5 additional HQ minutes required per 15-min block
   2. Not flagged as flat curve (FLAG_flat_curve == 0)
   3. Has complete rise phase (FLAG_incomplete_curve_start_curve == 0) - ONLY for curves < 1 hour
 - Creates DRINKING_PRED column for curves
@@ -111,6 +113,8 @@ print(f"Results exported to: {project_root / 'Results' / cohort_name}")
 print(f"- {cohort_name}_curve_stats_{today}.xlsx (curve-level stats with 'Drinking Curves' and 'Non-Drinking Curves' tabs)")
 print(f"- {cohort_name}_day_stats_{today}.xlsx (day-level stats with 'Drinking Days' and 'Non-Drinking Days' tabs)")
 print(f"\nDrinking detection criteria:")
-print(f"  - High-quality duration > required threshold (dynamic: 100% at 30 min, -7.5% per 15 min, floor at 25%)")
+print(f"  - High-quality duration > required threshold (two-phase algorithm):")
+print(f"    Phase 1 (30-60 min): 9 non-HQ minutes allowed per 15-min block")
+print(f"    Phase 2 (60+ min): 5 additional HQ minutes required per 15-min block")
 print(f"  - FLAG_flat_curve == 0 (not flat)")
 print(f"  - FLAG_incomplete_curve_start_curve == 0 (complete rise phase) - ONLY for curves < 1 hour")

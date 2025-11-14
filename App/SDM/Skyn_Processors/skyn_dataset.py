@@ -298,6 +298,7 @@ class skynDataset:
       # Add threshold information
       self.curve_features['unadjusted_threshold'] = self.curve_threshold_results['unadjusted_threshold']
       self.curve_features['baseline_mean'] = self.curve_threshold_results['baseline_mean']
+      self.curve_features['baseline_sd'] = self.curve_threshold_results['baseline_sd']
       self.curve_features['next_cluster_mean'] = self.curve_threshold_results['next_cluster_mean']
       self.curve_features['threshold_calculation_method'] = self.curve_threshold_results['threshold_calculation_method']
       self.curve_features['beta_value'] = self.curve_threshold_results['beta_value']
@@ -506,6 +507,7 @@ class skynDataset:
             'curve_threshold': self.curve_threshold,
             'threshold_method': 'manual' if isinstance(self.curve_threshold, (int, float)) else 'not_determined',
             'baseline_mean': None,
+            'baseline_sd': None,
             'next_cluster_mean': None,
             'threshold_calculation_method': 'manual',
             'beta_value': None,

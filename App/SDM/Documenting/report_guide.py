@@ -52,7 +52,7 @@ class ReportGuide:
             'descending_imputed_percent_CURVE': 'Fraction of descending TAC pairs containing imputed values',
             'CURVE_VALID': 'Whether the curve meets validity criteria (1=valid)',
             'REGION_VALID': 'Whether both the curve and periphery meet validity criteria (1=valid)',
-            'DRINKING_PRED': 'Predicted drinking curve based on quality and shape criteria: high_quality_duration_CURVE > required_HQ_duration (dynamic based on curve length) AND not flat AND complete rise phase (only for curves < 1 hour) (1=likely drinking)',
+            'DRINKING_PRED': 'Predicted drinking curve based on quality and shape criteria: high_quality_duration_CURVE > required_HQ_duration (two-phase algorithm based on curve length) AND not flat AND complete rise phase (only for curves < 1 hour) (1=likely drinking)',
             
             # Curve timing features
             'begin': 'Start time of the curve',
@@ -75,8 +75,7 @@ class ReportGuide:
             'flatlined_percent': 'Percentage of flatlined data',
             'high_quality_duration_CURVE': 'Duration of high-quality data in the curve (hours)',
             'high_quality_percent_CURVE': 'Percentage of high-quality data in the curve',
-            'high_quality_percent_DRK_THRESHOLD': 'Dynamic threshold for high-quality percentage used in drinking prediction: starts at 100% for 30-min curves, decreases by 7.5% per 15 minutes, floors at 25% (reached at 3 hours)',
-            'required_HQ_duration': 'Required high-quality duration for drinking prediction (hours): computed as duration_CURVE * high_quality_percent_DRK_THRESHOLD',
+            'required_HQ_duration': 'Required high-quality duration for drinking prediction (hours): two-phase algorithm - Phase 1 (30-60 min): 9 non-HQ minutes allowed per 15-min block; Phase 2 (60+ min): 5 additional HQ minutes required per 15-min block',
             'high_quality_above_threshold_duration_CURVE': 'Duration of high-quality TAC values at or above the curve threshold (hours)',
             
             # Low quality features

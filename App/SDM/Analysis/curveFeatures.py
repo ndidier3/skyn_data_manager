@@ -702,9 +702,12 @@ class curveFeatures():
     The incomplete rise flag is only applied to short curves (< 1 hour) because longer curves
     may have legitimate reasons for short rise phases that don't indicate poor quality.
     
-    Creates helper columns:
-    - high_quality_percent_DRK_THRESHOLD: Percentage threshold (100% at 30 min, -7.5% per 15 min, floor at 25%)
-    - required_HQ_duration: Absolute hours of HQ data required (duration * threshold percentage)
+    Required HQ duration uses a two-phase algorithm:
+    - Phase 1 (30-60 min): 9 non-HQ minutes allowed per 15-minute block (strict for short curves)
+    - Phase 2 (60+ min): Only 5 additional HQ minutes required per 15-minute block (more lenient for long curves)
+    
+    Creates helper column:
+    - required_HQ_duration: Absolute hours of HQ data required based on two-phase algorithm
     
     Returns:
         None (modifies self.curve_features in place)
@@ -712,16 +715,30 @@ class curveFeatures():
     # Initialize DRINKING_PRED column to 0
     self.curve_features['DRINKING_PRED'] = 0
     
-    # Compute dynamic high quality percentage threshold
-    # Formula: max(0.25, 1.15 - 0.3 * duration_CURVE)
-    # This creates -7.5% decrease per 15 minutes (0.25 hours)
-    self.curve_features['high_quality_percent_DRK_THRESHOLD'] = (
-      self.curve_features['duration_CURVE'].apply(lambda x: max(0.25, 1.15 - 0.3 * x))
-    )
+    # Compute required high quality duration using two-phase algorithm
+    def compute_required_hq(duration_hours):
+      duration_min = duration_hours * 60
+      
+      # Phase 1: <= 30 minutes requires 100% HQ
+      if duration_min <= 30:
+        return duration_hours
+      
+      # Phase 2: 30-60 minutes (9 non-HQ allowed per 15-min block)
+      elif duration_min <= 60:
+        n_blocks = int((duration_min - 30) / 15)
+        non_hq_allowed_min = 9 * n_blocks
+        hq_required_min = duration_min - non_hq_allowed_min
+        return hq_required_min / 60  # Convert to hours
+      
+      # Phase 3: > 60 minutes (5 additional HQ minutes per 15-min block)
+      else:
+        base_hq_min = 42  # HQ required at 60 minutes
+        n_blocks_beyond_60 = int((duration_min - 60) / 15)
+        hq_required_min = base_hq_min + (5 * n_blocks_beyond_60)
+        return hq_required_min / 60  # Convert to hours
     
-    # Compute required high quality duration based on curve duration and threshold percentage
     self.curve_features['required_HQ_duration'] = (
-      self.curve_features['duration_CURVE'] * self.curve_features['high_quality_percent_DRK_THRESHOLD']
+      self.curve_features['duration_CURVE'].apply(compute_required_hq)
     )
     
     # Identify curves meeting drinking prediction criteria
@@ -729,7 +746,7 @@ class curveFeatures():
     # Rise phase: only required for curves < 1 hour
     drinking_mask = (
       (self.curve_features['high_quality_duration_CURVE'] > self.curve_features['required_HQ_duration']) &
-      (self.curve_features['FLAG_flat_curve'] == 0) &
+      (self.curve_features['FLAG_below_threshold_curve'] == 0) &
       (
         (self.curve_features['duration_CURVE'] >= 1.0) | 
         (self.curve_features['FLAG_incomplete_curve_start_curve'] == 0)

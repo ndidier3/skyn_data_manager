@@ -19,9 +19,9 @@ DEFAULT_FLAG_SELECTIONS = {
     'flag_below_threshold_curve': {
       'percent_cutoff': 0.5,
     },
-    'flag_flat_curve': {
-      'cutoff': 2.0
-    },
+    # 'flag_flat_curve': {
+    #   'cutoff': 2.0
+    # },
     # Start / End flags (using only percent)
     'flag_incomplete_curve_start_curve': {
         'duration_cutoff': 7 / 60
