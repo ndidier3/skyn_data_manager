@@ -712,6 +712,7 @@ class ReportGuide:
             # Drinking curve overlap detection
             'drinking_curve_overlap': 'Whether any drinking curve overlapped with this day (0/1)',
             'predicted_drinking_curve_overlap': 'Whether any predicted drinking curve overlapped with this day based on DRINKING_PRED (0/1)',
+            'predicted_drinking_day_by_curve_start': 'Whether any predicted drinking curve started within this day (begin_CURVE within day boundaries) (0/1)',
             'total_curve_overlap_hours': 'Total hours of curve overlap with this day (sum across all curves)',
             'predicted_drinking_overlap_hours': 'Total hours of predicted drinking curve overlap with this day (sum across DRINKING_PRED=1 curves only)',
             

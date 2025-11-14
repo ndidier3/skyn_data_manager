@@ -12,7 +12,7 @@ Drinking Detection Implementation:
   2. Not flagged as flat curve (FLAG_flat_curve == 0)
   3. Has complete rise phase (FLAG_incomplete_curve_start_curve == 0) - ONLY for curves < 1 hour
 - Creates DRINKING_PRED column for curves
-- Creates predicted_drinking_curve_overlap column for days
+- Creates predicted_drinking_day_by_curve_start column for days (1 if drinking curve starts in day)
 - Exports separate visualization tabs for drinking vs. non-drinking curves/days
 """
 
@@ -98,19 +98,23 @@ day_features_calculator = dayFeatures(processed_data_folder)
 day_features_calculator.compute_low_quality_stats()  # Computes stats and adds to day_stat_frames
 
 # Add curve overlap detection using curve features from the curves object
-# This will use the DRINKING_PRED column to identify drinking days
+# This uses the DRINKING_PRED column to create:
+#   - predicted_drinking_curve_overlap (any overlap)
+#   - predicted_drinking_day_by_curve_start (curve starts in day)
 day_features_calculator.add_curve_overlap_detection(curves.curve_features)
 
 # Export day workbook with drinking day splits
 day_features_calculator.export_workbook_days(
     str(project_root / 'Results' / cohort_name / f'{cohort_name}_day_stats_{today}.xlsx'),
-    split_plots_by='drinking'  # Split plots by drinking days
+    split_plots_by='drinking_by_start'  # Split plots by days where drinking curves start
 )
 
 print(f"\nTest analysis complete!")
 print(f"Results exported to: {project_root / 'Results' / cohort_name}")
 print(f"- {cohort_name}_curve_stats_{today}.xlsx (curve-level stats with 'Drinking Curves' and 'Non-Drinking Curves' tabs)")
-print(f"- {cohort_name}_day_stats_{today}.xlsx (day-level stats with 'Drinking Days' and 'Non-Drinking Days' tabs)")
+print(f"- {cohort_name}_day_stats_{today}.xlsx (day-level stats with 'Drinking Days (by start)' and 'Non-Drinking Days (by start)' tabs)")
+print(f"\nDrinking day classification:")
+print(f"  - Days classified as 'Drinking Days' if a predicted drinking curve STARTS within the day")
 print(f"\nDrinking detection criteria:")
 print(f"  - High-quality duration > required threshold (two-phase algorithm):")
 print(f"    Phase 1 (30-60 min): 9 non-HQ minutes allowed per 15-min block")

@@ -276,6 +276,7 @@ class dayFeatures():
         # Initialize curve overlap columns
         self.day_features['drinking_curve_overlap'] = 0
         self.day_features['predicted_drinking_curve_overlap'] = 0
+        self.day_features['predicted_drinking_day_by_curve_start'] = 0
         self.day_features['total_curve_overlap_hours'] = 0.0
         self.day_features['predicted_drinking_overlap_hours'] = 0.0
         
@@ -370,6 +371,14 @@ class dayFeatures():
                 if not predicted_drinking_curves.empty:
                     self.day_features.loc[day_row.name, 'predicted_drinking_curve_overlap'] = 1
                 
+                # Check if any predicted drinking curves START within this day
+                curves_starting_in_day = predicted_drinking_curves[
+                    (predicted_drinking_curves['begin_CURVE'] >= day_start) & 
+                    (predicted_drinking_curves['begin_CURVE'] < day_end)
+                ]
+                if not curves_starting_in_day.empty:
+                    self.day_features.loc[day_row.name, 'predicted_drinking_day_by_curve_start'] = 1
+                
                 # Calculate total overlap hours
                 total_overlap = 0
                 predicted_drinking_overlap = 0
@@ -413,6 +422,7 @@ class dayFeatures():
         curve_stats = {
             'Days with curve overlap': self.day_features['drinking_curve_overlap'].sum(),
             'Days with predicted drinking curve overlap': self.day_features['predicted_drinking_curve_overlap'].sum(),
+            'Days with predicted drinking curve starting in day': self.day_features['predicted_drinking_day_by_curve_start'].sum(),
             'Total curve overlap hours across all days': self.day_features['total_curve_overlap_hours'].sum(),
             'Total predicted drinking overlap hours across all days': self.day_features['predicted_drinking_overlap_hours'].sum(),
             'Average curve overlap hours per overlapping day': self.day_features[self.day_features['drinking_curve_overlap'] == 1]['total_curve_overlap_hours'].mean() if self.day_features['drinking_curve_overlap'].sum() > 0 else 0,
@@ -433,7 +443,8 @@ class dayFeatures():
             file_name (str): Path to output Excel file
             split_plots_by (str, optional): How to split visualization tabs:
                 - None (default): All plots in one 'Day Plots' tab
-                - 'drinking': Split into 'Drinking Days' and 'Non-Drinking Days' tabs
+                - 'drinking': Split by predicted_drinking_curve_overlap (any overlap with predicted drinking curve)
+                - 'drinking_by_start': Split by predicted_drinking_day_by_curve_start (drinking curve starts in day)
         """
         print("\nExporting workbook...")
         print(f"File name: {file_name}")
@@ -469,7 +480,7 @@ class dayFeatures():
                 print(self.day_features['signal_processing_plot'])
                 
                 if split_plots_by == 'drinking' and 'predicted_drinking_curve_overlap' in self.day_features.columns:
-                    # Split by drinking days
+                    # Split by drinking days (overlap-based)
                     drinking_days = self.day_features[self.day_features['predicted_drinking_curve_overlap'] == 1]
                     non_drinking_days = self.day_features[self.day_features['predicted_drinking_curve_overlap'] == 0]
                     
@@ -496,6 +507,36 @@ class dayFeatures():
                             plot_header_text = '',
                             missing_plot_path_text = 'No Plot Available'
                         )
+                
+                elif split_plots_by == 'drinking_by_start' and 'predicted_drinking_day_by_curve_start' in self.day_features.columns:
+                    # Split by drinking days (curve start-based)
+                    drinking_days = self.day_features[self.day_features['predicted_drinking_day_by_curve_start'] == 1]
+                    non_drinking_days = self.day_features[self.day_features['predicted_drinking_day_by_curve_start'] == 0]
+                    
+                    if not non_drinking_days.empty:
+                        embed_graphs_into_workbook_tab(
+                            writer.book,
+                            [
+                                non_drinking_days['device_removal_plot'].tolist(),
+                                non_drinking_days['signal_processing_plot'].tolist()
+                            ],
+                            worksheet_name = 'Non-Drinking Days (by start)',
+                            plot_header_text = '',
+                            missing_plot_path_text = 'No Plot Available'
+                        )
+                    
+                    if not drinking_days.empty:
+                        embed_graphs_into_workbook_tab(
+                            writer.book,
+                            [
+                                drinking_days['device_removal_plot'].tolist(),
+                                drinking_days['signal_processing_plot'].tolist()
+                            ],
+                            worksheet_name = 'Drinking Days (by start)',
+                            plot_header_text = '',
+                            missing_plot_path_text = 'No Plot Available'
+                        )
+                
                 else:
                     # Default: all plots in one tab
                     embed_graphs_into_workbook_tab(
