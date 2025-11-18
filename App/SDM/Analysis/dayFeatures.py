@@ -435,7 +435,7 @@ class dayFeatures():
         
         print("Curve overlap statistics added to stats frames.")
 
-    def export_workbook_days(self, file_name, split_plots_by=None):
+    def export_workbook_days(self, file_name, split_plots_by=None, include_nonwear_plots=True, include_signal_processing_plots=True):
         """
         Export day features to an Excel workbook with plots.
         
@@ -445,6 +445,8 @@ class dayFeatures():
                 - None (default): All plots in one 'Day Plots' tab
                 - 'drinking': Split by predicted_drinking_curve_overlap (any overlap with predicted drinking curve)
                 - 'drinking_by_start': Split by predicted_drinking_day_by_curve_start (drinking curve starts in day)
+            include_nonwear_plots (bool, optional): Whether to include non-wear detection plots (device_removal_plot). Default: True
+            include_signal_processing_plots (bool, optional): Whether to include signal processing plots. Default: True
         """
         print("\nExporting workbook...")
         print(f"File name: {file_name}")
@@ -474,10 +476,18 @@ class dayFeatures():
                 frame.to_excel(writer, sheet_name='Stats', startrow=row_index)
                 row_index += len(frame) + 2
             
-            # Embed the plots (only if plot columns exist)
-            if 'device_removal_plot' in self.day_features.columns and 'signal_processing_plot' in self.day_features.columns:
-                print(self.day_features['device_removal_plot'])
-                print(self.day_features['signal_processing_plot'])
+            # Embed the plots (only if plot columns exist and are requested)
+            # Determine which plots to include
+            plot_columns_to_include = []
+            if include_nonwear_plots and 'device_removal_plot' in self.day_features.columns:
+                plot_columns_to_include.append('device_removal_plot')
+            if include_signal_processing_plots and 'signal_processing_plot' in self.day_features.columns:
+                plot_columns_to_include.append('signal_processing_plot')
+            
+            # Only embed plots if at least one type is requested
+            if plot_columns_to_include:
+                for col in plot_columns_to_include:
+                    print(self.day_features[col])
                 
                 if split_plots_by == 'drinking' and 'predicted_drinking_curve_overlap' in self.day_features.columns:
                     # Split by drinking days (overlap-based)
@@ -487,10 +497,7 @@ class dayFeatures():
                     if not non_drinking_days.empty:
                         embed_graphs_into_workbook_tab(
                             writer.book,
-                            [
-                                non_drinking_days['device_removal_plot'].tolist(),
-                                non_drinking_days['signal_processing_plot'].tolist()
-                            ],
+                            [non_drinking_days[col].tolist() for col in plot_columns_to_include],
                             worksheet_name = 'Non-Drinking Days',
                             plot_header_text = '',
                             missing_plot_path_text = 'No Plot Available'
@@ -499,10 +506,7 @@ class dayFeatures():
                     if not drinking_days.empty:
                         embed_graphs_into_workbook_tab(
                             writer.book,
-                            [
-                                drinking_days['device_removal_plot'].tolist(),
-                                drinking_days['signal_processing_plot'].tolist()
-                            ],
+                            [drinking_days[col].tolist() for col in plot_columns_to_include],
                             worksheet_name = 'Drinking Days',
                             plot_header_text = '',
                             missing_plot_path_text = 'No Plot Available'
@@ -516,10 +520,7 @@ class dayFeatures():
                     if not non_drinking_days.empty:
                         embed_graphs_into_workbook_tab(
                             writer.book,
-                            [
-                                non_drinking_days['device_removal_plot'].tolist(),
-                                non_drinking_days['signal_processing_plot'].tolist()
-                            ],
+                            [non_drinking_days[col].tolist() for col in plot_columns_to_include],
                             worksheet_name = 'Non-Drinking Days (by start)',
                             plot_header_text = '',
                             missing_plot_path_text = 'No Plot Available'
@@ -528,10 +529,7 @@ class dayFeatures():
                     if not drinking_days.empty:
                         embed_graphs_into_workbook_tab(
                             writer.book,
-                            [
-                                drinking_days['device_removal_plot'].tolist(),
-                                drinking_days['signal_processing_plot'].tolist()
-                            ],
+                            [drinking_days[col].tolist() for col in plot_columns_to_include],
                             worksheet_name = 'Drinking Days (by start)',
                             plot_header_text = '',
                             missing_plot_path_text = 'No Plot Available'
@@ -541,10 +539,7 @@ class dayFeatures():
                     # Default: all plots in one tab
                     embed_graphs_into_workbook_tab(
                         writer.book,
-                        [
-                            self.day_features['device_removal_plot'].tolist(),
-                            self.day_features['signal_processing_plot'].tolist()
-                        ],
+                        [self.day_features[col].tolist() for col in plot_columns_to_include],
                         worksheet_name = 'Day Plots',
                         plot_header_text = '',
                         missing_plot_path_text = 'No Plot Available'

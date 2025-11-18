@@ -547,25 +547,10 @@ def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separati
   for i, (merged_start, merged_end, curve_count) in enumerate(merged_curve_start_and_end_indices):
     merged_duration = merged_end - merged_start
     
-    # Check if this merged curve is substantial (≥15 min)
-    is_substantial = merged_duration >= min_curve_length
-    
-    # Check if any of the original curves that formed this merged curve were substantial
-    original_curve_indices = original_curve_mapping[i]
-    has_substantial_anchor = False
-    
-    for orig_idx in original_curve_indices:
-      if orig_idx < len(approved_curve_start_and_end_indices):
-        orig_start, orig_end = approved_curve_start_and_end_indices[orig_idx][:2]
-        orig_duration = orig_end - orig_start
-        if orig_duration >= min_curve_length:
-          has_substantial_anchor = True
-          break
-    
-    # Keep the curve if:
-    # 1. The merged curve itself is substantial (≥15 min), OR
-    # 2. It contains at least one substantial anchor curve (≥15 min)
-    if is_substantial or has_substantial_anchor:
+    # Keep the curve if the merged span (including gaps) is ≥15 min
+    # Note: If any anchor curve was ≥15 min, the merged duration must also be ≥15 min
+    # since the merged duration includes all anchor curves plus any gaps
+    if merged_duration >= min_curve_length:
       filtered_merged_curves.append([merged_start, merged_end, curve_count])
   
   return filtered_merged_curves 

@@ -106,7 +106,9 @@ day_features_calculator.add_curve_overlap_detection(curves.curve_features)
 # Export day workbook with drinking day splits
 day_features_calculator.export_workbook_days(
     str(project_root / 'Results' / cohort_name / f'{cohort_name}_day_stats_{today}.xlsx'),
-    split_plots_by='drinking_by_start'  # Split plots by days where drinking curves start
+    split_plots_by='drinking_by_start',  # Split plots by days where drinking curves start
+    include_nonwear_plots=True,
+    include_signal_processing_plots=True
 )
 
 print(f"\nTest analysis complete!")
