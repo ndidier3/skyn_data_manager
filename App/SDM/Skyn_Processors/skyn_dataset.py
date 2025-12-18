@@ -1,6 +1,5 @@
 from ..Configuration.configuration import *
 from ..Configuration.day_level import get_day_level_indices, create_day_level_dataframe
-from ..Configuration.event_level import get_event_level_indices, create_event_level_dataframe
 from ..Configuration.file_management import *
 from ..Signal_Processing.identify_overlapping_curves import identify_overlapping_curves
 from ..Signal_Processing.smooth_signal import smooth_savgol
@@ -25,7 +24,7 @@ from ..Event_Matching.match_curves_to_events import match_curves_to_events
 import pandas as pd
 import numpy as np
 import traceback
-from datetime import datetime
+from datetime import datetime, date, time
 from typing import Union, Dict
 
 class skynDataset:
@@ -101,6 +100,31 @@ class skynDataset:
     error_file = f'{self.error_logs_folder}{self.subid}_{self.dataset_identifier}_process_error_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.txt'
     with open(error_file, 'w') as file:
       file.write(self.error)
+
+  def filter_dataset_by_date_range(self, first_study_datetime: datetime = None, end_study_datetime: datetime = None):
+    """
+    Filter the dataset to include only data within the specified datetime range.
+    
+    Args:
+        first_study_datetime: First datetime to include (datetime object, optional, inclusive)
+        end_study_datetime: Last datetime to include (datetime object, optional, exclusive)
+    
+    Returns:
+        Filtered dataset
+    """
+    if first_study_datetime is not None and end_study_datetime is not None:
+      self.dataset = self.dataset[(self.dataset['datetime'] >= first_study_datetime) & (self.dataset['datetime'] < end_study_datetime)]
+      print(f'Filtered dataset to {len(self.dataset)} rows within datetime range ({first_study_datetime} to {end_study_datetime})')
+    elif first_study_datetime is not None:
+      self.dataset = self.dataset[self.dataset['datetime'] >= first_study_datetime]
+      print(f'Filtered dataset to {len(self.dataset)} rows from {first_study_datetime} onwards')
+    elif end_study_datetime is not None:
+      self.dataset = self.dataset[self.dataset['datetime'] < end_study_datetime]
+      print(f'Filtered dataset to {len(self.dataset)} rows up to {end_study_datetime}')
+    else:
+      print('Warning: No datetime range specified for filtering. Dataset unchanged.')
+    
+    return self.dataset
 
   def adjust_for_gaps_and_non_wear(self, export_excel = False):
     print(f'Processing Skyn Dataset: {self.subid} - {self.dataset_identifier}')  

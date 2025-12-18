@@ -198,6 +198,83 @@ class dayFeatures():
         else:
             self.day_valid = self.day_features
             self.day_invalid = pd.DataFrame()
+    
+    def filter_days_by_emadayn(self, min_day=1, max_day=28, device_filter=None):
+        """
+        Filter day-level data to only include study days within the specified EMADAYN range.
+        This is useful for ACE and other studies that use EMADAYN to identify study days.
+        
+        Args:
+            min_day (int): Minimum EMADAYN value to include (default: 1)
+            max_day (int): Maximum EMADAYN value to include (default: 28)
+            device_filter (str, optional): If provided, filter by device ID prefix (e.g., '31' or '32' for ACE)
+        
+        Returns:
+            None (modifies self.day_features in place)
+        """
+        print(f"\nFiltering days by EMADAYN...")
+        print(f"  EMADAYN range: {min_day} to {max_day}")
+        
+        rows_before = len(self.day_features)
+        
+        # Check if EMADAYN column exists
+        if 'EMADAYN' not in self.day_features.columns:
+            print(f"  Warning: EMADAYN column not found in day_features. Available columns: {list(self.day_features.columns)[:10]}...")
+            print(f"  Skipping EMADAYN filter.")
+            return
+        
+        # Filter by EMADAYN range
+        self.day_features = self.day_features[
+            (self.day_features['EMADAYN'] >= min_day) & 
+            (self.day_features['EMADAYN'] <= max_day)
+        ]
+        
+        rows_after_emadayn = len(self.day_features)
+        print(f"  Days after EMADAYN filter: {rows_after_emadayn} (removed {rows_before - rows_after_emadayn})")
+        
+        # Optional device filter (for ACE: filter to newer devices with 31/32 prefix)
+        if device_filter is not None:
+            if 'device_one' in self.day_features.columns:
+                device_col = 'device_one'
+            elif 'device_id' in self.day_features.columns:
+                device_col = 'device_id'
+            else:
+                print(f"  Warning: No device column found. Available columns: {list(self.day_features.columns)[:10]}...")
+                print(f"  Skipping device filter.")
+                device_col = None
+            
+            if device_col is not None:
+                rows_before_device = len(self.day_features)
+                # Convert device IDs to string and filter by prefix
+                self.day_features[device_col] = self.day_features[device_col].astype(str)
+                if isinstance(device_filter, list):
+                    # Multiple prefixes (e.g., ['31', '32'])
+                    mask = self.day_features[device_col].str.startswith(device_filter[0])
+                    for prefix in device_filter[1:]:
+                        mask = mask | self.day_features[device_col].str.startswith(prefix)
+                    self.day_features = self.day_features[mask]
+                else:
+                    # Single prefix
+                    self.day_features = self.day_features[
+                        self.day_features[device_col].str.startswith(str(device_filter))
+                    ]
+                rows_after_device = len(self.day_features)
+                print(f"  Days after device filter (prefix '{device_filter}'): {rows_after_device} (removed {rows_before_device - rows_after_device})")
+        
+        rows_after = len(self.day_features)
+        rows_excluded = rows_before - rows_after
+        
+        print(f"  Days before filtering: {rows_before}")
+        print(f"  Days after filtering: {rows_after}")
+        print(f"  Days excluded: {rows_excluded}")
+        
+        # Update valid/invalid day splits if they exist
+        if 'DAY_VALID' in self.day_features.columns:
+            self.day_valid = self.day_features[self.day_features['DAY_VALID'] == 1]
+            self.day_invalid = self.day_features[self.day_features['DAY_VALID'] != 1]
+        else:
+            self.day_valid = self.day_features
+            self.day_invalid = pd.DataFrame()
 
     def compute_low_quality_stats(self, output_filepath=None):
         """

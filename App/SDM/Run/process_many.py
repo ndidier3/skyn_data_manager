@@ -3,7 +3,7 @@ from App.SDM.Configuration.file_management import extract_dataset_identifier, ex
 from App.SDM.Configuration.file_management import save_to_computer, create_save_directories, load, create_individual_plot_folder
 from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
 import traceback
-from datetime import date
+from datetime import date, datetime
 import pandas as pd
 import os
 
@@ -11,9 +11,8 @@ def process_and_analyze_data(
   project_root, 
   data_input_folder, 
   output_folder_name = 'cohort', 
-  event_data = pd.DataFrame(), 
-  event_subid_column = 'ID',
-  use_prior_save = True, 
+  use_prior_save = True,
+  filter_by_study_dates = False, 
   smooth_and_impute = False,
   adjust_for_gaps_and_non_wear = False,
   analyze_days = False,
@@ -24,8 +23,12 @@ def process_and_analyze_data(
   gaps_and_non_wear_attrs = {},
   smooth_and_impute_attrs = {},
   curve_attrs = {},
-  day_attrs = {'day_start_hour': 0, 'make_graphs': True},
+  day_attrs = {
+    'day_start_hour': 0,
+    'make_graphs': True
+  },
   event_attrs = {},
+  day_filter_ranges = {},
   subids_to_process = None
 ):
   
@@ -89,6 +92,24 @@ def process_and_analyze_data(
         print(f"Creating new processor for {subid}_{dataset_identifier}")
         sdm_processor = skynDataset(str(file), processed_data_out, data_out, graphs_out, subid, dataset_identifier, 'e' + str(1))
       
+      if filter_by_study_dates:
+        # Check if subid exists in day_filter_ranges (subids are stored as strings)
+        subid_key = str(subid)
+        if subid_key in day_filter_ranges and day_filter_ranges[subid_key] is not None:
+          first_study_datetime, end_study_datetime = day_filter_ranges[subid_key]
+          # Handle cases where one or both datetimes might be None
+          first_dt = first_study_datetime if isinstance(first_study_datetime, datetime) else None
+          end_dt = end_study_datetime if isinstance(end_study_datetime, datetime) else None
+          
+          if first_dt is not None or end_dt is not None:
+            datetime_range_str = f"{first_dt if first_dt else 'start'} to {end_dt if end_dt else 'end'}"
+            print(f"Filtering dataset for {subid}_{dataset_identifier} by study datetime range: {datetime_range_str}")
+            sdm_processor.filter_dataset_by_date_range(first_dt, end_dt)
+          else:
+            print(f"Warning: No valid datetimes found for {subid}_{dataset_identifier} in day_filter_ranges")
+        else:
+          print(f"Warning: No study datetime range found for {subid}_{dataset_identifier}")
+
       if adjust_for_gaps_and_non_wear:
         print(f"Adjusting for gaps and non-wear for {subid}_{dataset_identifier}")
         sdm_processor.adjust_for_gaps_and_non_wear(**gaps_and_non_wear_attrs)

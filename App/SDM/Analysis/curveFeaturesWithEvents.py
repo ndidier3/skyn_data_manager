@@ -536,7 +536,7 @@ class curveFeaturesWithEvents(curveFeatures):
     self.compute_tac_feature_drink_correlations()
     self.compare_valid_invalid_tac_features()
 
-  def export_workbook_events_and_curves(self, file_name, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, export_plots=False, split_plots_by='validity'):
+  def export_workbook_events_and_curves(self, file_name, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, export_plots=False, split_plots_by='validity', include_nonwear_plots=True, include_signal_processing_plots_main=True, include_signal_processing_plots_wide=True):
     """
     Export workbook with events, curves, and optional plots.
     
@@ -548,6 +548,9 @@ class curveFeaturesWithEvents(curveFeatures):
       day_attrs (dict, optional): Day attributes
       export_plots (bool): Whether to include visualization tabs
       split_plots_by (str): How to split visualization tabs - 'validity' (Valid/Invalid) or 'drinking_pred' (Drinking/Non-Drinking)
+      include_nonwear_plots (bool, optional): Whether to include non-wear detection plots (device_removal_plot and device_removal_plot_EMA_REGION). Default: True
+      include_signal_processing_plots_main (bool, optional): Whether to include signal processing plots (focused/main version and signal_processing_plot_EMA_REGION). Default: True
+      include_signal_processing_plots_wide (bool, optional): Whether to include signal processing plots (wide version). Default: True
     
     Note:
       To use split_plots_by='drinking_pred', you must call set_datasets_by_valid_and_match() first.
@@ -589,71 +592,70 @@ class curveFeaturesWithEvents(curveFeatures):
       self.valid_matched_person_stats.to_excel(writer, sheet_name='Valid Matched by SubID', index=True)
       
       if export_plots:
-        # Add visualization tabs
-        if split_plots_by == 'drinking_pred' and hasattr(self, 'curve_drinking_with_event'):
-          # Split by drinking prediction (curves matched to events)
-          if not self.curve_non_drinking_with_event.empty:
-            embed_graphs_into_workbook_tab(
-              writer.book,
-              [
-                self.curve_non_drinking_with_event['device_removal_plot'].tolist(),
-                self.curve_non_drinking_with_event['signal_processing_plot'].tolist(),
-                self.curve_non_drinking_with_event['signal_processing_plot_wide'].tolist()
-              ],
-              worksheet_name = 'Non-Drinking Matched',
-              plot_header_text = '',
-              missing_plot_path_text = 'No Plot Available'
-            )
-          
-          if not self.curve_drinking_with_event.empty:
-            embed_graphs_into_workbook_tab(
-              writer.book,
-              [
-                self.curve_drinking_with_event['device_removal_plot'].tolist(),
-                self.curve_drinking_with_event['signal_processing_plot'].tolist(),
-                self.curve_drinking_with_event['signal_processing_plot_wide'].tolist()
-              ],
-              worksheet_name = 'Drinking Matched',
-              plot_header_text = '',
-              missing_plot_path_text = 'No Plot Available'
-            )
-        else:
-          # Split by validity (default)
-          embed_graphs_into_workbook_tab(
-            writer.book,
-            [
-              self.curve_valid_with_event['device_removal_plot'].tolist(),
-              self.curve_valid_with_event['signal_processing_plot'].tolist(),
-              self.curve_valid_with_event['signal_processing_plot_wide'].tolist()
-            ],
-            worksheet_name = 'Valid MatchedCurves',
-            plot_header_text = '',
-            missing_plot_path_text = 'No Plot Available'
-          )
-
-          embed_graphs_into_workbook_tab(
-            writer.book,
-            [
-              self.curve_invalid_with_event['device_removal_plot'].tolist(),
-              self.curve_invalid_with_event['signal_processing_plot'].tolist(),
-              self.curve_invalid_with_event['signal_processing_plot_wide'].tolist()
-            ],
-            worksheet_name = 'Invalid MatchedCurves',
-            plot_header_text = '',
-            missing_plot_path_text = 'No Plot Available'
-          )
+        # Determine which plots to include for curves
+        curve_plot_columns_to_include = []
+        if include_nonwear_plots and 'device_removal_plot' in self.curve_features.columns:
+          curve_plot_columns_to_include.append('device_removal_plot')
+        if include_signal_processing_plots_main and 'signal_processing_plot' in self.curve_features.columns:
+          curve_plot_columns_to_include.append('signal_processing_plot')
+        if include_signal_processing_plots_wide and 'signal_processing_plot_wide' in self.curve_features.columns:
+          curve_plot_columns_to_include.append('signal_processing_plot_wide')
         
-        # Always include unmatched events tab
-        embed_graphs_into_workbook_tab(
-          writer.book,
-          [
-            self.unmatched_events['device_removal_plot_EMA_REGION'].tolist(),
-            self.unmatched_events['signal_processing_plot_EMA_REGION'].tolist(),
-          ],
-          worksheet_name = 'No Curve - EMA Region',
-          plot_header_text = '',
-          missing_plot_path_text = 'No Plot Available'
-        )
+        # Determine which plots to include for unmatched events
+        unmatched_plot_columns_to_include = []
+        if include_nonwear_plots and 'device_removal_plot_EMA_REGION' in self.unmatched_events.columns:
+          unmatched_plot_columns_to_include.append('device_removal_plot_EMA_REGION')
+        if include_signal_processing_plots_main and 'signal_processing_plot_EMA_REGION' in self.unmatched_events.columns:
+          unmatched_plot_columns_to_include.append('signal_processing_plot_EMA_REGION')
+        
+        # Add visualization tabs for curves
+        if curve_plot_columns_to_include:
+          if split_plots_by == 'drinking_pred' and hasattr(self, 'curve_drinking_with_event'):
+            # Split by drinking prediction (curves matched to events)
+            if not self.curve_non_drinking_with_event.empty:
+              embed_graphs_into_workbook_tab(
+                writer.book,
+                [self.curve_non_drinking_with_event[col].tolist() for col in curve_plot_columns_to_include],
+                worksheet_name = 'Non-Drinking Matched',
+                plot_header_text = '',
+                missing_plot_path_text = 'No Plot Available'
+              )
+            
+            if not self.curve_drinking_with_event.empty:
+              embed_graphs_into_workbook_tab(
+                writer.book,
+                [self.curve_drinking_with_event[col].tolist() for col in curve_plot_columns_to_include],
+                worksheet_name = 'Drinking Matched',
+                plot_header_text = '',
+                missing_plot_path_text = 'No Plot Available'
+              )
+          else:
+            # Split by validity (default)
+            embed_graphs_into_workbook_tab(
+              writer.book,
+              [self.curve_valid_with_event[col].tolist() for col in curve_plot_columns_to_include],
+              worksheet_name = 'Valid MatchedCurves',
+              plot_header_text = '',
+              missing_plot_path_text = 'No Plot Available'
+            )
+
+            embed_graphs_into_workbook_tab(
+              writer.book,
+              [self.curve_invalid_with_event[col].tolist() for col in curve_plot_columns_to_include],
+              worksheet_name = 'Invalid MatchedCurves',
+              plot_header_text = '',
+              missing_plot_path_text = 'No Plot Available'
+            )
+        
+        # Always include unmatched events tab if plots are requested
+        if unmatched_plot_columns_to_include:
+          embed_graphs_into_workbook_tab(
+            writer.book,
+            [self.unmatched_events[col].tolist() for col in unmatched_plot_columns_to_include],
+            worksheet_name = 'No Curve - EMA Region',
+            plot_header_text = '',
+            missing_plot_path_text = 'No Plot Available'
+          )
       
       # Add imputations
       if not hasattr(self, 'imputations') or self.imputations is None or self.imputations.empty:
@@ -670,7 +672,7 @@ class curveFeaturesWithEvents(curveFeatures):
       if run_settings_df is not None:
           run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
 
-  def export_sorted_workbook(self, file_name, sort_column, ascending=True, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, flag_prefix=None, split_plots_by='validity'):
+  def export_sorted_workbook(self, file_name, sort_column, ascending=True, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, flag_prefix=None, split_plots_by='validity', include_nonwear_plots=True, include_signal_processing_plots_main=True, include_signal_processing_plots_wide=True):
     """
     Export a workbook with features and curves sorted by a specified column.
     Includes only rows that are uniquely flagged (have the specified flag but no other flags)
@@ -687,6 +689,9 @@ class curveFeaturesWithEvents(curveFeatures):
         day_attrs (dict, optional): Day attributes
         flag_prefix (str, optional): The exact flag column name to use for filtering
         split_plots_by (str): How to split visualization tabs - 'validity' (Valid/Invalid) or 'drinking_pred' (Drinking/Non-Drinking)
+        include_nonwear_plots (bool, optional): Whether to include non-wear detection plots (device_removal_plot). Default: True
+        include_signal_processing_plots_main (bool, optional): Whether to include signal processing plots (focused/main version). Default: True
+        include_signal_processing_plots_wide (bool, optional): Whether to include signal processing plots (wide version). Default: True
     
     Note:
         To use split_plots_by='drinking_pred', you must call set_datasets_by_valid_and_match() first.
@@ -794,8 +799,18 @@ class curveFeaturesWithEvents(curveFeatures):
           how='inner'
       )
       
+      # Determine which plots to include
+      plot_columns_to_include = []
+      if include_nonwear_plots and 'device_removal_plot' in sorted_features_with_events.columns:
+        plot_columns_to_include.append('device_removal_plot')
+      if include_signal_processing_plots_main and 'signal_processing_plot' in sorted_features_with_events.columns:
+        plot_columns_to_include.append('signal_processing_plot')
+      if include_signal_processing_plots_wide and 'signal_processing_plot_wide' in sorted_features_with_events.columns:
+        plot_columns_to_include.append('signal_processing_plot_wide')
+      
       # Add visualization tabs - split by drinking_pred or validity
-      if split_plots_by == 'drinking_pred' and hasattr(self, 'curve_drinking_with_event') and 'DRINKING_PRED' in sorted_features_with_events.columns:
+      if plot_columns_to_include:
+        if split_plots_by == 'drinking_pred' and hasattr(self, 'curve_drinking_with_event') and 'DRINKING_PRED' in sorted_features_with_events.columns:
           # Split by drinking prediction (only curves matched to events)
           # sorted_features_with_events is already filtered to curves with events (line 771-775)
           drinking_curves = sorted_features_with_events[sorted_features_with_events['DRINKING_PRED'] == 1]
@@ -804,11 +819,7 @@ class curveFeaturesWithEvents(curveFeatures):
           if not non_drinking_curves.empty:
               embed_graphs_into_workbook_tab(
                   writer.book,
-                  [
-                      non_drinking_curves['device_removal_plot'].tolist(),
-                      non_drinking_curves['signal_processing_plot'].tolist(),
-                      non_drinking_curves['signal_processing_plot_wide'].tolist()
-                  ],
+                  [non_drinking_curves[col].tolist() for col in plot_columns_to_include],
                   worksheet_name='Non-Drinking Matched',
                   plot_header_text='',
                   missing_plot_path_text='No Plot Available'
@@ -817,16 +828,12 @@ class curveFeaturesWithEvents(curveFeatures):
           if not drinking_curves.empty:
               embed_graphs_into_workbook_tab(
                   writer.book,
-                  [
-                      drinking_curves['device_removal_plot'].tolist(),
-                      drinking_curves['signal_processing_plot'].tolist(),
-                      drinking_curves['signal_processing_plot_wide'].tolist()
-                  ],
+                  [drinking_curves[col].tolist() for col in plot_columns_to_include],
                   worksheet_name='Drinking Matched',
                   plot_header_text='',
                   missing_plot_path_text='No Plot Available'
               )
-      else:
+        else:
           # Split by validity (default)
           validity_column = 'REGION_VALID' if 'REGION_VALID' in sorted_features_with_events.columns else 'CURVE_VALID'
           valid_curves = sorted_features_with_events[sorted_features_with_events[validity_column] == 1]
@@ -843,11 +850,7 @@ class curveFeaturesWithEvents(curveFeatures):
               if not uniquely_flagged.empty:
                   embed_graphs_into_workbook_tab(
                       writer.book,
-                      [
-                          uniquely_flagged['device_removal_plot'].tolist(),
-                          uniquely_flagged['signal_processing_plot'].tolist(),
-                          uniquely_flagged['signal_processing_plot_wide'].tolist()
-                      ],
+                      [uniquely_flagged[col].tolist() for col in plot_columns_to_include],
                       worksheet_name='Invalid Curves',
                       plot_header_text='',
                       missing_plot_path_text='No Plot Available'
@@ -863,11 +866,7 @@ class curveFeaturesWithEvents(curveFeatures):
                   )
                   embed_graphs_into_workbook_tab(
                       writer.book,
-                      [
-                          closest_non_flagged['device_removal_plot'].tolist(),
-                          closest_non_flagged['signal_processing_plot'].tolist(),
-                          closest_non_flagged['signal_processing_plot_wide'].tolist()
-                      ],
+                      [closest_non_flagged[col].tolist() for col in plot_columns_to_include],
                       worksheet_name='Valid Curves',
                       plot_header_text='',
                       missing_plot_path_text='No Plot Available'

@@ -1,65 +1,146 @@
 import pandas as pd
-from datetime import timedelta
-from .configuration import get_closest_index_with_timestamp
+from datetime import timedelta, datetime, date, time
 
-def get_event_level_indices(
-  subid, 
-  dataset, 
-  event_data, 
-  drink_start_column='drinkstarttime_m', 
-  drink_total_column='totsd_all_m', 
-  day_id_column='STUDYDAY', 
-  extra_columns=[], 
-  pad_hours_before=2, 
-  pad_hours_after=24, 
-  append_duplicates=False  # Control whether duplicates are appended -- usually repeated start/end indices is not desirable
-):
-  # Filter and sort event data by subject ID and drink start time
-  event_data = event_data[(event_data['ID'] == str(subid)) | (event_data['ID'] == int(subid))]
-  event_data = event_data.sort_values(by=drink_start_column, ignore_index=True)
-  event_data.reset_index(drop=True, inplace=True)
-  
-  # Initialize results
-  event_start_end_indices = []
-  extra_info = []
-  
-  for i, row in event_data.iterrows():
-    if row[drink_start_column]:
-      # Calculate start and end indices
-      start_index = get_closest_index_with_timestamp(dataset, row[drink_start_column] - timedelta(hours=pad_hours_before), time_diff_limit_hours=12)
-      end_index = get_closest_index_with_timestamp(dataset, row[drink_start_column] + timedelta(hours=pad_hours_after), time_diff_limit_hours=12)
-      
-      if start_index is not None and end_index is not None:
-        new_entry = [start_index, end_index, row[drink_total_column], row[day_id_column]]
+def get_study_date_range(event_df: pd.DataFrame, subid_column: str, study_day_id_column: str, 
+                         datetime_column: str, max_study_day_id: int, day_start_hour: int):
+    """
+    Calculate the first and last study datetime boundaries for each subject based on their study day IDs.
+    
+    For each subject:
+    - Finds the earliest study day ID and extracts the corresponding date
+    - Adjusts the date backward if earliest_day_id != 1 (e.g., if earliest is 3, subtracts 2 days)
+    - Adds day_start_hour to create the first study datetime
+    - Finds the latest study day ID and adjusts the date forward to correspond to max_study_day_id
+    - Adds day_start_hour + 1 day to create the end study datetime (exclusive boundary)
+    
+    Args:
+        event_df: DataFrame containing event data
+        subid_column: Column name for subject ID
+        study_day_id_column: Column name for study day ID (e.g., 'emadayn')
+        datetime_column: Column name for datetime (e.g., 'surveytime_first')
+        max_study_day_id: Maximum expected study day ID
+        day_start_hour: Hour at which each day starts (e.g., 7 for 7:00 AM)
+    
+    Returns:
+        Dictionary mapping subid to (first_study_datetime, end_study_datetime) tuple where both are datetime objects.
+        end_study_datetime is exclusive (data < end_study_datetime will be included).
+    """
+    # Convert datetime column to datetime if it's not already
+    event_df = event_df.copy()
+    event_df[datetime_column] = pd.to_datetime(event_df[datetime_column], errors='coerce')
+    
+    # Extract date from datetime column
+    event_df['_extracted_date'] = event_df[datetime_column].dt.date
+    
+    # Dictionary to store results: {subid: (first_study_datetime, end_study_datetime)}
+    study_date_ranges = {}
+    
+    # Process each unique subject
+    for subid in event_df[subid_column].unique():
+        subid_data = event_df[event_df[subid_column] == subid].copy()
         
-        # Append only if duplicates are allowed or the entry is unique
-        if append_duplicates or new_entry not in event_start_end_indices:
-          event_start_end_indices.append(new_entry)
-          extra_info.append(
-            dict(zip([col for col in extra_columns], [row[col] for col in extra_columns]))
-          )
-      else:
-        event_start_end_indices.append([None, None, row[drink_total_column], row[day_id_column]])
-        extra_info.append(
-            dict(zip([col for col in extra_columns], [row[col] for col in extra_columns]))
-          )
-  return event_start_end_indices, extra_info
+        # Filter out rows with missing study_day_id or datetime
+        subid_data = subid_data[
+            subid_data[study_day_id_column].notna() & 
+            subid_data['_extracted_date'].notna()
+        ]
+        
+        if subid_data.empty:
+            continue
+        
+        # Find earliest study day ID for this subject
+        earliest_day_id = int(subid_data[study_day_id_column].min())
+        
+        # Get the date associated with the earliest study day ID
+        earliest_day_data = subid_data[subid_data[study_day_id_column] == earliest_day_id]
+        earliest_date = earliest_day_data['_extracted_date'].iloc[0]
+        
+        # Adjust first study date: if earliest_day_id != 1, subtract the difference
+        days_to_subtract = earliest_day_id - 1
+        first_study_date = earliest_date - timedelta(days=days_to_subtract)
+        
+        # Create first study datetime with day_start_hour
+        first_study_datetime = datetime.combine(first_study_date, time(hour=day_start_hour, minute=0, second=0))
+        
+        # Find latest study day ID for this subject
+        latest_day_id = int(subid_data[study_day_id_column].max())
+        
+        # Get the date associated with the latest study day ID
+        latest_day_data = subid_data[subid_data[study_day_id_column] == latest_day_id]
+        latest_date = latest_day_data['_extracted_date'].iloc[0]
+        
+        # Adjust end study date: add days so it corresponds to max_study_day_id
+        days_to_add = max_study_day_id - latest_day_id
+        end_study_date = latest_date + timedelta(days=days_to_add)
+        
+        # Create end study datetime with day_start_hour + 1 day (exclusive boundary)
+        end_study_datetime = datetime.combine(end_study_date, time(hour=day_start_hour, minute=0, second=0)) + timedelta(days=1)
+        
+        # Store subid as string for consistent key matching
+        study_date_ranges[str(subid)] = (first_study_datetime, end_study_datetime)
+    
+    return study_date_ranges
 
-def create_event_level_dataframe(subid, dataset_identifier, events):
-  all_events_features = []
-
-  for event in events:
-    combined_features = {
-      'subid': subid,
-      'dataset_identifier': dataset_identifier,
-      'event': event.event_number,
-      'day_id': event.day_id,
-      'drink_total': event.drink_total,
-      'curve_not_found_reason': event.curve_not_found_reason
-    }
-    combined_features.update(event.extra_info)
-    for d in event.all_features.values():
-        combined_features.update(d)
-    all_events_features.append(combined_features)
-
-  return pd.DataFrame(all_events_features)
+def get_study_date_range_from_start_date(event_df: pd.DataFrame, subid_column: str, 
+                                         start_date_column: str, max_study_day_id: int, 
+                                         day_start_hour: int):
+    """
+    Calculate the first and last study datetime boundaries for each subject based on a start date column.
+    
+    This is a simpler version of get_study_date_range for cases where the start date is directly available
+    (e.g., B1STARTDATE for ARC Burst 1).
+    
+    For each subject:
+    - Uses the start_date_column value as STUDYDAY 1's date
+    - Adds day_start_hour to create the first study datetime
+    - Adds max_study_day_id days to get the end study date (the day after the last study day)
+    - Adds day_start_hour to create the end study datetime (exclusive boundary)
+    
+    Args:
+        event_df: DataFrame containing event data
+        subid_column: Column name for subject ID
+        start_date_column: Column name for start date (e.g., 'B1STARTDATE')
+        max_study_day_id: Maximum expected study day ID (e.g., 28)
+        day_start_hour: Hour at which each day starts (e.g., 7 for 7:00 AM)
+    
+    Returns:
+        Dictionary mapping subid to (first_study_datetime, end_study_datetime) tuple where both are datetime objects.
+        end_study_datetime is exclusive (data < end_study_datetime will be included).
+    """
+    event_df = event_df.copy()
+    
+    # Convert start_date_column to datetime if it's not already
+    event_df[start_date_column] = pd.to_datetime(event_df[start_date_column], errors='coerce')
+    
+    # Dictionary to store results: {subid: (first_study_datetime, end_study_datetime)}
+    study_date_ranges = {}
+    
+    # Process each unique subject
+    for subid in event_df[subid_column].unique():
+        subid_data = event_df[event_df[subid_column] == subid].copy()
+        
+        # Get the start date for this subject (should be the same across all rows)
+        start_dates = subid_data[start_date_column].dropna().unique()
+        
+        if len(start_dates) == 0:
+            # No valid start date for this subject
+            continue
+        
+        # Use the first (should be only) start date
+        first_study_date = start_dates[0]
+        
+        # Create first study datetime with day_start_hour (STUDYDAY 1)
+        first_study_datetime = datetime.combine(first_study_date.date(), time(hour=day_start_hour, minute=0, second=0))
+        
+        # Calculate end study date: start_date + max_study_day_id days (the day after the last study day)
+        # STUDYDAY 1 = B1STARTDATE, STUDYDAY max_study_day_id = B1STARTDATE + (max_study_day_id - 1) days
+        # Exclusive boundary = B1STARTDATE + max_study_day_id days at day_start_hour
+        end_study_date = first_study_date + timedelta(days=max_study_day_id)
+        
+        # Create end study datetime with day_start_hour (exclusive boundary)
+        end_study_datetime = datetime.combine(end_study_date.date(), time(hour=day_start_hour, minute=0, second=0))
+        
+        # Store subid as string for consistent key matching
+        study_date_ranges[str(subid)] = (first_study_datetime, end_study_datetime)
+    
+    return study_date_ranges
