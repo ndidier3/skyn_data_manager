@@ -39,3 +39,5 @@ App/SDM/Scripts/LINC/run_curve_analysis.py
 node_modules
 analysis_scripts/
 App/SDM/Scripts/LINC/*
+# Temporary debugging scripts
+temp_*.py

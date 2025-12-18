@@ -37,6 +37,10 @@ def get_study_date_range(event_df: pd.DataFrame, subid_column: str, study_day_id
     
     # Process each unique subject
     for subid in event_df[subid_column].unique():
+        # Normalize subid to integer string for consistent key matching
+        # This handles cases where subid might be float64 (e.g., 1028.0) from CSV
+        subid_normalized = str(int(float(subid)))
+        
         subid_data = event_df[event_df[subid_column] == subid].copy()
         
         # Filter out rows with missing study_day_id or datetime
@@ -76,8 +80,8 @@ def get_study_date_range(event_df: pd.DataFrame, subid_column: str, study_day_id
         # Create end study datetime with day_start_hour + 1 day (exclusive boundary)
         end_study_datetime = datetime.combine(end_study_date, time(hour=day_start_hour, minute=0, second=0)) + timedelta(days=1)
         
-        # Store subid as string for consistent key matching
-        study_date_ranges[str(subid)] = (first_study_datetime, end_study_datetime)
+        # Store subid as normalized integer string for consistent key matching
+        study_date_ranges[subid_normalized] = (first_study_datetime, end_study_datetime)
     
     return study_date_ranges
 
@@ -109,6 +113,14 @@ def get_study_date_range_from_start_date(event_df: pd.DataFrame, subid_column: s
     """
     event_df = event_df.copy()
     
+    # Verify that the start_date_column exists in the DataFrame
+    if start_date_column not in event_df.columns:
+        raise ValueError(
+            f"Required column '{start_date_column}' not found in event_data. "
+            f"Available columns: {list(event_df.columns)}. "
+            f"Please ensure this column is preserved when processing event data."
+        )
+    
     # Convert start_date_column to datetime if it's not already
     event_df[start_date_column] = pd.to_datetime(event_df[start_date_column], errors='coerce')
     
@@ -117,6 +129,10 @@ def get_study_date_range_from_start_date(event_df: pd.DataFrame, subid_column: s
     
     # Process each unique subject
     for subid in event_df[subid_column].unique():
+        # Normalize subid to integer string for consistent key matching
+        # This handles cases where subid might be float64 (e.g., 1028.0) from CSV
+        subid_normalized = str(int(float(subid)))
+        
         subid_data = event_df[event_df[subid_column] == subid].copy()
         
         # Get the start date for this subject (should be the same across all rows)
@@ -129,18 +145,42 @@ def get_study_date_range_from_start_date(event_df: pd.DataFrame, subid_column: s
         # Use the first (should be only) start date
         first_study_date = start_dates[0]
         
+        # Convert to datetime if it's a numpy.datetime64 or Timestamp
+        if hasattr(first_study_date, 'date'):
+            study_date = first_study_date.date()
+        elif hasattr(first_study_date, 'to_pydatetime'):
+            study_date = first_study_date.to_pydatetime().date()
+        else:
+            # Try converting to datetime first
+            first_study_date = pd.to_datetime(first_study_date)
+            study_date = first_study_date.date()
+        
         # Create first study datetime with day_start_hour (STUDYDAY 1)
-        first_study_datetime = datetime.combine(first_study_date.date(), time(hour=day_start_hour, minute=0, second=0))
+        first_study_datetime = datetime.combine(study_date, time(hour=day_start_hour, minute=0, second=0))
         
         # Calculate end study date: start_date + max_study_day_id days (the day after the last study day)
         # STUDYDAY 1 = B1STARTDATE, STUDYDAY max_study_day_id = B1STARTDATE + (max_study_day_id - 1) days
         # Exclusive boundary = B1STARTDATE + max_study_day_id days at day_start_hour
-        end_study_date = first_study_date + timedelta(days=max_study_day_id)
+        # Ensure first_study_date is a datetime for timedelta operations
+        if not isinstance(first_study_date, datetime):
+            first_study_date_dt = pd.to_datetime(first_study_date)
+        else:
+            first_study_date_dt = first_study_date
+        end_study_date = first_study_date_dt + timedelta(days=max_study_day_id)
+        
+        # Convert end_study_date to date for datetime.combine
+        if hasattr(end_study_date, 'date'):
+            end_study_date_obj = end_study_date.date()
+        elif hasattr(end_study_date, 'to_pydatetime'):
+            end_study_date_obj = end_study_date.to_pydatetime().date()
+        else:
+            end_study_date_dt = pd.to_datetime(end_study_date)
+            end_study_date_obj = end_study_date_dt.date()
         
         # Create end study datetime with day_start_hour (exclusive boundary)
-        end_study_datetime = datetime.combine(end_study_date.date(), time(hour=day_start_hour, minute=0, second=0))
+        end_study_datetime = datetime.combine(end_study_date_obj, time(hour=day_start_hour, minute=0, second=0))
         
-        # Store subid as string for consistent key matching
-        study_date_ranges[str(subid)] = (first_study_datetime, end_study_datetime)
+        # Store subid as normalized integer string for consistent key matching
+        study_date_ranges[subid_normalized] = (first_study_datetime, end_study_datetime)
     
     return study_date_ranges

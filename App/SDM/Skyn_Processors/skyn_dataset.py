@@ -608,6 +608,22 @@ class skynDataset:
 
       self.day_level_data = create_day_level_dataframe(self.days, self.subid, self.dataset_identifier, morning_report=morning_report)
       
+      # If graphs were made, ensure plot paths in day_level_data point to the current plot_folder
+      # This is important when loading saved processors that may have old plot paths
+      if make_graphs and not self.day_level_data.empty:
+        # Update plot paths to use current plot_folder if they exist
+        if 'device_removal_plot' in self.day_level_data.columns:
+          # Update paths to point to current plot_folder
+          for idx, row in self.day_level_data.iterrows():
+            day_id = int(row['day_no']) - 1  # day_no is 1-indexed, day_id is 0-indexed
+            if day_id < len(self.days) and hasattr(self.days[day_id], 'device_removal_plot'):
+              self.day_level_data.at[idx, 'device_removal_plot'] = self.days[day_id].device_removal_plot
+        if 'signal_processing_plot' in self.day_level_data.columns:
+          for idx, row in self.day_level_data.iterrows():
+            day_id = int(row['day_no']) - 1
+            if day_id < len(self.days) and hasattr(self.days[day_id], 'signal_processing_plot'):
+              self.day_level_data.at[idx, 'signal_processing_plot'] = self.days[day_id].signal_processing_plot
+      
       if export_processed_data:
         with pd.ExcelWriter(f'{self.data_out_folder}/processed_{self.subid}_{self.dataset_identifier}.xlsx', engine='xlsxwriter') as writer:
           self.dataset.to_excel(writer, sheet_name='processed_data', index=False)
