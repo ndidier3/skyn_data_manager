@@ -100,7 +100,11 @@ def match_curves_to_events(
         raise ValueError(f"Missing required columns in events_df: {missing_event_cols}")
     
     if len(curve_features) > 0:
-        required_curve_cols = ['subid', 'curve_id', 'begin_CURVE', 'end_CURVE', 'CURVE_VALID', 'PERIPHERY_VALID']
+        # Prefer REGION_VALID if available, otherwise require CURVE_VALID and PERIPHERY_VALID
+        if 'REGION_VALID' in curve_features.columns:
+            required_curve_cols = ['subid', 'curve_id', 'begin_CURVE', 'end_CURVE', 'REGION_VALID']
+        else:
+            required_curve_cols = ['subid', 'curve_id', 'begin_CURVE', 'end_CURVE', 'CURVE_VALID', 'PERIPHERY_VALID']
         missing_curve_cols = [col for col in required_curve_cols if col not in curve_features.columns]
         if missing_curve_cols:
             raise ValueError(f"Missing required columns in curve_features: {missing_curve_cols}")
@@ -156,7 +160,11 @@ def match_curves_to_events(
                 adjusted_overlap_proportion = adjusted_overlap_duration / adjusted_curve_duration if adjusted_curve_duration > 0 else None
                 
                 # Check if curve is valid
-                is_valid_curve = (curve_data.get('CURVE_VALID', 0) == 1 and curve_data.get('PERIPHERY_VALID', 0) == 1)
+                # Prefer REGION_VALID if available (ARC standard), otherwise use CURVE_VALID and PERIPHERY_VALID
+                if 'REGION_VALID' in curve_data.index:
+                    is_valid_curve = (curve_data.get('REGION_VALID', 0) == 1)
+                else:
+                    is_valid_curve = (curve_data.get('CURVE_VALID', 0) == 1 and curve_data.get('PERIPHERY_VALID', 0) == 1)
                 
                 # Assign to appropriate valid/invalid match column based on validity
                 if is_valid_curve:

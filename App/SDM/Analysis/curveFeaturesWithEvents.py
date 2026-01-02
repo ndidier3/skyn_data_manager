@@ -100,6 +100,81 @@ class curveFeaturesWithEvents(curveFeatures):
       self.curve_drinking_with_event = self.curve_features[drinking & event_found]
       self.curve_non_drinking_with_event = self.curve_features[non_drinking & event_found]
 
+  def create_event_curve_matching_dataframe(self):
+    """
+    Create a comprehensive dataframe showing all event-curve matches (both valid and invalid).
+    This expands the event_data to show each event-curve pair as a separate row.
+    
+    Returns:
+        pd.DataFrame: DataFrame with one row per event-curve match, including both valid and invalid matches
+    """
+    if self.event_data.empty:
+      return pd.DataFrame()
+    
+    # Get all unique events
+    unique_events = self.event_data[['ema_id', 'ID']].drop_duplicates()
+    
+    matching_rows = []
+    
+    for _, event_row in unique_events.iterrows():
+      ema_id = event_row['ema_id']
+      event_id = event_row['ID']
+      
+      # Get the full event row
+      event_data_row = self.event_data[
+        (self.event_data['ema_id'] == ema_id) & 
+        (self.event_data['ID'] == event_id)
+      ].iloc[0]
+      
+      # Add valid curve matches
+      for i in range(1, 6):
+        curve_id_col = f'valid_curve_match_{i}'
+        if curve_id_col in event_data_row.index and pd.notna(event_data_row[curve_id_col]):
+          curve_id = event_data_row[curve_id_col]
+          matching_rows.append({
+            'ema_id': ema_id,
+            'ID': event_id,
+            'curve_id': curve_id,
+            'curve_validity': 'valid',
+            'match_rank': i
+          })
+      
+      # Add invalid curve matches
+      for i in range(1, 6):
+        curve_id_col = f'invalid_curve_match_{i}'
+        if curve_id_col in event_data_row.index and pd.notna(event_data_row[curve_id_col]):
+          curve_id = event_data_row[curve_id_col]
+          matching_rows.append({
+            'ema_id': ema_id,
+            'ID': event_id,
+            'curve_id': curve_id,
+            'curve_validity': 'invalid',
+            'match_rank': i
+          })
+    
+    if not matching_rows:
+      return pd.DataFrame()
+    
+    matching_df = pd.DataFrame(matching_rows)
+    
+    # Merge with event data to get all event columns
+    matching_df = matching_df.merge(
+      self.event_data,
+      on=['ema_id', 'ID'],
+      how='left'
+    )
+    
+    # Merge with curve features to get curve information
+    matching_df = matching_df.merge(
+      self.curve_features[['subid', 'curve_id', 'CURVE_VALID', 'PERIPHERY_VALID']],
+      left_on=['ID', 'curve_id'],
+      right_on=['subid', 'curve_id'],
+      how='left',
+      suffixes=('', '_curve')
+    )
+    
+    return matching_df
+  
   def count_matches(self):
     # Basic counts
     self.counts = {
@@ -129,6 +204,48 @@ class curveFeaturesWithEvents(curveFeatures):
       'Events with a Shared Curve (Valid Only)': [self.event_data[self.event_data['has_shared_match']][['ema_id', 'ID']].drop_duplicates().shape[0]],
       'Events with a Shared Curve (First Match Only, Valid Only)': [self.event_data[self.event_data['has_shared_first_match']][['ema_id', 'ID']].drop_duplicates().shape[0]]
     }
+    
+    # Add detailed breakdowns for valid and invalid curve matching
+    if 'num_valid_curves_matched' in self.event_data.columns:
+      unique_events = self.event_data[['ema_id', 'ID']].drop_duplicates()
+      event_counts = self.event_data.groupby(['ema_id', 'ID']).first().reset_index()
+      
+      # Valid curve matching breakdowns
+      events_with_valid = event_counts[event_counts['num_valid_curves_matched'] >= 1]
+      events_one_valid = event_counts[event_counts['num_valid_curves_matched'] == 1]
+      events_multiple_valid = event_counts[event_counts['num_valid_curves_matched'] > 1]
+      
+      self.counts.update({
+        'Events matched to at least one Valid Curve': [len(events_with_valid)],
+        'Events matched to one Valid Curve': [len(events_one_valid)],
+        'Events matched to multiple Valid Curves': [len(events_multiple_valid)]
+      })
+    
+    if 'num_invalid_curves_matched' in self.event_data.columns:
+      if 'event_counts' not in locals():
+        unique_events = self.event_data[['ema_id', 'ID']].drop_duplicates()
+        event_counts = self.event_data.groupby(['ema_id', 'ID']).first().reset_index()
+      
+      # Invalid curve matching breakdowns (MUTUALLY EXCLUSIVE with valid curve matching)
+      # Only count events that matched to invalid curves AND did NOT match to any valid curves
+      events_with_invalid_only = event_counts[
+        (event_counts['num_invalid_curves_matched'] >= 1) &
+        (event_counts['num_valid_curves_matched'] == 0)
+      ]
+      events_one_invalid_only = event_counts[
+        (event_counts['num_invalid_curves_matched'] == 1) &
+        (event_counts['num_valid_curves_matched'] == 0)
+      ]
+      events_multiple_invalid_only = event_counts[
+        (event_counts['num_invalid_curves_matched'] > 1) &
+        (event_counts['num_valid_curves_matched'] == 0)
+      ]
+      
+      self.counts.update({
+        'Events matched to at least one Invalid Curve (only)': [len(events_with_invalid_only)],
+        'Events matched to one Invalid Curve (only)': [len(events_one_invalid_only)],
+        'Events matched to multiple Invalid Curves (only)': [len(events_multiple_invalid_only)]
+      })
     
     # Add drinking prediction counts if available
     if hasattr(self, 'curve_drinking_with_event'):

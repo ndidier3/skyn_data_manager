@@ -44,6 +44,14 @@ def process_event_timestamps(
     if 'ema_id' not in events_df.columns:
         events_df['ema_id'] = None
     
+    # Validate that ema_id_column exists in the dataframe
+    if ema_id_column not in events_df.columns:
+        raise ValueError(
+            f"ema_id_column '{ema_id_column}' not found in event data. "
+            f"Available columns (first 20): {list(events_df.columns[:20])}... "
+            f"Please ensure the column specified in event_attrs['ema_id_column'] exists in your event data."
+        )
+    
     event_ranges = []
     
     for i, row in events_df.iterrows():
@@ -96,8 +104,12 @@ def process_event_timestamps(
             events_df.loc[i, 'event_match_end'] = event_match_end
             events_df.loc[i, 'drink_total'] = row[drink_total_column]
             events_df.loc[i, 'end_timestamp_modified'] = timestamp_modified
+            # Set ema_id from the specified ema_id_column
             if events_df.loc[i, 'ema_id'] is None:
                 events_df.loc[i, 'ema_id'] = row[ema_id_column]
+            
+            # Get ema_id value for use in labels and event_ranges
+            ema_id_value = events_df.loc[i, 'ema_id'] if pd.notna(events_df.loc[i, 'ema_id']) else row[ema_id_column]
             
             if timestamp_modified:
                 events_df.loc[i, 'modification_note'] = modification_note
@@ -107,7 +119,7 @@ def process_event_timestamps(
             # Get drink total suffix if it exists
             drink_suffix = f'_{row[drink_total_column]}drks' if pd.notna(row[drink_total_column]) else '_NAdrks'
             
-            earliest_label = f'{earliest_timestamp_column}_{row[ema_id_column]}{drink_suffix}'
+            earliest_label = f'{earliest_timestamp_column}_{ema_id_value}{drink_suffix}'
             event_labels = pd.concat([event_labels, pd.DataFrame({'timestamp': [earliest_timestamp], 'label': [earliest_label]})], ignore_index=True)
             
             # Get middle timestamps (excluding earliest and latest, and only including valid timestamps)
@@ -123,11 +135,11 @@ def process_event_timestamps(
             if middle_timestamps:
                 event_labels = pd.concat([event_labels, pd.DataFrame({'timestamp': middle_timestamps, 'label': middle_abbreviated_labels})], ignore_index=True)
 
-            latest_label = f'{latest_timestamp_column}_{row[ema_id_column]}{drink_suffix}'
+            latest_label = f'{latest_timestamp_column}_{ema_id_value}{drink_suffix}'
             event_labels = pd.concat([event_labels, pd.DataFrame({'timestamp': [latest_timestamp], 'label': [latest_label]})], ignore_index=True)
 
             event_ranges.append({
-                'ema_id': row[ema_id_column],
+                'ema_id': ema_id_value,
                 'drink_total': row[drink_total_column],
                 'earliest_timestamp': earliest_timestamp,
                 'latest_timestamp': latest_timestamp,
