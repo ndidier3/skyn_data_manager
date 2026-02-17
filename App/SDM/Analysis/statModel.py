@@ -2,16 +2,29 @@ import pandas as pd
 import scipy.stats as stats
 import numpy as np
 
-def compare_correlation_strengths(r1, n1, r2, n2):
+def compare_correlation_strengths(r1, n1, r2, n2, return_z_stat=False):
     """
     Compare the strength of two independent correlation coefficients using Fisher's z-transformation.
-    Returns the p-value for the difference.
+    
+    Args:
+        r1: Correlation coefficient for group 1
+        n1: Sample size for group 1
+        r2: Correlation coefficient for group 2
+        n2: Sample size for group 2
+        return_z_stat: If True, returns (z_statistic, p_value). If False, returns only p_value (for backward compatibility).
+    
+    Returns:
+        p-value (if return_z_stat=False) or (z_statistic, p_value) tuple (if return_z_stat=True)
     """
     # Fisher's z-transformation cannot be computed for r = 1 or r = -1, handle this case
     if abs(r1) == 1 or abs(r2) == 1:
-        return 0.0 # Or handle as a special case, a perfect correlation is likely significant
+        if return_z_stat:
+            return (np.inf, 0.0)  # Or handle as a special case, a perfect correlation is likely significant
+        return 0.0
         
     if n1 <= 3 or n2 <= 3:
+        if return_z_stat:
+            return (np.nan, np.nan)
         return np.nan
     
     # Fisher's z-transformation
@@ -27,6 +40,8 @@ def compare_correlation_strengths(r1, n1, r2, n2):
     # Two-tailed p-value
     p_value = stats.norm.sf(abs(z_stat)) * 2
     
+    if return_z_stat:
+        return (z_stat, p_value)
     return p_value
 
 class statModel:
