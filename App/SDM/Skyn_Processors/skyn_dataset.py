@@ -49,6 +49,12 @@ class skynDataset:
     self.sampling_rate = 1 #biosensor readings per minute. this is updated in the command below
     self.dataset = configure_raw_data(self, error_logger=self.log_error)
 
+    # Unique device_id(s) in this dataset (for filtering by device type, e.g. new vs old_skyn)
+    self.device_ids = self.dataset['device_id'].unique().tolist() if 'device_id' in self.dataset.columns else []
+    # Device model: T15 (new) vs T10 (old) vs 'mixed'. From ARC raw data: old IDs start with "20-", new with "31-" or "32-".
+    # Label as 'T10' if all devices are T10, 'T15' if all are T15, or 'mixed' if there's a mix
+    self.device_model = determine_device_model(self.device_ids)
+
     self.time_elapsed_column = 'Duration_Hrs' #updated after cropping/processing
 
     #EXPORT PATH INFO

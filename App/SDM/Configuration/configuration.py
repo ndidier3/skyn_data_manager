@@ -301,7 +301,48 @@ def get_closest_index_after_timestamp(data, timestamp, datetime_column='datetime
   
   except Exception as e:
     print(f"Error in get_closest_index_after_timestamp: {e}")
-    return 
+    return
+
+def determine_device_model(device_ids):
+    """
+    Determine device model from device_id list.
+    
+    Device model: T15 (new) vs T10 (old) vs 'mixed'. 
+    From ARC raw data: old IDs start with "20-", new with "31-" or "32-".
+    Label as 'T10' if all devices are T10, 'T15' if all are T15, or 'mixed' if there's a mix.
+    
+    Args:
+        device_ids: List of device_id strings (e.g., ['20-3AC-0-00766', '31-51F-0-00088'])
+    
+    Returns:
+        str: 'T10', 'T15', 'mixed', or None if no valid device_ids found
+    """
+    if not device_ids:
+        return None
+    
+    # Extract prefixes from all device_ids
+    prefixes = []
+    for device_id in device_ids:
+        if device_id:
+            device_str = str(device_id).strip()
+            if device_str:
+                prefix = device_str.split('-')[0]
+                prefixes.append(prefix)
+    
+    if not prefixes:
+        return None
+    
+    has_t10 = any(p == '20' for p in prefixes)
+    has_t15 = any(p in ('31', '32') for p in prefixes)
+    
+    if has_t10 and has_t15:
+        return 'mixed'
+    elif has_t15:
+        return 'T15'
+    elif has_t10:
+        return 'T10'
+    else:
+        return None 
 
 #RETIRED
 def determine_post_cleaning_validity(self):
