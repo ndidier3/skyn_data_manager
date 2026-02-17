@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 
 class curveFeatures():
-  def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, subids=None, additional_processed_data_folders=[]):
+  def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, subids=None, additional_processed_data_folders=[], device_models=None):
     """
     Args:
       processed_data_folder (str): Path to the folder containing processed files.
@@ -20,6 +20,8 @@ class curveFeatures():
       curve_attrs (dict, optional): Curve attributes.
       subids (list of str or int, optional): If provided, only load files for these subids.
       additional_processed_data_folders (list, optional): Additional folders to search for processed files.
+      device_models (list or str, optional): If provided, keep only processors whose device_model is in this
+        set (e.g. 'T15' or ['T15'] for new only). Each processor has device_model = 'T15' or 'T10' from skyn_dataset.
     """
     # Get list of processed files (exclude hidden files)
     processed_files = [file for file in os.listdir(processed_data_folder) 
@@ -38,6 +40,13 @@ class curveFeatures():
     self.processors = [load(file[:-4], processed_data_folder) for file in processed_files]
     self.processors = [processor for processor in self.processors if hasattr(processor, 'curve_features')]
     self.processors = [processor for processor in self.processors if len(processor.curve_features) > 0]
+    # Optional filter by device_model (T15 vs T10)
+    processors_before_filter = len(self.processors)
+    if device_models is not None:
+      allowed = {device_models} if isinstance(device_models, str) else set(device_models)
+      self.processors = [p for p in self.processors if getattr(p, 'device_model', None) in allowed]
+      if processors_before_filter != len(self.processors):
+        print(f"\nFiltered processors by device_model: {processors_before_filter} -> {len(self.processors)} (keeping {device_models})")
     self.no_curve_subids = [processor.subid for processor in self.processors if len(processor.curve_features) == 0]
     print(f"\nFound {len(self.processors)} processors with curve_features")
     

@@ -11,8 +11,14 @@ import os
 import numpy as np
 
 class curveFeaturesWithEvents(curveFeatures):
-  def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, subids=None):
-    super().__init__(processed_data_folder, smooth_and_impute_attrs, curve_attrs, subids)
+  def __init__(self, processed_data_folder, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None, subids=None, allowed_device_ids=None, exclude_device_ids=None, device_models=None):
+    """
+    Args:
+      device_models (list or str, optional): If provided, keep only processors whose device_model is in this
+        list (e.g. ['T15'] for new only). Each processor has device_model = 'T15' or 'T10' from skyn_dataset.
+      allowed_device_ids, exclude_device_ids: Unused; kept for backward compatibility.
+    """
+    super().__init__(processed_data_folder, smooth_and_impute_attrs, curve_attrs, subids, device_models=device_models)
     
     # Filter processors to only include those with both curve features and events
     self.processors = [processor for processor in self.processors 
@@ -58,14 +64,30 @@ class curveFeaturesWithEvents(curveFeatures):
     self.event_attrs = event_attrs
     self.day_attrs = day_attrs
 
-    # Find drink total column
+    # Find drink total column - check event_attrs first, then fall back to pattern matching
     self.drink_total_column = None
-    if not self.event_data.empty:
+    if event_attrs and 'drink_total_column' in event_attrs:
+        # Use the column specified in event_attrs if it exists in event_data
+        specified_col = event_attrs['drink_total_column']
+        if not self.event_data.empty and specified_col in self.event_data.columns:
+            self.drink_total_column = specified_col
+            print(f"[INIT] Using drink_total_column from event_attrs: '{specified_col}'")
+        else:
+            print(f"Warning: drink_total_column '{specified_col}' from event_attrs not found in event_data, falling back to pattern matching")
+    
+    # Fall back to pattern matching if not specified in event_attrs or column not found
+    if self.drink_total_column is None and not self.event_data.empty:
         for col in self.event_data.columns:
             # More specific search for drink total column
             if ('drink' in col.lower() and 'total' in col.lower()) or 'totsd' in col.lower():
                 self.drink_total_column = col
+                print(f"[INIT] Using pattern-matched drink_total_column: '{col}'")
                 break
+    
+    if self.drink_total_column:
+        print(f"[INIT] Final drink_total_column set to: '{self.drink_total_column}'")
+    else:
+        print("[INIT] No drink_total_column found")
 
     self.default_tac_features = report_guide.stats_features
 
@@ -184,6 +206,8 @@ class curveFeaturesWithEvents(curveFeatures):
       'Curves with Event Match': [len(self.curve_with_event)],
       'Curves (Valid) with Event Match': [len(self.curve_valid_with_event)],
       'Curves (Invalid) with Event Match': [len(self.curve_invalid_with_event)],
+      'Curves (Valid) without Event Match': [len(self.curve_valid_without_event)],
+      'Curves (Invalid) without Event Match': [len(self.curve_invalid_without_event)],
       'Events': [self.event_data[['ema_id', 'ID']].drop_duplicates().shape[0]],
       'Events NOT matched to a Curve': [self.unmatched_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
       'Events matched to a Curve': [self.matched_events[['ema_id', 'ID']].drop_duplicates().shape[0]],
@@ -245,6 +269,43 @@ class curveFeaturesWithEvents(curveFeatures):
         'Events matched to at least one Invalid Curve (only)': [len(events_with_invalid_only)],
         'Events matched to one Invalid Curve (only)': [len(events_one_invalid_only)],
         'Events matched to multiple Invalid Curves (only)': [len(events_multiple_invalid_only)]
+      })
+      
+      # Four distinct matching situations (a)-(d) for tracking
+      # (a) Multiple passed only (no flagged); (b) Multiple flagged only (no passed)
+      # (c) One passed and 1+ flagged; (d) Multiple passed and 1+ flagged
+      events_multiple_passed_only = event_counts[
+        (event_counts['num_valid_curves_matched'] > 1) &
+        (event_counts['num_invalid_curves_matched'] == 0)
+      ]
+      events_multiple_flagged_only = event_counts[
+        (event_counts['num_invalid_curves_matched'] > 1) &
+        (event_counts['num_valid_curves_matched'] == 0)
+      ]
+      events_one_passed_one_or_more_flagged = event_counts[
+        (event_counts['num_valid_curves_matched'] == 1) &
+        (event_counts['num_invalid_curves_matched'] >= 1)
+      ]
+      events_multiple_passed_one_or_more_flagged = event_counts[
+        (event_counts['num_valid_curves_matched'] > 1) &
+        (event_counts['num_invalid_curves_matched'] >= 1)
+      ]
+      passed_dropped_a = (events_multiple_passed_only['num_valid_curves_matched'] - 1).sum() if len(events_multiple_passed_only) > 0 else 0
+      flagged_dropped_b = (events_multiple_flagged_only['num_invalid_curves_matched'] - 1).sum() if len(events_multiple_flagged_only) > 0 else 0
+      flagged_dropped_c = events_one_passed_one_or_more_flagged['num_invalid_curves_matched'].sum() if len(events_one_passed_one_or_more_flagged) > 0 else 0
+      passed_dropped_d = (events_multiple_passed_one_or_more_flagged['num_valid_curves_matched'] - 1).sum() if len(events_multiple_passed_one_or_more_flagged) > 0 else 0
+      flagged_dropped_d = events_multiple_passed_one_or_more_flagged['num_invalid_curves_matched'].sum() if len(events_multiple_passed_one_or_more_flagged) > 0 else 0
+      
+      self.counts.update({
+        '(a) Events multiple passed only (no flagged)': [len(events_multiple_passed_only)],
+        '(a) Passed curves dropped (AUC rule)': [int(passed_dropped_a)],
+        '(b) Events multiple flagged only (no passed)': [len(events_multiple_flagged_only)],
+        '(b) Flagged curves dropped (AUC rule)': [int(flagged_dropped_b)],
+        '(c) Events one passed and 1+ flagged': [len(events_one_passed_one_or_more_flagged)],
+        '(c) Flagged curves dropped (event had passed)': [int(flagged_dropped_c)],
+        '(d) Events multiple passed and 1+ flagged': [len(events_multiple_passed_one_or_more_flagged)],
+        '(d) Passed curves dropped (AUC rule)': [int(passed_dropped_d)],
+        '(d) Flagged curves dropped (event had passed)': [int(flagged_dropped_d)]
       })
     
     # Add drinking prediction counts if available
@@ -1020,8 +1081,12 @@ class curveFeaturesWithEvents(curveFeatures):
     density_plot_filename = os.path.join(output_dir, 'tac_density_distributions.png')
     visualizer.create_tac_density_plots(self.curve_with_event, output_filename=density_plot_filename)
     
-    # Optionally, you can add more plot types here, e.g.:
-    # visualizer.create_quality_mean_plots(self.curve_with_event, raw_curve_features=raw_curve_features, output_dir=output_dir)
+    # Quality mean plots: mean ± SE of TAC features across quality bins (optional raw overlay)
+    visualizer.create_quality_mean_plots(
+        self.curve_with_event,
+        raw_curve_features=raw_curve_features,
+        output_dir=output_dir,
+    )
 
   def clean_out_distant_events(self, distance_threshold=8):
     # This method is designed to remove events that are too far from their matched curves
