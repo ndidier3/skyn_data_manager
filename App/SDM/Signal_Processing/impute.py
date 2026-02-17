@@ -327,7 +327,7 @@ def convert_index_sets_to_index_region_pairs(*args):
     - list of [start, end] region pairs with extended boundaries
     - sorted list of proximal indices, which includes:
       a) Extension indices: Values added by extending before/after each region
-         (extension length = min(15, max(3, 3 + round(region_length/7))))
+         (extension length = min(15, 3 + round(region_length/7)); effective min 3, max 15 at region_length >= 84)
       b) Merged gap indices: Values that fall between merged regions
          (when regions are within dynamic merge_distance of each other)
       Note: Proximal indices never include any of the original input indices
