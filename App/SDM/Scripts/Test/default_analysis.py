@@ -10,7 +10,7 @@ Drinking Detection Implementation:
      Phase 1 (30-60 min): 9 non-HQ minutes allowed per 15-min block
      Phase 2 (60+ min): 5 additional HQ minutes required per 15-min block
   2. Not flagged as flat curve (FLAG_flat_curve == 0)
-  3. Has complete rise phase (FLAG_incomplete_curve_start_curve == 0) - ONLY for curves < 1 hour
+  3. Has complete rise phase (FLAG_incomplete_curve_start_curve == 0)
 - Creates DRINKING_PRED column for curves
 - Creates predicted_drinking_day_by_curve_start column for days (1 if drinking curve starts in day)
 - Exports separate visualization tabs for drinking vs. non-drinking curves/days
@@ -122,4 +122,4 @@ print(f"  - High-quality duration > required threshold (two-phase algorithm):")
 print(f"    Phase 1 (30-60 min): 9 non-HQ minutes allowed per 15-min block")
 print(f"    Phase 2 (60+ min): 5 additional HQ minutes required per 15-min block")
 print(f"  - FLAG_flat_curve == 0 (not flat)")
-print(f"  - FLAG_incomplete_curve_start_curve == 0 (complete rise phase) - ONLY for curves < 1 hour")
+print(f"  - FLAG_incomplete_curve_start_curve == 0 (complete rise phase)")

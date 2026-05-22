@@ -14,7 +14,7 @@ class ReportGuide:
             '_PERIPHERY_BEFORE': 'The region before the curve start, used for quality assessment',
             '_PERIPHERY_AFTER': 'The region after the curve end, used for quality assessment',
             '_REGION': 'The region consisting of CURVE + PERIPHERY',
-            '_EMA_REGION': 'The 12-hour region starting at the earliest timestamp of the event',
+            '_EMA_REGION': 'The 6-hour region around the earliest timestamp of the event (2 hours before, 4 hours after)',
         }
         self._curve_feature_descriptions = {
             # Basic identifiers
@@ -52,7 +52,7 @@ class ReportGuide:
             'descending_imputed_percent_CURVE': 'Fraction of descending TAC pairs containing imputed values',
             'CURVE_VALID': 'Whether the curve meets validity criteria (1=valid)',
             'REGION_VALID': 'Whether both the curve and periphery meet validity criteria (1=valid)',
-            'DRINKING_PRED': 'Predicted drinking curve based on quality and shape criteria: high_quality_duration_CURVE > required_HQ_duration (two-phase algorithm based on curve length) AND not flat AND complete rise phase (only for curves < 1 hour) (1=likely drinking)',
+            'DRINKING_PRED': 'Predicted drinking curve: duration_CURVE > default 29 min, high_quality_duration_CURVE > required_HQ_duration (four-phase vs curve length), FLAG_below_threshold_curve==0, FLAG_incomplete_curve_start_curve==0 (1=likely drinking)',
             
             # Curve timing features
             'begin': 'Start time of the curve',
@@ -93,6 +93,8 @@ class ReportGuide:
             'unimputed_gap_percent': 'Percentage of unimputed gap data',
             'total_gap_duration': 'Total duration of gap data (hours)',
             'total_gap_percent': 'Total percentage of gap data',
+            'total_gap_duration_inclusive': 'Total duration of gap data (hours); inclusive: gap==1 only, no mutual exclusivity',
+            'total_gap_percent_inclusive': 'Total percentage of gap data; inclusive: gap==1 only, no mutual exclusivity',
             'gap_imputation_ratio': 'Ratio of gap data that has been imputed (0-1)',
             
             # Non-wear features
@@ -102,6 +104,8 @@ class ReportGuide:
             'unimputed_non_wear_percent': 'Percentage of unimputed non-wear data',
             'total_non_wear_duration': 'Total duration of non-wear data (hours)',
             'total_non_wear_percent': 'Total percentage of non-wear data',
+            'total_non_wear_duration_inclusive': 'Total duration of non-wear data (hours); inclusive: non_wear==1 only, no mutual exclusivity',
+            'total_non_wear_percent_inclusive': 'Total percentage of non-wear data; inclusive: non_wear==1 only, no mutual exclusivity',
             'non_wear_imputation_ratio': 'Ratio of non-wear data that has been imputed (0-1)',
             
             # Jump features
@@ -111,6 +115,8 @@ class ReportGuide:
             'unimputed_jump_percent_CURVE': 'Percentage of unimputed jump data',
             'total_jump_duration_CURVE': 'Total duration of jump data (hours)',
             'total_jump_percent_CURVE': 'Total percentage of jump data',
+            'total_jump_duration_inclusive': 'Total duration of jump data (hours); inclusive: jump==1 only, no mutual exclusivity',
+            'total_jump_percent_inclusive': 'Total percentage of jump data; inclusive: jump==1 only, no mutual exclusivity',
             'jump_imputation_ratio_CURVE': 'Ratio of jump data that has been imputed (0-1)',
             
             # Plummet features
@@ -120,6 +126,8 @@ class ReportGuide:
             'unimputed_plummet_percent': 'Percentage of unimputed plummet data',
             'total_plummet_duration': 'Total duration of plummet data (hours)',
             'total_plummet_percent': 'Total percentage of plummet data',
+            'total_plummet_duration_inclusive': 'Total duration of plummet data (hours); inclusive: plummet==1 only, no mutual exclusivity',
+            'total_plummet_percent_inclusive': 'Total percentage of plummet data; inclusive: plummet==1 only, no mutual exclusivity',
             'plummet_imputation_ratio': 'Ratio of plummet data that has been imputed (0-1)',
             
             # Extreme negative features
@@ -129,6 +137,8 @@ class ReportGuide:
             'unimputed_extreme_negative_percent': 'Percentage of unimputed extreme negative data',
             'total_extreme_negative_duration': 'Total duration of extreme negative data (hours)',
             'total_extreme_negative_percent': 'Total percentage of extreme negative data',
+            'total_extreme_negative_duration_inclusive': 'Total duration of extreme negative data (hours); inclusive: extreme_negative==1 only, no mutual exclusivity',
+            'total_extreme_negative_percent_inclusive': 'Total percentage of extreme negative data; inclusive: extreme_negative==1 only, no mutual exclusivity',
             'sub_negative_10_sum': 'Sum of all TAC values below -10',
             'extreme_negative_imputation_ratio': 'Ratio of extreme negative data that has been imputed (0-1)',
             'low_quality_imputation_ratio': 'Ratio of overall low quality data that has been imputed (0-1)',
@@ -326,7 +336,17 @@ class ReportGuide:
             'unimputed_jump_percent_CURVE': 'Percentage of unimputed jump data',
             'total_jump_duration_CURVE': 'Total duration of jump data (hours)',
             'total_jump_percent_CURVE': 'Total percentage of jump data',
+            'total_jump_duration_inclusive_CURVE': 'Total duration of jump data (hours); inclusive: jump==1 only, no mutual exclusivity',
+            'total_jump_percent_inclusive_CURVE': 'Total percentage of jump data; inclusive: jump==1 only, no mutual exclusivity',
             'jump_imputation_ratio_CURVE': 'Ratio of jump data that has been imputed (0-1)',
+            'total_gap_duration_inclusive_CURVE': 'Total duration of gap data (hours); inclusive: gap==1 only, no mutual exclusivity',
+            'total_gap_percent_inclusive_CURVE': 'Total percentage of gap data; inclusive: gap==1 only, no mutual exclusivity',
+            'total_non_wear_duration_inclusive_CURVE': 'Total duration of non-wear data (hours); inclusive: non_wear==1 only, no mutual exclusivity',
+            'total_non_wear_percent_inclusive_CURVE': 'Total percentage of non-wear data; inclusive: non_wear==1 only, no mutual exclusivity',
+            'total_plummet_duration_inclusive_CURVE': 'Total duration of plummet data (hours); inclusive: plummet==1 only, no mutual exclusivity',
+            'total_plummet_percent_inclusive_CURVE': 'Total percentage of plummet data; inclusive: plummet==1 only, no mutual exclusivity',
+            'total_extreme_negative_duration_inclusive_CURVE': 'Total duration of extreme negative data (hours); inclusive: extreme_negative==1 only, no mutual exclusivity',
+            'total_extreme_negative_percent_inclusive_CURVE': 'Total percentage of extreme negative data; inclusive: extreme_negative==1 only, no mutual exclusivity',
             'imputed_duration_CURVE': 'Duration of imputed data (hours)',
             'imputed_percent_CURVE': 'Percentage of imputed data',
             'total_low_quality_duration_CURVE': 'Duration of low quality data (hours)',
@@ -383,6 +403,16 @@ class ReportGuide:
             'flatlined_percent_CURVE': 'numeric',
             'imputed_jump_duration_CURVE': 'numeric',
             'imputed_jump_percent_CURVE': 'numeric',
+            'total_jump_duration_inclusive_CURVE': 'numeric',
+            'total_jump_percent_inclusive_CURVE': 'numeric',
+            'total_gap_duration_inclusive_CURVE': 'numeric',
+            'total_gap_percent_inclusive_CURVE': 'numeric',
+            'total_non_wear_duration_inclusive_CURVE': 'numeric',
+            'total_non_wear_percent_inclusive_CURVE': 'numeric',
+            'total_plummet_duration_inclusive_CURVE': 'numeric',
+            'total_plummet_percent_inclusive_CURVE': 'numeric',
+            'total_extreme_negative_duration_inclusive_CURVE': 'numeric',
+            'total_extreme_negative_percent_inclusive_CURVE': 'numeric',
             'imputed_duration_CURVE': 'numeric',
             'imputed_percent_CURVE': 'numeric',
             'total_low_quality_duration_CURVE': 'numeric',
@@ -432,6 +462,8 @@ class ReportGuide:
             'unimputed_gap_percent_REGION': 'numeric',
             'total_gap_duration_REGION': 'numeric',
             'total_gap_percent_REGION': 'numeric',
+            'total_gap_duration_inclusive_REGION': 'numeric',
+            'total_gap_percent_inclusive_REGION': 'numeric',
             'gap_imputation_ratio_REGION': 'numeric',
             'imputed_non_wear_duration_REGION': 'numeric',
             'imputed_non_wear_percent_REGION': 'numeric',
@@ -439,6 +471,8 @@ class ReportGuide:
             'unimputed_non_wear_percent_REGION': 'numeric',
             'total_non_wear_duration_REGION': 'numeric',
             'total_non_wear_percent_REGION': 'numeric',
+            'total_non_wear_duration_inclusive_REGION': 'numeric',
+            'total_non_wear_percent_inclusive_REGION': 'numeric',
             'non_wear_imputation_ratio_REGION': 'numeric',
             'imputed_jump_duration_REGION': 'numeric',
             'imputed_jump_percent_REGION': 'numeric',
@@ -446,6 +480,8 @@ class ReportGuide:
             'unimputed_jump_percent_REGION': 'numeric',
             'total_jump_duration_REGION': 'numeric',
             'total_jump_percent_REGION': 'numeric',
+            'total_jump_duration_inclusive_REGION': 'numeric',
+            'total_jump_percent_inclusive_REGION': 'numeric',
             'jump_imputation_ratio_REGION': 'numeric',
             'imputed_plummet_duration_REGION': 'numeric',
             'imputed_plummet_percent_REGION': 'numeric',
@@ -453,6 +489,8 @@ class ReportGuide:
             'unimputed_plummet_percent_REGION': 'numeric',
             'total_plummet_duration_REGION': 'numeric',
             'total_plummet_percent_REGION': 'numeric',
+            'total_plummet_duration_inclusive_REGION': 'numeric',
+            'total_plummet_percent_inclusive_REGION': 'numeric',
             'plummet_imputation_ratio_REGION': 'numeric',
             'imputed_extreme_negative_duration_REGION': 'numeric',
             'imputed_extreme_negative_percent_REGION': 'numeric',
@@ -460,6 +498,8 @@ class ReportGuide:
             'unimputed_extreme_negative_percent_REGION': 'numeric',
             'total_extreme_negative_duration_REGION': 'numeric',
             'total_extreme_negative_percent_REGION': 'numeric',
+            'total_extreme_negative_duration_inclusive_REGION': 'numeric',
+            'total_extreme_negative_percent_inclusive_REGION': 'numeric',
             'sub_negative_10_sum_REGION': 'numeric',
             'extreme_negative_imputation_ratio_REGION': 'numeric',
             'low_quality_imputation_ratio_REGION': 'numeric',
@@ -487,6 +527,8 @@ class ReportGuide:
             'unimputed_gap_percent_PERIPHERY_BEFORE': 'numeric',
             'total_gap_duration_PERIPHERY_BEFORE': 'numeric',
             'total_gap_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_gap_duration_inclusive_PERIPHERY_BEFORE': 'numeric',
+            'total_gap_percent_inclusive_PERIPHERY_BEFORE': 'numeric',
             'gap_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
             'imputed_non_wear_duration_PERIPHERY_BEFORE': 'numeric',
             'imputed_non_wear_percent_PERIPHERY_BEFORE': 'numeric',
@@ -494,6 +536,8 @@ class ReportGuide:
             'unimputed_non_wear_percent_PERIPHERY_BEFORE': 'numeric',
             'total_non_wear_duration_PERIPHERY_BEFORE': 'numeric',
             'total_non_wear_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_non_wear_duration_inclusive_PERIPHERY_BEFORE': 'numeric',
+            'total_non_wear_percent_inclusive_PERIPHERY_BEFORE': 'numeric',
             'non_wear_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
             'imputed_jump_duration_PERIPHERY_BEFORE': 'numeric',
             'imputed_jump_percent_PERIPHERY_BEFORE': 'numeric',
@@ -501,6 +545,8 @@ class ReportGuide:
             'unimputed_jump_percent_PERIPHERY_BEFORE': 'numeric',
             'total_jump_duration_PERIPHERY_BEFORE': 'numeric',
             'total_jump_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_jump_duration_inclusive_PERIPHERY_BEFORE': 'numeric',
+            'total_jump_percent_inclusive_PERIPHERY_BEFORE': 'numeric',
             'jump_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
             'imputed_plummet_duration_PERIPHERY_BEFORE': 'numeric',
             'imputed_plummet_percent_PERIPHERY_BEFORE': 'numeric',
@@ -508,6 +554,8 @@ class ReportGuide:
             'unimputed_plummet_percent_PERIPHERY_BEFORE': 'numeric',
             'total_plummet_duration_PERIPHERY_BEFORE': 'numeric',
             'total_plummet_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_plummet_duration_inclusive_PERIPHERY_BEFORE': 'numeric',
+            'total_plummet_percent_inclusive_PERIPHERY_BEFORE': 'numeric',
             'plummet_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
             'imputed_extreme_negative_duration_PERIPHERY_BEFORE': 'numeric',
             'imputed_extreme_negative_percent_PERIPHERY_BEFORE': 'numeric',
@@ -515,6 +563,8 @@ class ReportGuide:
             'unimputed_extreme_negative_percent_PERIPHERY_BEFORE': 'numeric',
             'total_extreme_negative_duration_PERIPHERY_BEFORE': 'numeric',
             'total_extreme_negative_percent_PERIPHERY_BEFORE': 'numeric',
+            'total_extreme_negative_duration_inclusive_PERIPHERY_BEFORE': 'numeric',
+            'total_extreme_negative_percent_inclusive_PERIPHERY_BEFORE': 'numeric',
             'sub_negative_10_sum_PERIPHERY_BEFORE': 'numeric',
             'extreme_negative_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
             'low_quality_imputation_ratio_PERIPHERY_BEFORE': 'numeric',
@@ -542,6 +592,8 @@ class ReportGuide:
             'unimputed_gap_percent_PERIPHERY_AFTER': 'numeric',
             'total_gap_duration_PERIPHERY_AFTER': 'numeric',
             'total_gap_percent_PERIPHERY_AFTER': 'numeric',
+            'total_gap_duration_inclusive_PERIPHERY_AFTER': 'numeric',
+            'total_gap_percent_inclusive_PERIPHERY_AFTER': 'numeric',
             'gap_imputation_ratio_PERIPHERY_AFTER': 'numeric',
             'imputed_non_wear_duration_PERIPHERY_AFTER': 'numeric',
             'imputed_non_wear_percent_PERIPHERY_AFTER': 'numeric',
@@ -549,6 +601,8 @@ class ReportGuide:
             'unimputed_non_wear_percent_PERIPHERY_AFTER': 'numeric',
             'total_non_wear_duration_PERIPHERY_AFTER': 'numeric',
             'total_non_wear_percent_PERIPHERY_AFTER': 'numeric',
+            'total_non_wear_duration_inclusive_PERIPHERY_AFTER': 'numeric',
+            'total_non_wear_percent_inclusive_PERIPHERY_AFTER': 'numeric',
             'non_wear_imputation_ratio_PERIPHERY_AFTER': 'numeric',
             'imputed_jump_duration_PERIPHERY_AFTER': 'numeric',
             'imputed_jump_percent_PERIPHERY_AFTER': 'numeric',
@@ -556,6 +610,8 @@ class ReportGuide:
             'unimputed_jump_percent_PERIPHERY_AFTER': 'numeric',
             'total_jump_duration_PERIPHERY_AFTER': 'numeric',
             'total_jump_percent_PERIPHERY_AFTER': 'numeric',
+            'total_jump_duration_inclusive_PERIPHERY_AFTER': 'numeric',
+            'total_jump_percent_inclusive_PERIPHERY_AFTER': 'numeric',
             'jump_imputation_ratio_PERIPHERY_AFTER': 'numeric',
             'imputed_plummet_duration_PERIPHERY_AFTER': 'numeric',
             'imputed_plummet_percent_PERIPHERY_AFTER': 'numeric',
@@ -563,6 +619,8 @@ class ReportGuide:
             'unimputed_plummet_percent_PERIPHERY_AFTER': 'numeric',
             'total_plummet_duration_PERIPHERY_AFTER': 'numeric',
             'total_plummet_percent_PERIPHERY_AFTER': 'numeric',
+            'total_plummet_duration_inclusive_PERIPHERY_AFTER': 'numeric',
+            'total_plummet_percent_inclusive_PERIPHERY_AFTER': 'numeric',
             'plummet_imputation_ratio_PERIPHERY_AFTER': 'numeric',
             'imputed_extreme_negative_duration_PERIPHERY_AFTER': 'numeric',
             'imputed_extreme_negative_percent_PERIPHERY_AFTER': 'numeric',
@@ -570,6 +628,8 @@ class ReportGuide:
             'unimputed_extreme_negative_percent_PERIPHERY_AFTER': 'numeric',
             'total_extreme_negative_duration_PERIPHERY_AFTER': 'numeric',
             'total_extreme_negative_percent_PERIPHERY_AFTER': 'numeric',
+            'total_extreme_negative_duration_inclusive_PERIPHERY_AFTER': 'numeric',
+            'total_extreme_negative_percent_inclusive_PERIPHERY_AFTER': 'numeric',
             'sub_negative_10_sum_PERIPHERY_AFTER': 'numeric',
             'extreme_negative_imputation_ratio_PERIPHERY_AFTER': 'numeric',
             'low_quality_imputation_ratio_PERIPHERY_AFTER': 'numeric',
@@ -603,6 +663,11 @@ class ReportGuide:
             'Dataset_ID': 'Dataset identifier',
             'day_no': 'Day number (sequential day in the study)',
             'begin_day': 'Start time of the day (social day boundary)',
+            'day_of_week_cat': (
+                'Calendar weekday derived from ``begin_day``: integer **1 = Monday** through **7 = Sunday** '
+                '(pandas weekday convention); missing when ``begin_day`` is missing or invalid'
+            ),
+            'new_device': '1 if device_two is non-null (two distinct devices contributed data that day, indicating a mid-burst device swap); 0 otherwise',
             'end_day': 'End time of the day (social day boundary)',
             
             # Device information
@@ -621,6 +686,100 @@ class ReportGuide:
             'device_worn_duration': 'Duration device was worn (hours) [using algorithm]',
             'device_worn_percent_of_device_on': 'Percentage of device-on time that device was worn',
             'device_worn_percent_of_day': 'Percentage of day that device was worn',
+
+            # Day-level TAC summaries (minute rows in the social day); exploratory — coverage varies; do not rely on these as primary inputs yet
+            'tac_day_mean': (
+                'Mean TAC (µg/L) across minute rows in the day window (**coerced numeric**; NaNs excluded from the mean)'
+            ),
+            'tac_day_median': 'Median TAC (µg/L) across minute rows in the day window',
+            'tac_day_sd': 'Sample standard deviation of TAC across minute rows (pandas ``std``, ddof=1; NaN if insufficient finite values)',
+            'tac_day_min': 'Minimum TAC (µg/L) among minute rows in the day window',
+            'tac_day_max': 'Maximum TAC (µg/L) among minute rows in the day window',
+            'tac_day_q25': '25th percentile of TAC across minute rows in the day window',
+            'tac_day_q75': '75th percentile of TAC across minute rows in the day window',
+            'tac_non_missing_minute_count': (
+                'Count of minute rows in the day window with non-null TAC after numeric coercion'
+            ),
+            'tac_non_missing_fraction_of_rows': (
+                '``tac_non_missing_minute_count`` divided by the number of minute rows in the day segment (0 when empty)'
+            ),
+
+            # Time-region TAC features — Q1 (hours 0–6) and Q2_Q4 (hours 6–24) of the social day
+            'tac_q1_mean': 'Mean TAC (µg/L) across minute rows in Q1 (hours 0–6 of social day); NaN if no valid TAC data',
+            'tac_q1_max': 'Maximum TAC (µg/L) among minute rows in Q1; NaN if no valid TAC data',
+            'tac_q1_above_threshold_percent': 'Fraction of minute rows in Q1 where TAC ≥ curve_threshold (0–1); NaN if no data',
+            'tac_q1_auc': 'Area under the TAC curve in Q1 (trapezoidal rule, dx=0.1); NaN if no valid TAC data',
+            'tac_q1_rise_rate_point_to_point': 'Mean ascending point-to-point TAC rate within Q1; 0 if no ascending steps; NaN if no data',
+            'tac_q1_fall_rate_point_to_point': 'Mean descending point-to-point TAC rate within Q1; 0 if no descending steps; NaN if no data',
+            'tac_q1_ascending_duration': 'Total duration (hours) of ascending TAC steps within Q1; 0 if none; NaN if no data',
+            'tac_q1_descending_duration': 'Total duration (hours) of descending TAC steps within Q1; 0 if none; NaN if no data',
+
+            'tac_q2_q4_mean': 'Mean TAC (µg/L) across minute rows in Q2–Q4 (hours 6–24 of social day); NaN if no valid TAC data',
+            'tac_q2_q4_max': 'Maximum TAC (µg/L) among minute rows in Q2–Q4; NaN if no valid TAC data',
+            'tac_q2_q4_above_threshold_percent': 'Fraction of minute rows in Q2–Q4 where TAC ≥ curve_threshold (0–1); NaN if no data',
+            'tac_q2_q4_auc': 'Area under the TAC curve in Q2–Q4 (trapezoidal rule, dx=0.1); NaN if no valid TAC data',
+            'tac_q2_q4_rise_rate_point_to_point': 'Mean ascending point-to-point TAC rate within Q2–Q4; 0 if no ascending steps; NaN if no data',
+            'tac_q2_q4_fall_rate_point_to_point': 'Mean descending point-to-point TAC rate within Q2–Q4; 0 if no descending steps; NaN if no data',
+            'tac_q2_q4_ascending_duration': 'Total duration (hours) of ascending TAC steps within Q2–Q4; 0 if none; NaN if no data',
+            'tac_q2_q4_descending_duration': 'Total duration (hours) of descending TAC steps within Q2–Q4; 0 if none; NaN if no data',
+
+            # Burst prior medians across all qualifying curves on prior days within the burst
+            'median_prior_peak_CURVE': (
+                'Median ``peak_CURVE`` across all qualifying curves on prior burst days '
+                '(HQ% >= 75% and HQ duration >= 1 hour); NaN on the first day or if no qualifying prior curves'
+            ),
+            'median_prior_auc_total_CURVE': (
+                'Median ``auc_total_CURVE`` across all qualifying prior curves in the burst; NaN first day'
+            ),
+            'median_prior_duration_CURVE': (
+                'Median ``duration_CURVE`` across all qualifying prior curves in the burst; NaN first day'
+            ),
+            'median_prior_total_low_quality_percent_CURVE': (
+                'Median ``total_low_quality_percent_CURVE`` across all qualifying prior curves in the burst; '
+                'NaN first day'
+            ),
+            'median_prior_rise_rate_CURVE': (
+                'Median ``rise_rate_CURVE`` across all qualifying prior curves in the burst; NaN first day'
+            ),
+            'median_prior_fall_rate_CURVE': (
+                'Median ``fall_rate_CURVE`` across all qualifying prior curves in the burst; NaN first day'
+            ),
+            'median_prior_rise_rate_point_to_point_CURVE': (
+                'Median ``rise_rate_point_to_point_CURVE`` across all qualifying prior curves in the burst; NaN first day'
+            ),
+            'median_prior_fall_rate_point_to_point_CURVE': (
+                'Median ``fall_rate_point_to_point_CURVE`` across all qualifying prior curves in the burst; NaN first day'
+            ),
+            'median_prior_fall_duration_CURVE': (
+                'Median ``fall_duration_CURVE`` across all qualifying prior curves in the burst; NaN first day'
+            ),
+            'median_prior_rise_duration_CURVE': (
+                'Median ``rise_duration_CURVE`` across all qualifying prior curves in the burst; NaN first day'
+            ),
+
+            # Prior burst-day medians of day-level TAC region features
+            'median_prior_tac_q1_mean': 'Expanding median of tac_q1_mean across prior days in the burst; NaN first day',
+            'median_prior_tac_q1_max': 'Expanding median of tac_q1_max across prior days in the burst; NaN first day',
+            'median_prior_tac_q1_auc': 'Expanding median of tac_q1_auc across prior days in the burst; NaN first day',
+            'median_prior_tac_q2_q4_mean': 'Expanding median of tac_q2_q4_mean across prior days in the burst; NaN first day',
+            'median_prior_tac_q2_q4_max': 'Expanding median of tac_q2_q4_max across prior days in the burst; NaN first day',
+            'median_prior_tac_q2_q4_auc': 'Expanding median of tac_q2_q4_auc across prior days in the burst; NaN first day',
+            'median_prior_curve_1_start_offset_hours': 'Expanding median of curve_1_start_offset_hours across prior days in the burst; captures typical top-curve start time; NaN first day',
+            'median_prior_curve_1_end_offset_hours': 'Expanding median of curve_1_end_offset_hours across prior days in the burst; captures typical top-curve end time; NaN first day',
+
+            # Per-slot derived features (slots ordered by descending high_quality_duration_CURVE)
+            'curve_{n}_overlap_fraction': (
+                '``curve_{n}_overlap_hours`` divided by ``curve_{n}_duration_CURVE`` (fraction of the curve that '
+                'falls within the social day); NaN if duration missing or <= 0'
+            ),
+            'curve_{n}_start_offset_hours': (
+                'Hours from ``begin_day`` to ``begin_CURVE`` for the curve in slot ``n``; '
+                'negative if the curve started before the social day (prior-day spillover); 0 at day start'
+            ),
+            'curve_{n}_end_offset_hours': (
+                'Hours from ``begin_day`` to ``end_CURVE`` for the curve in slot ``n``; '
+                '>24 if the curve extends past the social day; values near 24 = curve ended at day end'
+            ),
             'device_worn_duration_cutoff': 'Duration device was worn [using 28 Celcius cutoff]',
             'device_worn_cutoff_percent_of_device_on': 'Percentage of device-on time that device was worn (with cutoff)',
             'device_worn_cutoff_percent_of_day': 'Percentage of day that device was worn (with cutoff)',
@@ -636,6 +795,12 @@ class ReportGuide:
             'unimputed_low_quality_percent': 'Percentage of day that was unimputed low quality',
             'imputed_low_quality_duration': 'Duration of imputed low quality data (hours)',
             'imputed_low_quality_percent': 'Percentage of day that was imputed low quality',
+            'low_quality_percent_of_day': 'Low-quality duration divided by 24 hours (0–1; fixed 24h denominator)',
+            'unimputed_low_quality_percent_of_day': 'Unimputed low-quality duration divided by 24 hours (0–1; fixed 24h denominator)',
+            'imputed_low_quality_percent_of_day': 'Imputed low-quality duration divided by 24 hours (0–1; fixed 24h denominator)',
+            'tac_day_missing': '1 if this day row was inserted to represent a study day with no TAC day-level data; 0 if observed from TAC processing',
+            'invalid_region_curve_overlap': '1 if any curve overlaps this day where duration_CURVE > 60 min and REGION_VALID = 0 (used to treat non-drinking days as unknown when applicable); 0 otherwise',
+            'unknown_reason': 'Reason label for unknown-classified day rows (blank otherwise): invalid_region_curve, tac_day_missing, or low_quality_day',
             
             # Gap analysis
             'gap_duration': 'Duration of data gaps (hours)',
@@ -689,6 +854,13 @@ class ReportGuide:
             'low_quality_imputation_ratio': 'Overall ratio of low quality data that was imputed (0-1)',
             'total_gaps_and_non_wear_percent': 'Total percentage of gaps and non-wear combined',
             'below_threshold_percent': 'Percentage of data below detection threshold',
+            'above_threshold_duration': 'Duration of TAC at or above curve threshold (hours)',
+            'above_threshold_percent_of_day': 'Fraction of the 24-hour day with TAC at or above curve threshold (0-1)',
+            'above_threshold_high_quality_percent': 'Of above-threshold minutes, fraction that are high-quality (0-1); None if no above-threshold data',
+            'above_threshold_high_quality_percent_of_day': (
+                'Fraction of the 24-hour day with TAC both at/above curve threshold **and** high-quality '
+                '(minutes above threshold & not low-quality, divided by 24 hours; 0 when no data)'
+            ),
             
             # Signal characteristics
             'flatline_max': 'Maximum duration of flatline periods (minutes)',
@@ -712,7 +884,11 @@ class ReportGuide:
             # Drinking curve overlap detection
             'drinking_curve_overlap': 'Whether any drinking curve overlapped with this day (0/1)',
             'predicted_drinking_curve_overlap': 'Whether any predicted drinking curve overlapped with this day based on DRINKING_PRED (0/1)',
-            'predicted_drinking_day_by_curve_start': 'Whether any predicted drinking curve started within this day (begin_CURVE within day boundaries) (0/1)',
+            'predicted_drinking_day_by_curve_start': (
+                'Drinking day (0/1): 1 if any curve with DRINKING_PRED=1 has begin_CURVE inside '
+                '[begin_day, end_day), or if above_threshold_percent_of_day ≥ 0.75 and '
+                'above_threshold_high_quality_percent > 0.60 (day-level fractions; curve QC applies upstream)'
+            ),
             'total_curve_overlap_hours': 'Total hours of curve overlap with this day (sum across all curves)',
             'predicted_drinking_overlap_hours': 'Total hours of predicted drinking curve overlap with this day (sum across DRINKING_PRED=1 curves only)',
             
@@ -720,21 +896,59 @@ class ReportGuide:
             'curve_1_id': 'ID of first curve that overlapped with this day',
             'curve_1_predicted_drinking': 'Whether first overlapping curve was predicted drinking (DRINKING_PRED=1)',
             'curve_1_overlap_hours': 'Hours of overlap between first curve and this day',
-            'curve_1_high_quality_duration': 'High-quality duration from first overlapping curve (carried forward from curve features)',
+            'curve_1_duration_CURVE': (
+                'Total duration (hours) of the first overlapping curve from ``duration_CURVE``; used with '
+                '``curve_1_overlap_hours`` for fraction-on-day when selecting max-HQ attachment'
+            ),
+            'curve_1_high_quality_duration': (
+                'High-quality duration (hours) for **overlap slot 1** (chronologically first overlapping curve), from '
+                '``high_quality_duration_CURVE``. Full curve features are available per slot as ``curve_{n}_<feature>``.'
+            ),
             'curve_1_extends_prior_day': 'Whether first curve extends into prior day (0/1)',
             'curve_1_extends_next_day': 'Whether first curve extends into next day (0/1)',
             'curve_2_id': 'ID of second curve that overlapped with this day',
             'curve_2_predicted_drinking': 'Whether second overlapping curve was predicted drinking (DRINKING_PRED=1)',
             'curve_2_overlap_hours': 'Hours of overlap between second curve and this day',
+            'curve_2_duration_CURVE': 'Total duration (hours) of the second overlapping curve (``duration_CURVE``)',
             'curve_2_high_quality_duration': 'High-quality duration from second overlapping curve (carried forward from curve features)',
             'curve_2_extends_prior_day': 'Whether second curve extends into prior day (0/1)',
             'curve_2_extends_next_day': 'Whether second curve extends into next day (0/1)',
             'curve_3_id': 'ID of third curve that overlapped with this day',
             'curve_3_predicted_drinking': 'Whether third overlapping curve was predicted drinking (DRINKING_PRED=1)',
             'curve_3_overlap_hours': 'Hours of overlap between third curve and this day',
+            'curve_3_duration_CURVE': 'Total duration (hours) of the third overlapping curve (``duration_CURVE``)',
             'curve_3_high_quality_duration': 'High-quality duration from third overlapping curve (carried forward from curve features)',
             'curve_3_extends_prior_day': 'Whether third curve extends into prior day (0/1)',
             'curve_3_extends_next_day': 'Whether third curve extends into next day (0/1)',
+            'annotation_drinking_day': (
+                'Manual or review annotation for drinking vs non-drinking day (e.g. filled in Excel or '
+                'downstream); initialized as blank when building curve-attachment exports.'
+            ),
+
+            # Morning EMA merge and TAC agreement (day rows)
+            'morning_self_report_alcohol': (
+                'Merged morning self-report of alcohol use for this day (0/1 when a response exists; '
+                'missing if no morning item matched this day row)'
+            ),
+            'morning_report_matched': (
+                '1 if a morning alcohol response was linked to this day row; 0 if no match'
+            ),
+            'morning_merge_date': (
+                'Calendar date used when joining morning EMA to this TAC day (calendar merge path)'
+            ),
+            'inside_burst': (
+                '1 if this day’s calendar date falls inside the skyn wear / study window for that burst; '
+                '0 if outside (used to subset Agreement_summary and burst grids)'
+            ),
+            'self_report_and_tac_comparison': (
+                'Morning alcohol self-report vs drinking-day flag (predicted_drinking_day_by_curve_start), '
+                'with day-quality gating on non-drinking days: true_positive, false_positive, true_negative, '
+                'false_negative when sufficient data; true_unknown / false_unknown when non-drinking day and '
+                'low_quality_percent ≥ 0.25 and self-report present; positive_without_self_report when drinking day '
+                'and no morning SR; negative_without_self_report when no drinking day, no morning SR, and the day is '
+                'high-quality enough to score sufficient-data non-drinking; unknown_sr_missing when no drinking day, no morning '
+                'SR, and low_quality_percent ≥ 0.25 (unknown due to low quality, not labeled as sufficient data)'
+            ),
         }
 
         # Tab descriptions for different export types
@@ -815,6 +1029,8 @@ class ReportGuide:
             'unimputed_gap_percent_REGION': 'Percentage of unimputed gap data in region',
             'total_gap_duration_REGION': 'Total duration of gap data in region (hours)',
             'total_gap_percent_REGION': 'Total percentage of gap data in region',
+            'total_gap_duration_inclusive_REGION': 'Total duration of gap data in region (hours); inclusive: gap==1 only, no mutual exclusivity',
+            'total_gap_percent_inclusive_REGION': 'Total percentage of gap data in region; inclusive: gap==1 only, no mutual exclusivity',
             'gap_imputation_ratio_REGION': 'Ratio of gap data that has been imputed in region (0-1)',
             'imputed_non_wear_duration_REGION': 'Duration of imputed non-wear data in region (hours)',
             'imputed_non_wear_percent_REGION': 'Percentage of imputed non-wear data in region',
@@ -822,6 +1038,8 @@ class ReportGuide:
             'unimputed_non_wear_percent_REGION': 'Percentage of unimputed non-wear data in region',
             'total_non_wear_duration_REGION': 'Total duration of non-wear data in region (hours)',
             'total_non_wear_percent_REGION': 'Total percentage of non-wear data in region',
+            'total_non_wear_duration_inclusive_REGION': 'Total duration of non-wear data in region (hours); inclusive: non_wear==1 only, no mutual exclusivity',
+            'total_non_wear_percent_inclusive_REGION': 'Total percentage of non-wear data in region; inclusive: non_wear==1 only, no mutual exclusivity',
             'non_wear_imputation_ratio_REGION': 'Ratio of non-wear data that has been imputed in region (0-1)',
             'imputed_jump_duration_REGION': 'Duration of imputed jump data in region (hours)',
             'imputed_jump_percent_REGION': 'Percentage of imputed jump data in region',
@@ -829,6 +1047,8 @@ class ReportGuide:
             'unimputed_jump_percent_REGION': 'Percentage of unimputed jump data in region',
             'total_jump_duration_REGION': 'Total duration of jump data in region (hours)',
             'total_jump_percent_REGION': 'Total percentage of jump data in region',
+            'total_jump_duration_inclusive_REGION': 'Total duration of jump data in region (hours); inclusive: jump==1 only, no mutual exclusivity',
+            'total_jump_percent_inclusive_REGION': 'Total percentage of jump data in region; inclusive: jump==1 only, no mutual exclusivity',
             'jump_imputation_ratio_REGION': 'Ratio of jump data that has been imputed in region (0-1)',
             'imputed_plummet_duration_REGION': 'Duration of imputed plummet data in region (hours)',
             'imputed_plummet_percent_REGION': 'Percentage of imputed plummet data in region',
@@ -836,6 +1056,8 @@ class ReportGuide:
             'unimputed_plummet_percent_REGION': 'Percentage of unimputed plummet data in region',
             'total_plummet_duration_REGION': 'Total duration of plummet data in region (hours)',
             'total_plummet_percent_REGION': 'Total percentage of plummet data in region',
+            'total_plummet_duration_inclusive_REGION': 'Total duration of plummet data in region (hours); inclusive: plummet==1 only, no mutual exclusivity',
+            'total_plummet_percent_inclusive_REGION': 'Total percentage of plummet data in region; inclusive: plummet==1 only, no mutual exclusivity',
             'plummet_imputation_ratio_REGION': 'Ratio of plummet data that has been imputed in region (0-1)',
             'imputed_extreme_negative_duration_REGION': 'Duration of imputed extreme negative data in region (hours)',
             'imputed_extreme_negative_percent_REGION': 'Percentage of imputed extreme negative data in region',
@@ -843,6 +1065,8 @@ class ReportGuide:
             'unimputed_extreme_negative_percent_REGION': 'Percentage of unimputed extreme negative data in region',
             'total_extreme_negative_duration_REGION': 'Total duration of extreme negative data in region (hours)',
             'total_extreme_negative_percent_REGION': 'Total percentage of extreme negative data in region',
+            'total_extreme_negative_duration_inclusive_REGION': 'Total duration of extreme negative data in region (hours); inclusive: extreme_negative==1 only, no mutual exclusivity',
+            'total_extreme_negative_percent_inclusive_REGION': 'Total percentage of extreme negative data in region; inclusive: extreme_negative==1 only, no mutual exclusivity',
             'sub_negative_10_sum_REGION': 'Sum of all TAC values below -10 in region',
             'extreme_negative_imputation_ratio_REGION': 'Ratio of extreme negative data that has been imputed in region (0-1)',
             'low_quality_imputation_ratio_REGION': 'Ratio of overall low quality data that has been imputed in region (0-1)',
@@ -925,6 +1149,8 @@ class ReportGuide:
             'unimputed_gap_percent_PERIPHERY_BEFORE': 'Percentage of unimputed gap data in periphery before',
             'total_gap_duration_PERIPHERY_BEFORE': 'Total duration of gap data in periphery before (hours)',
             'total_gap_percent_PERIPHERY_BEFORE': 'Total percentage of gap data in periphery before',
+            'total_gap_duration_inclusive_PERIPHERY_BEFORE': 'Total duration of gap data in periphery before (hours); inclusive: gap==1 only, no mutual exclusivity',
+            'total_gap_percent_inclusive_PERIPHERY_BEFORE': 'Total percentage of gap data in periphery before; inclusive: gap==1 only, no mutual exclusivity',
             'gap_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of gap data that has been imputed in periphery before (0-1)',
             'imputed_non_wear_duration_PERIPHERY_BEFORE': 'Duration of imputed non-wear data in periphery before (hours)',
             'imputed_non_wear_percent_PERIPHERY_BEFORE': 'Percentage of imputed non-wear data in periphery before',
@@ -932,6 +1158,8 @@ class ReportGuide:
             'unimputed_non_wear_percent_PERIPHERY_BEFORE': 'Percentage of unimputed non-wear data in periphery before',
             'total_non_wear_duration_PERIPHERY_BEFORE': 'Total duration of non-wear data in periphery before (hours)',
             'total_non_wear_percent_PERIPHERY_BEFORE': 'Total percentage of non-wear data in periphery before',
+            'total_non_wear_duration_inclusive_PERIPHERY_BEFORE': 'Total duration of non-wear data in periphery before (hours); inclusive: non_wear==1 only, no mutual exclusivity',
+            'total_non_wear_percent_inclusive_PERIPHERY_BEFORE': 'Total percentage of non-wear data in periphery before; inclusive: non_wear==1 only, no mutual exclusivity',
             'non_wear_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of non-wear data that has been imputed in periphery before (0-1)',
             'imputed_jump_duration_PERIPHERY_BEFORE': 'Duration of imputed jump data in periphery before (hours)',
             'imputed_jump_percent_PERIPHERY_BEFORE': 'Percentage of imputed jump data in periphery before',
@@ -939,6 +1167,8 @@ class ReportGuide:
             'unimputed_jump_percent_PERIPHERY_BEFORE': 'Percentage of unimputed jump data in periphery before',
             'total_jump_duration_PERIPHERY_BEFORE': 'Total duration of jump data in periphery before (hours)',
             'total_jump_percent_PERIPHERY_BEFORE': 'Total percentage of jump data in periphery before',
+            'total_jump_duration_inclusive_PERIPHERY_BEFORE': 'Total duration of jump data in periphery before (hours); inclusive: jump==1 only, no mutual exclusivity',
+            'total_jump_percent_inclusive_PERIPHERY_BEFORE': 'Total percentage of jump data in periphery before; inclusive: jump==1 only, no mutual exclusivity',
             'jump_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of jump data that has been imputed in periphery before (0-1)',
             'imputed_plummet_duration_PERIPHERY_BEFORE': 'Duration of imputed plummet data in periphery before (hours)',
             'imputed_plummet_percent_PERIPHERY_BEFORE': 'Percentage of imputed plummet data in periphery before',
@@ -946,6 +1176,8 @@ class ReportGuide:
             'unimputed_plummet_percent_PERIPHERY_BEFORE': 'Percentage of unimputed plummet data in periphery before',
             'total_plummet_duration_PERIPHERY_BEFORE': 'Total duration of plummet data in periphery before (hours)',
             'total_plummet_percent_PERIPHERY_BEFORE': 'Total percentage of plummet data in periphery before',
+            'total_plummet_duration_inclusive_PERIPHERY_BEFORE': 'Total duration of plummet data in periphery before (hours); inclusive: plummet==1 only, no mutual exclusivity',
+            'total_plummet_percent_inclusive_PERIPHERY_BEFORE': 'Total percentage of plummet data in periphery before; inclusive: plummet==1 only, no mutual exclusivity',
             'plummet_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of plummet data that has been imputed in periphery before (0-1)',
             'imputed_extreme_negative_duration_PERIPHERY_BEFORE': 'Duration of imputed extreme negative data in periphery before (hours)',
             'imputed_extreme_negative_percent_PERIPHERY_BEFORE': 'Percentage of imputed extreme negative data in periphery before',
@@ -953,6 +1185,8 @@ class ReportGuide:
             'unimputed_extreme_negative_percent_PERIPHERY_BEFORE': 'Percentage of unimputed extreme negative data in periphery before',
             'total_extreme_negative_duration_PERIPHERY_BEFORE': 'Total duration of extreme negative data in periphery before (hours)',
             'total_extreme_negative_percent_PERIPHERY_BEFORE': 'Total percentage of extreme negative data in periphery before',
+            'total_extreme_negative_duration_inclusive_PERIPHERY_BEFORE': 'Total duration of extreme negative data in periphery before (hours); inclusive: extreme_negative==1 only, no mutual exclusivity',
+            'total_extreme_negative_percent_inclusive_PERIPHERY_BEFORE': 'Total percentage of extreme negative data in periphery before; inclusive: extreme_negative==1 only, no mutual exclusivity',
             'sub_negative_10_sum_PERIPHERY_BEFORE': 'Sum of all TAC values below -10 in periphery before',
             'extreme_negative_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of extreme negative data that has been imputed in periphery before (0-1)',
             'low_quality_imputation_ratio_PERIPHERY_BEFORE': 'Ratio of overall low quality data that has been imputed in periphery before (0-1)',
@@ -980,6 +1214,8 @@ class ReportGuide:
             'unimputed_gap_percent_PERIPHERY_AFTER': 'Percentage of unimputed gap data in periphery after',
             'total_gap_duration_PERIPHERY_AFTER': 'Total duration of gap data in periphery after (hours)',
             'total_gap_percent_PERIPHERY_AFTER': 'Total percentage of gap data in periphery after',
+            'total_gap_duration_inclusive_PERIPHERY_AFTER': 'Total duration of gap data in periphery after (hours); inclusive: gap==1 only, no mutual exclusivity',
+            'total_gap_percent_inclusive_PERIPHERY_AFTER': 'Total percentage of gap data in periphery after; inclusive: gap==1 only, no mutual exclusivity',
             'gap_imputation_ratio_PERIPHERY_AFTER': 'Ratio of gap data that has been imputed in periphery after (0-1)',
             'imputed_non_wear_duration_PERIPHERY_AFTER': 'Duration of imputed non-wear data in periphery after (hours)',
             'imputed_non_wear_percent_PERIPHERY_AFTER': 'Percentage of imputed non-wear data in periphery after',
@@ -987,6 +1223,8 @@ class ReportGuide:
             'unimputed_non_wear_percent_PERIPHERY_AFTER': 'Percentage of unimputed non-wear data in periphery after',
             'total_non_wear_duration_PERIPHERY_AFTER': 'Total duration of non-wear data in periphery after (hours)',
             'total_non_wear_percent_PERIPHERY_AFTER': 'Total percentage of non-wear data in periphery after',
+            'total_non_wear_duration_inclusive_PERIPHERY_AFTER': 'Total duration of non-wear data in periphery after (hours); inclusive: non_wear==1 only, no mutual exclusivity',
+            'total_non_wear_percent_inclusive_PERIPHERY_AFTER': 'Total percentage of non-wear data in periphery after; inclusive: non_wear==1 only, no mutual exclusivity',
             'non_wear_imputation_ratio_PERIPHERY_AFTER': 'Ratio of non-wear data that has been imputed in periphery after (0-1)',
             'imputed_jump_duration_PERIPHERY_AFTER': 'Duration of imputed jump data in periphery after (hours)',
             'imputed_jump_percent_PERIPHERY_AFTER': 'Percentage of imputed jump data in periphery after',
@@ -994,6 +1232,8 @@ class ReportGuide:
             'unimputed_jump_percent_PERIPHERY_AFTER': 'Percentage of unimputed jump data in periphery after',
             'total_jump_duration_PERIPHERY_AFTER': 'Total duration of jump data in periphery after (hours)',
             'total_jump_percent_PERIPHERY_AFTER': 'Total percentage of jump data in periphery after',
+            'total_jump_duration_inclusive_PERIPHERY_AFTER': 'Total duration of jump data in periphery after (hours); inclusive: jump==1 only, no mutual exclusivity',
+            'total_jump_percent_inclusive_PERIPHERY_AFTER': 'Total percentage of jump data in periphery after; inclusive: jump==1 only, no mutual exclusivity',
             'jump_imputation_ratio_PERIPHERY_AFTER': 'Ratio of jump data that has been imputed in periphery after (0-1)',
             'imputed_plummet_duration_PERIPHERY_AFTER': 'Duration of imputed plummet data in periphery after (hours)',
             'imputed_plummet_percent_PERIPHERY_AFTER': 'Percentage of imputed plummet data in periphery after',
@@ -1001,6 +1241,8 @@ class ReportGuide:
             'unimputed_plummet_percent_PERIPHERY_AFTER': 'Percentage of unimputed plummet data in periphery after',
             'total_plummet_duration_PERIPHERY_AFTER': 'Total duration of plummet data in periphery after (hours)',
             'total_plummet_percent_PERIPHERY_AFTER': 'Total percentage of plummet data in periphery after',
+            'total_plummet_duration_inclusive_PERIPHERY_AFTER': 'Total duration of plummet data in periphery after (hours); inclusive: plummet==1 only, no mutual exclusivity',
+            'total_plummet_percent_inclusive_PERIPHERY_AFTER': 'Total percentage of plummet data in periphery after; inclusive: plummet==1 only, no mutual exclusivity',
             'plummet_imputation_ratio_PERIPHERY_AFTER': 'Ratio of plummet data that has been imputed in periphery after (0-1)',
             'imputed_extreme_negative_duration_PERIPHERY_AFTER': 'Duration of imputed extreme negative data in periphery after (hours)',
             'imputed_extreme_negative_percent_PERIPHERY_AFTER': 'Percentage of imputed extreme negative data in periphery after',
@@ -1008,6 +1250,8 @@ class ReportGuide:
             'unimputed_extreme_negative_percent_PERIPHERY_AFTER': 'Percentage of unimputed extreme negative data in periphery after',
             'total_extreme_negative_duration_PERIPHERY_AFTER': 'Total duration of extreme negative data in periphery after (hours)',
             'total_extreme_negative_percent_PERIPHERY_AFTER': 'Total percentage of extreme negative data in periphery after',
+            'total_extreme_negative_duration_inclusive_PERIPHERY_AFTER': 'Total duration of extreme negative data in periphery after (hours); inclusive: extreme_negative==1 only, no mutual exclusivity',
+            'total_extreme_negative_percent_inclusive_PERIPHERY_AFTER': 'Total percentage of extreme negative data in periphery after; inclusive: extreme_negative==1 only, no mutual exclusivity',
             'sub_negative_10_sum_PERIPHERY_AFTER': 'Sum of all TAC values below -10 in periphery after',
             'extreme_negative_imputation_ratio_PERIPHERY_AFTER': 'Ratio of extreme negative data that has been imputed in periphery after (0-1)',
             'low_quality_imputation_ratio_PERIPHERY_AFTER': 'Ratio of overall low quality data that has been imputed in periphery after (0-1)',
