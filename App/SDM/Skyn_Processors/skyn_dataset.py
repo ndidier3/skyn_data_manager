@@ -545,7 +545,9 @@ class skynDataset:
             'capped_reason': None
         }
 
-  def set_ema_regions(self, export_excel=True):
+  def set_ema_regions(self, export_excel=True, ema_region_extend_before=2, ema_region_extend_after=4):
+    """Set EMA regions for each event. Window is (drink_start - extend_before) to (drink_start + extend_after) hours.
+    Default 2+4 = 6-hour window (2 hours before, 4 hours after drink start)."""
     try:
       self.ema_regions = []
       ema_region_feature_dictionaries = []
@@ -554,7 +556,7 @@ class skynDataset:
           drink_start = row['earliest_timestamp']
           drink_total = row['drink_total']
           ema_id = row['ema_id']
-          ema_region = emaRegion(self.dataset, self.subid, self.dataset_identifier, ema_id, drink_start, self.event_labels)
+          ema_region = emaRegion(self.dataset, self.subid, self.dataset_identifier, ema_id, drink_start, self.event_labels, extend_before_hours=ema_region_extend_before, extend_after_hours=ema_region_extend_after)
           ema_region.make_device_removal_plot(self.plot_folder)
           ema_region.make_signal_processing_plot(self.plot_folder, self.curve_threshold, drink_total)
           ema_region_feature_dictionaries.append(ema_region.self_report_region_quality_features)
@@ -584,7 +586,14 @@ class skynDataset:
       day_start_end_pairs = get_day_level_indices(self.dataset, day_start_hour)
       day_id = 0
       for start, end in day_start_end_pairs:
-        day = skynDay(self.dataset, start, end, non_wear_self_report_column = non_wear_self_report_column, day_start_hour = day_start_hour)
+        day = skynDay(
+          self.dataset,
+          start,
+          end,
+          self.curve_threshold,
+          non_wear_self_report_column = non_wear_self_report_column,
+          day_start_hour = day_start_hour
+        )
         self.days.append(day)
         if make_graphs:
           # Conditionally include Dataset_ID in subtitle if not '001'
