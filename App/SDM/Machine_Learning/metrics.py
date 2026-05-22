@@ -20,13 +20,19 @@ def compute_binary_metrics(y_true, y_pred, y_prob=None):
     Returns:
     - dict: Dictionary containing accuracy, precision, recall, F1-score, ROC-AUC, and confusion matrix.
     """
+    cm = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = cm.ravel() if cm.size == 4 else (0, 0, 0, 0)
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
     return {
         'accuracy': accuracy_score(y_true, y_pred),
         'precision': precision_score(y_true, y_pred, zero_division=0),
         'recall': recall_score(y_true, y_pred, zero_division=0),
+        'sensitivity': sensitivity,
+        'specificity': specificity,
         'f1_score': f1_score(y_true, y_pred, zero_division=0),
         'roc_auc': roc_auc_score(y_true, y_prob) if y_prob is not None else None,
-        'confusion_matrix': confusion_matrix(y_true, y_pred),
+        'confusion_matrix': cm,
     }
 
 def compute_classification_metrics(y_true, y_pred, y_prob=None):

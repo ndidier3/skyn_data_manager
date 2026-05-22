@@ -3,7 +3,6 @@ from .cv_folds import *
 from .get_feature_importances import get_feature_importances
 from .metrics import *
 # from statsmodels.formula.api import mixedlm  # Add this import for mixed-effects model
-from sklearn.model_selection import GroupKFold
 import pandas as pd
 import numpy as np
 
@@ -22,9 +21,18 @@ class Model:
 
   def fit_cv(self, X, y, fold_method = 'within_person', n_folds = 3):
     """
-    Perform cross-validation, which can handle both binary and multiclass classifications.
-    It ensures that each participant contributes to both training and testing for multi-class problems,
-    while using appropriate metrics for binary classification.
+    Cross-validation with optional **group-aware** splits on ``grouping_column``.
+
+    fold_method:
+
+    - ``within_person``: spreads rows from the same group across folds so each participant can
+      appear in both train and test (see ``get_indices_within_group_folding``).
+    - ``group_kfold`` / ``leave_participant_out``: **blocked by group** — sklearn ``GroupKFold``
+      so each holdout fold contains disjoint groups (typical participant-level evaluation).
+    - ``by_device`` / ``leave_one_group_out``: **leave-one-group-out** — one fold per distinct
+      group (every row from that group is held out together).
+
+    Group-based methods require ``grouping_column`` to be set on the Model.
     """
     self.results_df = X.copy()
     split_metrics = []
@@ -36,14 +44,29 @@ class Model:
     """ Retrieving CV fold indices """
     if fold_method == 'within_person':
       folds = get_indices_within_group_folding(X, self.grouping_column, folds = n_folds)
-      for fold_n in range(n_folds):
-        self.results_df[f'y_true_{fold_n}'] = np.nan
-        self.results_df[f'y_pred_{fold_n}'] = np.nan
-    elif fold_method == 'by_device':
+    elif fold_method in ('by_device', 'leave_one_group_out'):
       folds = get_leave_group_out_cv_indices(X, self.grouping_column)
-      for fold_n in range(len(folds)):
-        self.results_df[f'y_true_{fold_n}'] = np.nan
-        self.results_df[f'y_pred_{fold_n}'] = np.nan
+    elif fold_method in ('group_kfold', 'leave_participant_out'):
+      if not self.grouping_column:
+        raise ValueError(
+          f"fold_method={fold_method!r} requires grouping_column on the Model."
+        )
+      folds = get_group_kfold_cv_indices(X, self.grouping_column, n_folds)
+    else:
+      raise ValueError(
+        "fold_method must be 'within_person', 'group_kfold', 'leave_participant_out', "
+        "'by_device', or 'leave_one_group_out'."
+      )
+
+    n_outer_folds = len(folds)
+    for fold_n in range(n_outer_folds):
+      self.results_df[f'y_true_{fold_n}'] = np.nan
+      self.results_df[f'y_pred_{fold_n}'] = np.nan
+
+    use_inner_group_kfold = (
+      self.grouping_column is not None
+      and fold_method in ('group_kfold', 'leave_participant_out', 'by_device', 'leave_one_group_out')
+    )
 
     for fold_n, fold in enumerate(folds):
       train_idx = fold['training']
@@ -68,12 +91,26 @@ class Model:
         # y_prob = []
 
       else:
-        #currently assumes RF -- may need adjustment later
-        grid = create_rf_search_grid(n_splits=n_folds, group_kfold=False)
-        grid.fit(
-          X_train[[col for col in X_train.columns if col != self.grouping_column]],
-          y_train
+        # RF or XGBoost grid search (model_name selects estimator)
+        feature_cols = [col for col in X_train.columns if col != self.grouping_column]
+        X_tr_feat = X_train[feature_cols]
+        groups_train = (
+          X_train[self.grouping_column] if self.grouping_column is not None else None
         )
+        if use_inner_group_kfold:
+          n_groups_train = groups_train.nunique()
+          inner_splits = max(2, min(n_folds, n_groups_train))
+        else:
+          inner_splits = max(2, min(n_folds, len(X_train)))
+        mn = self.model_name.upper()
+        if "XGB" in mn:
+          grid = create_xgb_search_grid(n_splits=inner_splits, group_kfold=use_inner_group_kfold)
+        else:
+          grid = create_rf_search_grid(n_splits=inner_splits, group_kfold=use_inner_group_kfold)
+        if use_inner_group_kfold:
+          grid.fit(X_tr_feat, y_train, groups=groups_train)
+        else:
+          grid.fit(X_tr_feat, y_train)
         self.current_model = grid.best_estimator_
         self.current_model.fit(
           X_train[[col for col in X_train.columns if col != self.grouping_column]],
@@ -150,6 +187,12 @@ class Model:
       X = X[[col for col in X.columns if col != self.grouping_column]]
       self.grid.fit(X, y, groups=groups)
       self.best = self.grid.best_estimator_   
+    elif "XGB" in self.model_name.upper():
+      self.grid = create_xgb_search_grid(n_splits, group_kfold=self.grouping_column != None)
+      groups = X[self.grouping_column] if self.grouping_column else None
+      X = X[[col for col in X.columns if col != self.grouping_column]]
+      self.grid.fit(X, y, groups=groups)
+      self.best = self.grid.best_estimator_
     elif "RF" in self.model_name:
       # Create the search grid for random forest
       self.grid = create_rf_search_grid(n_splits, group_kfold = self.grouping_column != None)
