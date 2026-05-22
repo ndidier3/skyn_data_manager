@@ -22,44 +22,82 @@ class DataQualityAnalyzer:
             self._cache[key] = compute_func()
         return self._cache[key]
     
+    def _has_imp_cand(self):
+        """Whether all five *_imp_cand columns are present (from impute_low_quality_data)."""
+        required = {'gap_imp_cand', 'non_wear_imp_cand', 'jump_imp_cand', 
+                    'plummet_imp_cand', 'extreme_negative_imp_cand'}
+        return required.issubset(self.df.columns)
+    
     @property
     def low_quality_mask(self):
-        """Cached boolean mask for low quality data (jumps, plummets, extreme negatives, non-wear, gaps)."""
-        return self._get_cached('low_quality_mask', lambda: (
-            (self.df['jump'] == 1) | (self.df['plummet'] == 1) | 
-            (self.df['extreme_negative'] == 1) | (self.df['non_wear'] == 1) | 
-            (self.df['gap'] == 1)
-        ))
+        """Cached boolean mask for low quality data (union of all five types)."""
+        def compute():
+            if self._has_imp_cand():
+                return (
+                    (self.df['gap_imp_cand'] == 1) | (self.df['non_wear_imp_cand'] == 1) |
+                    (self.df['jump_imp_cand'] == 1) | (self.df['plummet_imp_cand'] == 1) |
+                    (self.df['extreme_negative_imp_cand'] == 1)
+                )
+            return (
+                (self.df['gap'] == 1) | (self.df['non_wear'] == 1) | (self.df['jump'] == 1) |
+                (self.df['plummet'] == 1) | (self.df['extreme_negative'] == 1)
+            )
+        return self._get_cached('low_quality_mask', compute)
     
     @property
     def imputed_mask(self):
         """Cached boolean mask for imputed data."""
         return self._get_cached('imputed_mask', lambda: self.df['imputed'] == 1)
     
-    @property
-    def jump_mask(self):
-        """Cached boolean mask for jump data."""
-        return self._get_cached('jump_mask', lambda: self.df['jump'] == 1)
-    
-    @property
-    def plummet_mask(self):
-        """Cached boolean mask for plummet data."""
-        return self._get_cached('plummet_mask', lambda: self.df['plummet'] == 1)
-    
-    @property
-    def extreme_negative_mask(self):
-        """Cached boolean mask for extreme negative data."""
-        return self._get_cached('extreme_negative_mask', lambda: self.df['extreme_negative'] == 1)
+    def _exclusive_masks(self):
+        """Mutually exclusive masks with precedence: gap > non_wear > jump > plummet > extreme_negative.
+        Uses *_imp_cand when available (from impute_low_quality_data); otherwise falls back to
+        exclusive masks computed from raw flags."""
+        def compute():
+            if self._has_imp_cand():
+                gap_excl = self.df['gap_imp_cand'] == 1
+                non_wear_excl = self.df['non_wear_imp_cand'] == 1
+                jump_excl = self.df['jump_imp_cand'] == 1
+                plummet_excl = self.df['plummet_imp_cand'] == 1
+                extreme_excl = self.df['extreme_negative_imp_cand'] == 1
+                return (gap_excl, non_wear_excl, jump_excl, plummet_excl, extreme_excl)
+            gap_raw = self.df['gap'] == 1
+            non_wear_raw = self.df['non_wear'] == 1
+            jump_raw = self.df['jump'] == 1
+            plummet_raw = self.df['plummet'] == 1
+            extreme_raw = self.df['extreme_negative'] == 1
+            gap_excl = gap_raw
+            non_wear_excl = non_wear_raw & ~gap_excl
+            jump_excl = jump_raw & ~gap_excl & ~non_wear_excl
+            plummet_excl = plummet_raw & ~gap_excl & ~non_wear_excl & ~jump_excl
+            extreme_excl = extreme_raw & ~gap_excl & ~non_wear_excl & ~jump_excl & ~plummet_excl
+            return (gap_excl, non_wear_excl, jump_excl, plummet_excl, extreme_excl)
+        return self._get_cached('_exclusive_masks', compute)
     
     @property
     def gap_mask(self):
-        """Cached boolean mask for gap data."""
-        return self._get_cached('gap_mask', lambda: self.df['gap'] == 1)
+        """Cached boolean mask for gap data (exclusive: gap takes precedence)."""
+        return self._exclusive_masks()[0]
     
     @property
     def non_wear_mask(self):
-        """Cached boolean mask for non-wear data."""
-        return self._get_cached('non_wear_mask', lambda: self.df['non_wear'] == 1)
+        """Cached boolean mask for non-wear data (exclusive: non-wear after gap)."""
+        return self._exclusive_masks()[1]
+    
+    @property
+    def jump_mask(self):
+        """Cached boolean mask for jump data (exclusive: jump after gap, non-wear)."""
+        return self._exclusive_masks()[2]
+    
+    @property
+    def plummet_mask(self):
+        """Cached boolean mask for plummet data (exclusive: plummet after gap, non-wear, jump)."""
+        return self._exclusive_masks()[3]
+    
+    @property
+    def extreme_negative_mask(self):
+        """Cached boolean mask for extreme negative data (exclusive: lowest precedence)."""
+        return self._exclusive_masks()[4]
 
     def count_longest_tac_flatline(self, threshold=10, tolerance=0.1):
         """Count the longest period where TAC values remain flat (within tolerance) above threshold."""
@@ -260,6 +298,118 @@ class DataQualityAnalyzer:
         if total_gaps == 0:
             return None
         return (self.gap_mask & self.imputed_mask).sum() / total_gaps
+
+    def get_total_gap_duration(self):
+        """Total gap duration in hours (exclusive)."""
+        return self.gap_mask.sum() / 60
+
+    def get_total_gap_percent(self):
+        """Total gap percent (exclusive)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self.gap_mask.sum() / len(self.df)
+
+    def get_total_non_wear_duration(self):
+        """Total non-wear duration in hours (exclusive)."""
+        return self.non_wear_mask.sum() / 60
+
+    def get_total_non_wear_percent(self):
+        """Total non-wear percent (exclusive)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self.non_wear_mask.sum() / len(self.df)
+
+    def get_total_jump_duration(self):
+        """Total jump duration in hours (exclusive)."""
+        return self.jump_mask.sum() / 60
+
+    def get_total_jump_percent(self):
+        """Total jump percent (exclusive)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self.jump_mask.sum() / len(self.df)
+
+    def get_total_plummet_duration(self):
+        """Total plummet duration in hours (exclusive)."""
+        return self.plummet_mask.sum() / 60
+
+    def get_total_plummet_percent(self):
+        """Total plummet percent (exclusive)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self.plummet_mask.sum() / len(self.df)
+
+    def get_total_extreme_negative_duration(self):
+        """Total extreme negative duration in hours (exclusive)."""
+        return self.extreme_negative_mask.sum() / 60
+
+    def get_total_extreme_negative_percent(self):
+        """Total extreme negative percent (exclusive)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self.extreme_negative_mask.sum() / len(self.df)
+
+    def _inclusive_mask(self, col):
+        """Raw inclusive mask (flag==1) for the given column. Handles missing column."""
+        if col not in self.df.columns:
+            return pd.Series(False, index=self.df.index)
+        return self.df[col] == 1
+
+    def get_total_gap_duration_inclusive(self):
+        """Total gap duration in hours (inclusive: gap==1, no mutual exclusivity)."""
+        return self._inclusive_mask('gap').sum() / 60
+
+    def get_total_gap_percent_inclusive(self):
+        """Total gap percent (inclusive: gap==1)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self._inclusive_mask('gap').sum() / len(self.df)
+
+    def get_total_non_wear_duration_inclusive(self):
+        """Total non-wear duration in hours (inclusive: non_wear==1)."""
+        return self._inclusive_mask('non_wear').sum() / 60
+
+    def get_total_non_wear_percent_inclusive(self):
+        """Total non-wear percent (inclusive: non_wear==1)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self._inclusive_mask('non_wear').sum() / len(self.df)
+
+    def get_total_jump_duration_inclusive(self):
+        """Total jump duration in hours (inclusive: jump==1)."""
+        return self._inclusive_mask('jump').sum() / 60
+
+    def get_total_jump_percent_inclusive(self):
+        """Total jump percent (inclusive: jump==1)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self._inclusive_mask('jump').sum() / len(self.df)
+
+    def get_total_plummet_duration_inclusive(self):
+        """Total plummet duration in hours (inclusive: plummet==1)."""
+        return self._inclusive_mask('plummet').sum() / 60
+
+    def get_total_plummet_percent_inclusive(self):
+        """Total plummet percent (inclusive: plummet==1)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self._inclusive_mask('plummet').sum() / len(self.df)
+
+    def get_total_extreme_negative_duration_inclusive(self):
+        """Total extreme negative duration in hours (inclusive: extreme_negative==1)."""
+        return self._inclusive_mask('extreme_negative').sum() / 60
+
+    def get_total_extreme_negative_percent_inclusive(self):
+        """Total extreme negative percent (inclusive: extreme_negative==1)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self._inclusive_mask('extreme_negative').sum() / len(self.df)
+
+    def get_sub_negative_10_sum(self):
+        """Sum of TAC values where extreme_negative (exclusive mask)."""
+        if len(self.df) == 0:
+            return 0.0
+        return self.df.loc[self.extreme_negative_mask, self.tac_column].sum()
 
     def get_non_wear_imputation_ratio(self):
         """Calculate ratio of imputed non-wear data."""

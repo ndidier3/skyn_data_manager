@@ -220,9 +220,27 @@ class QualityVisualizer:
             self.curve_features = curve_features.copy()
             self.raw_curve_features = raw_curve_features.copy() if raw_curve_features is not None else None
             
+            # Check if 'perfect' column exists (may not be in exported Excel files)
+            has_perfect_col = 'perfect' in self.curve_features.columns
+            if not has_perfect_col:
+                print("Note: 'perfect' column not found. Perfect curves will not be shown separately.")
+            
             # Create a separate plot for each quality feature
             for quality_feat in self.quality_features:
+                # Skip if quality feature doesn't exist in the DataFrame
+                if quality_feat not in self.curve_features.columns:
+                    print(f"Skipping quality feature '{quality_feat}' (not found in data)")
+                    continue
+                    
                 try:
+                    # Extract region type from quality feature name once per feature
+                    # Handle PERIPHERY_BEFORE/PERIPHERY_AFTER correctly (need last 2 parts, not just last)
+                    parts = quality_feat.split('_')
+                    if parts[-1] in ['BEFORE', 'AFTER'] and len(parts) > 1:
+                        region_type = '_'.join(parts[-2:])  # Get PERIPHERY_BEFORE or PERIPHERY_AFTER
+                    else:
+                        region_type = parts[-1]  # Get CURVE, REGION, etc.
+                    
                     # Reverse completion values if needed
                     if quality_feat in ['rise_complete_percent_CURVE', 'fall_complete_percent_CURVE']:
                         self.curve_features[quality_feat] = self.curve_features[quality_feat].apply(self._reverse_value)
@@ -244,8 +262,6 @@ class QualityVisualizer:
                     
                     # Process each imputation ratio group for histogram
                     for group_idx, ((min_ratio, max_ratio, group_name), color) in enumerate(zip(self.imputation_ratio_groups, self.group_colors)):
-                        # Extract region type from quality feature name
-                        region_type = quality_feat.split('_')[-1]  # Get last part after underscore
                         
                         if 'low_quality' in quality_feat:
                             ratio_col = f'low_quality_imputation_ratio_{region_type}'
@@ -307,15 +323,22 @@ class QualityVisualizer:
                     na_color = 'black'
 
                     # Histogram: plot 'Perfect' and '[0]' as NA
-                    # Plot 'Perfect' at x=0
-                    perfect_mask = self.curve_features['perfect'] == 1
-                    perfect_data = self.curve_features[perfect_mask]
-                    perfect_count = len(perfect_data)
-                    hist_ax.bar(0, perfect_count, width=bar_width, alpha=0.3, color=na_color, label='NA')
-                    if perfect_count > 0:
-                        hist_ax.text(0, perfect_count, f'{perfect_count}', ha='center', va='bottom', color=na_color)
+                    # Plot 'Perfect' at x=0 (if 'perfect' column exists)
+                    has_perfect_col = 'perfect' in self.curve_features.columns
+                    if has_perfect_col:
+                        perfect_mask = self.curve_features['perfect'] == 1
+                        perfect_data = self.curve_features[perfect_mask]
+                        perfect_count = len(perfect_data)
+                        hist_ax.bar(0, perfect_count, width=bar_width, alpha=0.3, color=na_color, label='NA')
+                        if perfect_count > 0:
+                            hist_ax.text(0, perfect_count, f'{perfect_count}', ha='center', va='bottom', color=na_color)
+                    else:
+                        hist_ax.bar(0, 0, width=bar_width, alpha=0.3, color=na_color, label='NA')
                     # Plot [0] at x=1
-                    zero_mask = (self.curve_features['perfect'] != 1) & (self.curve_features[quality_feat] == 0)
+                    if has_perfect_col:
+                        zero_mask = (self.curve_features['perfect'] != 1) & (self.curve_features[quality_feat] == 0)
+                    else:
+                        zero_mask = (self.curve_features[quality_feat] == 0)
                     zero_count = np.sum(zero_mask)
                     hist_ax.bar(1, zero_count, width=bar_width, alpha=0.3, color=na_color)
                     if zero_count > 0:
@@ -361,8 +384,11 @@ class QualityVisualizer:
                                         (self.curve_features[ratio_col] > min_ratio) &
                                         (self.curve_features[ratio_col] < max_ratio)
                                     )
-                            # Mask for this bin (excluding perfect)
-                            bin_mask = (self.curve_features['perfect'] != 1)
+                            # Mask for this bin (excluding perfect if column exists)
+                            if has_perfect_col:
+                                bin_mask = (self.curve_features['perfect'] != 1)
+                            else:
+                                bin_mask = pd.Series([True] * len(self.curve_features), index=self.curve_features.index)
                             x = self.curve_features[quality_feat]
                             if label.startswith('[') and label.endswith(')'):
                                 if min_val == max_val:
@@ -419,16 +445,20 @@ class QualityVisualizer:
                         na_color = 'black'
 
                         # Histogram: plot 'Perfect' and '[0]' as NA
-                        # Plot 'Perfect' at x=0
-                        perfect_mask = self.curve_features['perfect'] == 1
-                        perfect_data = self.curve_features[perfect_mask]
-                        if not perfect_data.empty:
-                            mean = perfect_data[tac_feat].mean()
-                            std_err = perfect_data[tac_feat].std() / np.sqrt(len(perfect_data))
-                            ax.errorbar(0, mean, yerr=std_err, fmt='o', color=na_color, label='NA')
+                        # Plot 'Perfect' at x=0 (if 'perfect' column exists)
+                        if has_perfect_col:
+                            perfect_mask = self.curve_features['perfect'] == 1
+                            perfect_data = self.curve_features[perfect_mask]
+                            if not perfect_data.empty:
+                                mean = perfect_data[tac_feat].mean()
+                                std_err = perfect_data[tac_feat].std() / np.sqrt(len(perfect_data))
+                                ax.errorbar(0, mean, yerr=std_err, fmt='o', color=na_color, label='NA')
                         
                         # Plot [0] at x=1
-                        zero_mask = (self.curve_features['perfect'] != 1) & (self.curve_features[quality_feat] == 0)
+                        if has_perfect_col:
+                            zero_mask = (self.curve_features['perfect'] != 1) & (self.curve_features[quality_feat] == 0)
+                        else:
+                            zero_mask = (self.curve_features[quality_feat] == 0)
                         zero_data = self.curve_features[zero_mask]
                         if not zero_data.empty:
                             mean = zero_data[tac_feat].mean()
@@ -477,7 +507,8 @@ class QualityVisualizer:
                                             (self.curve_features[ratio_col] > min_ratio) &
                                             (self.curve_features[ratio_col] < max_ratio)
                                         )
-                                group_mask = group_mask & (self.curve_features['perfect'] != 1)
+                                if has_perfect_col:
+                                    group_mask = group_mask & (self.curve_features['perfect'] != 1)
                                 x = self.curve_features[quality_feat]
                                 y = self.curve_features[tac_feat]
                                 if label.startswith('[') and label.endswith(')'):
