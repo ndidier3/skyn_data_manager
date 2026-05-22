@@ -78,12 +78,23 @@ class curveFeatures():
     
     # Convert subid and curve_id to int
     self.curve_features[['subid', 'curve_id']] = self.curve_features[['subid', 'curve_id']].astype(int)
+
+    # Build a de-duplication key that supports multi-burst designs.
+    # For single-burst studies, subid+curve_id is still sufficient, but for
+    # designs like LINC that have multiple bursts per participant, dataset-
+    # level identifiers ensure curve_ids are unique per burst rather than
+    # globally.
+    dedup_keys = ['subid', 'curve_id']
+    if 'dataset_id' in self.curve_features.columns:
+      dedup_keys.append('dataset_id')
+    elif 'dataset_identifier' in self.curve_features.columns:
+      dedup_keys.append('dataset_identifier')
     
     # Store plot columns before drop_duplicates
     plot_data = self.curve_features[plot_cols].copy()
     
     # Drop duplicates while preserving plot columns
-    self.curve_features = self.curve_features.drop_duplicates(subset=['subid', 'curve_id'])
+    self.curve_features = self.curve_features.drop_duplicates(subset=dedup_keys)
     
     # Restore plot columns
     for col in plot_cols:
@@ -691,16 +702,15 @@ class curveFeatures():
       if run_settings_df is not None:
         run_settings_df.to_excel(writer, sheet_name='Run Settings', index=False)
 
-  def identify_drinking_curves(self):
+  def identify_drinking_curves(self, min_drinking_duration_minutes=29, require_valid=False):
     """
     Identify curves likely to represent actual drinking events based on data quality and shape.
     Sets a 'DRINKING_PRED' column to 1 for curves that meet all criteria:
+    - duration_CURVE > min_drinking_duration_minutes (converted to hours; default excludes ≤29 min)
     - high_quality_duration_CURVE > required_HQ_duration (dynamic requirement based on curve length)
     - FLAG_below_threshold_curve == 0 (not flagged as below threshold)
-    - FLAG_incomplete_curve_start_curve == 0 (has complete rise phase) - ONLY for curves < 1 hour
-    
-    The incomplete rise flag is only applied to short curves (< 1 hour) because longer curves
-    may have legitimate reasons for short rise phases that don't indicate poor quality.
+    - FLAG_incomplete_curve_start_curve == 0 (complete rise phase; always required)
+    - If require_valid: REGION_VALID == 1 (curve plus periphery validity)
     
     Required HQ duration uses a four-phase algorithm:
     - Phase 1 (≤30 min): 100% HQ required (strictest for very short curves)
@@ -711,9 +721,21 @@ class curveFeatures():
     Creates helper column:
     - required_HQ_duration: Absolute hours of HQ data required based on four-phase algorithm
     
+    Args:
+        min_drinking_duration_minutes: Curves with ``duration_CURVE`` (hours) not strictly greater
+            than this many minutes are excluded (default 29 → same as former ``> 29`` minutes rule).
+        require_valid: If True, only curves with ``REGION_VALID == 1`` can be labeled; requires
+            a ``REGION_VALID`` column on ``curve_features``.
+    
     Returns:
         None (modifies self.curve_features in place)
     """
+    if require_valid and 'REGION_VALID' not in self.curve_features.columns:
+      raise ValueError(
+        "require_valid=True requires column 'REGION_VALID' on curve_features "
+        "(run region validity / feature flagging that sets REGION_VALID first)."
+      )
+
     # Initialize DRINKING_PRED column to 0
     self.curve_features['DRINKING_PRED'] = 0
     
@@ -751,17 +773,16 @@ class curveFeatures():
     )
     
     # Identify curves meeting drinking prediction criteria
-    # Base: high-quality duration threshold + not below threshold
-    # Rise phase: only required for curves < 1 hour
+    min_drinking_duration_hours = float(min_drinking_duration_minutes) / 60.0
     drinking_mask = (
+      (self.curve_features['duration_CURVE'] > min_drinking_duration_hours) &
       (self.curve_features['high_quality_duration_CURVE'] > self.curve_features['required_HQ_duration']) &
       (self.curve_features['FLAG_below_threshold_curve'] == 0) &
-      (
-        (self.curve_features['duration_CURVE'] >= 1.0) | 
-        (self.curve_features['FLAG_incomplete_curve_start_curve'] == 0)
-      )
+      (self.curve_features['FLAG_incomplete_curve_start_curve'] == 0)
     )
-    
+    if require_valid:
+      drinking_mask = drinking_mask & (self.curve_features['REGION_VALID'] == 1)
+
     self.curve_features.loc[drinking_mask, 'DRINKING_PRED'] = 1
 
   def identify_perfect_curves(self, output_dir):

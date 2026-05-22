@@ -154,7 +154,7 @@ class featureFlagger:
     suffix = f"PERIPHERY_{periphery_type.upper()}"
     
     self.flag_data_above_cutoff(
-      f'total_extreme_negative_percent_{suffix}', percent_cutoff,
+      f'total_extreme_negative_percent_inclusive_{suffix}', percent_cutoff,
       f'FLAG_extreme_negative_periphery_{periphery_type}'
     )
 
@@ -355,8 +355,8 @@ class featureFlagger:
       'flag_imputed_fall_curve': ['fall_imputed_percent_CURVE', 'descending_imputed_percent_CURVE'],
       'flag_gaps_and_non_wear_periphery_before': ['total_gap_percent_PERIPHERY_BEFORE', 'total_non_wear_percent_PERIPHERY_BEFORE'],
       'flag_gaps_and_non_wear_periphery_after': ['total_gap_percent_PERIPHERY_AFTER', 'total_non_wear_percent_PERIPHERY_AFTER'],
-      'flag_extreme_negative_periphery_before': ['total_extreme_negative_percent_PERIPHERY_BEFORE'],
-      'flag_extreme_negative_periphery_after': ['total_extreme_negative_percent_PERIPHERY_AFTER'],
+      'flag_extreme_negative_periphery_before': ['total_extreme_negative_percent_inclusive_PERIPHERY_BEFORE'],
+      'flag_extreme_negative_periphery_after': ['total_extreme_negative_percent_inclusive_PERIPHERY_AFTER'],
       'flag_unimputed_low_quality_periphery_before': ['unimputed_low_quality_percent_PERIPHERY_BEFORE'],
       'flag_unimputed_low_quality_periphery_after': ['unimputed_low_quality_percent_PERIPHERY_AFTER']
     }
@@ -640,12 +640,12 @@ class featureFlagger:
       
       # Periphery Before flags
       'FLAG_gaps_and_non_wear_periphery_before': 'total_gaps_and_non_wear_percent_PERIPHERY_BEFORE',
-      'FLAG_extreme_negative_periphery_before': 'total_extreme_negative_percent_PERIPHERY_BEFORE',
+      'FLAG_extreme_negative_periphery_before': 'total_extreme_negative_percent_inclusive_PERIPHERY_BEFORE',
       'FLAG_unimputed_low_quality_periphery_before': 'unimputed_low_quality_percent_PERIPHERY_BEFORE',
       
       # Periphery After flags
       'FLAG_gaps_and_non_wear_periphery_after': 'total_gaps_and_non_wear_percent_PERIPHERY_AFTER',
-      'FLAG_extreme_negative_periphery_after': 'total_extreme_negative_percent_PERIPHERY_AFTER',
+      'FLAG_extreme_negative_periphery_after': 'total_extreme_negative_percent_inclusive_PERIPHERY_AFTER',
       'FLAG_unimputed_low_quality_periphery_after': 'unimputed_low_quality_percent_PERIPHERY_AFTER'
     }
 
