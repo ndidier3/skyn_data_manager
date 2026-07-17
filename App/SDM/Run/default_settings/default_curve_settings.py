@@ -10,6 +10,6 @@ DEFAULT_CURVE_ATTRS = {
     'curve_threshold': 'auto',
     'default_threshold': 8.0,
     'periphery_buffer_before': 2, 
-    'periphery_buffer_after': 1,
+    'periphery_buffer_after': 2,
     'merge_curves_within_duration': 2
 } 

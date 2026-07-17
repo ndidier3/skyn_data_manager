@@ -41,3 +41,6 @@ analysis_scripts/
 App/SDM/Scripts/LINC/*
 # Temporary debugging scripts
 temp_*.py
+export/
+App/SDM/Scripts/ACE_LINC
+
