@@ -317,3 +317,186 @@ def create_matched_valid_invalid_boxplots(valid_df, invalid_df, output_path=None
         return None
     else:
         return fig
+
+
+def create_memloss_category_boxplots(df, output_path=None, show_legend=True, random_seed=42):
+    """
+    Horizontal box-whisker + scatter for TAC features across memory-loss categories
+    among matched valid curves.
+
+    Layout (per feature panel):
+      - Y-axis categories (top → bottom): En bloc, Fragmentary, No memory loss
+      - X-axis: TAC feature values
+      - Within each category band: box-whisker slightly above center, scatter slightly
+        below center (box then points, left-to-right reading of the pair along the row)
+
+    Category coding (memlev):
+      2 = En bloc (full blackout)
+      1 = Fragmentary (partial / brownout)
+      0 = No memory loss
+
+    Args:
+        df (pd.DataFrame): Matched valid curves with memlev + TAC feature columns
+        output_path (str, optional): Save path. If None, return the figure.
+        show_legend (bool): Show category legend on the top panel
+        random_seed (int): Seed for scatter jitter
+
+    Returns:
+        matplotlib.figure.Figure or None
+    """
+    rng = np.random.default_rng(random_seed)
+
+    features = [
+        ('peak_CURVE', 'Peak'),
+        ('rise_rate_CURVE', 'Rise rate to peak'),
+        ('rise_rate_point_to_point_CURVE', 'Rise rate point-to-point'),
+        ('rise_duration_CURVE', 'Rise duration to peak'),
+        ('rise_duration_point_to_point_CURVE', 'Rise duration point-to-point'),
+        ('auc_total_CURVE', 'AUC'),
+        ('fall_duration_CURVE', 'Fall duration from peak'),
+        ('fall_duration_point_to_point_CURVE', 'Fall duration point-to-point'),
+        ('fall_rate_CURVE', 'Fall rate from peak'),
+        ('fall_rate_point_to_point_CURVE', 'Fall rate point-to-point'),
+        ('duration_CURVE', 'Duration of full curve'),
+    ]
+
+    if 'memlev' not in df.columns:
+        raise ValueError("DataFrame must include memlev column")
+
+    available = [(c, n) for c, n in features if c in df.columns]
+    if not available:
+        print("Warning: No TAC features found for memloss category plots")
+        return None
+
+    # Top → bottom on the figure: En bloc, Fragmentary, No memory loss
+    # boxplot vert=False places first series at y=1 (bottom), so reverse data order
+    categories = [
+        (2.0, 'En bloc', '#b22222'),
+        (1.0, 'Fragmentary', '#daa520'),
+        (0.0, 'No memory loss', '#2f6f9f'),
+    ]
+    category_order_for_boxplot = list(reversed(categories))  # bottom → top for matplotlib
+
+    n_features = len(available)
+    fig, axes = plt.subplots(n_features, 1, figsize=(11, 2.6 * n_features))
+    if n_features == 1:
+        axes = [axes]
+
+    box_height = 0.28
+    scatter_offset = 0.32  # points sit below the box within the category band
+    point_size = 14
+    point_alpha = 0.45
+    log_features = {
+        'auc_total_CURVE',
+        'rise_rate_CURVE',
+        'rise_rate_point_to_point_CURVE',
+        'fall_rate_CURVE',
+        'fall_rate_point_to_point_CURVE',
+    }
+
+    for ax, (feature_col, feature_name) in zip(axes, available):
+        series_by_cat = []
+        for memlev, _label, _color in category_order_for_boxplot:
+            vals = df.loc[df['memlev'] == memlev, feature_col].dropna().astype(float)
+            series_by_cat.append(vals)
+
+        use_log = feature_col in log_features
+        if use_log:
+            series_by_cat = [s[s > 0] for s in series_by_cat]
+            if any(len(s) > 0 for s in series_by_cat):
+                ax.set_xscale('log')
+
+        box_positions = [1.0, 2.0, 3.0]
+        bp = ax.boxplot(
+            series_by_cat,
+            positions=box_positions,
+            vert=False,
+            patch_artist=True,
+            widths=box_height,
+            showfliers=False,
+            whis=1.5,
+            medianprops={'color': 'black', 'linewidth': 1.8},
+            zorder=3,
+        )
+
+        for box, (_memlev, _label, color) in zip(bp['boxes'], category_order_for_boxplot):
+            box.set(facecolor=color, alpha=0.28)
+            box.set(edgecolor=color, linewidth=1.6)
+        whisker_colors = [c for _m, _l, c in category_order_for_boxplot for _ in range(2)]
+        for element in ('whiskers', 'caps'):
+            for artist, color in zip(bp[element], whisker_colors):
+                artist.set_color(color)
+                artist.set_linewidth(1.3)
+
+        # Scatter below each box (same category band)
+        for pos, series, (_memlev, _label, color) in zip(
+            box_positions, series_by_cat, category_order_for_boxplot
+        ):
+            if len(series) == 0:
+                continue
+            jitter = rng.normal(0, 0.05, size=len(series))
+            jitter = np.clip(jitter, -0.12, 0.12)
+            y = (pos - scatter_offset) + jitter
+            ax.scatter(
+                series.values, y,
+                s=point_size, alpha=point_alpha, color=color,
+                edgecolors='none', zorder=2,
+            )
+
+        # Shared x-limits from data
+        all_vals = pd.concat([s for s in series_by_cat if len(s) > 0], ignore_index=True)
+        if len(all_vals) > 0:
+            xmin, xmax = float(all_vals.min()), float(all_vals.max())
+            if use_log:
+                ax.set_xlim(left=max(xmin * 0.7, xmin / 2 if xmin > 0 else 0.1), right=xmax * 1.4)
+            else:
+                span = xmax - xmin
+                pad = span * 0.04 if span > 0 else 1.0
+                ax.set_xlim(left=max(0, xmin - pad) if xmin >= 0 else xmin - pad, right=xmax + pad)
+
+        ax.set_yticks(box_positions)
+        ax.set_yticklabels(
+            [label for _m, label, _c in category_order_for_boxplot],
+            fontsize=10,
+        )
+        ax.set_ylabel(feature_name, fontsize=11, fontweight='bold', labelpad=8)
+        ax.set_xlabel('')
+        ax.grid(True, axis='x', linestyle='--', alpha=0.3, zorder=0)
+        ax.set_ylim(0.35, 3.65)
+
+        # Counts on the right
+        for pos, series, (_memlev, label, _color) in zip(
+            box_positions, series_by_cat, category_order_for_boxplot
+        ):
+            ax.text(
+                1.01, pos, f'n={len(series)}',
+                transform=ax.get_yaxis_transform(),
+                va='center', ha='left', fontsize=8, color='#444444',
+            )
+
+    fig.suptitle(
+        'Matched Valid Curves: TAC Features by Memory-Loss Category',
+        fontsize=15, fontweight='bold', y=0.995,
+    )
+
+    if show_legend:
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor=color, alpha=0.35, edgecolor=color, label=label)
+            for _m, label, color in categories
+        ]
+        axes[0].legend(
+            handles=legend_elements, loc='upper right',
+            bbox_to_anchor=(0.98, 0.98), fontsize=10, framealpha=0.92,
+        )
+
+    plt.tight_layout(rect=[0.08, 0.01, 0.96, 0.98])
+    plt.subplots_adjust(hspace=0.22)
+
+    if output_path:
+        os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+        fig.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        print(f"Box plot saved to: {output_path}")
+        return None
+    return fig
