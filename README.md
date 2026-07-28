@@ -21,9 +21,8 @@ skyn_data_manager/
 │   ├── Visualization/        # Plot and workbook generation
 │   └── Scripts/              # Study-specific entry-point scripts
 │       ├── Test/             # Minimal end-to-end example
-│       ├── LINC/
-│       ├── ACE/
-│       ├── ARC/
+│       ├── [PROJECT NAME 1]/
+│       ├── [PROJECT NAME 2]/
 │       └── ...
 ├── Inputs/
 │   ├── Skyn_Data_RAW/        # Raw Skyn CSV exports, by cohort
@@ -39,8 +38,6 @@ Study scripts live under `App/SDM/Scripts/{COHORT}/`. Each cohort typically has:
 - **`process/`** — run signal processing, curve/day identification, and (where applicable) event matching
 - **`analysis/`** — load processed data and export cohort-level workbooks or figures
 - **`{cohort}_settings.py`** — cohort overrides on top of shared defaults
-
-Cohort-specific notes: [LINC](App/SDM/Scripts/LINC/README.md), [ACE](App/SDM/Scripts/ACE/README.md).
 
 ---
 
@@ -71,12 +68,12 @@ Settings are layered:
 
 1. **Defaults** — `App/SDM/Run/default_settings/` (`default_curve_settings.py`, `default_flag_settings.py`, `default_smooth_impute_settings.py`)
 2. **Cohort file** — e.g. `linc_settings.py`, `ace_settings.py` (imports defaults, overrides threshold, day start hour, event columns, etc.)
-3. **Script call** — boolean flags passed to `process_and_analyze_data()` control which pipeline steps run
+3. **Script call** — arguments passed to `process_and_analyze_data()` control which pipeline steps run
 
-Common flags when calling `process_and_analyze_data()`:
+Common arguments when calling `process_and_analyze_data()`:
 
-| Flag | Typical use |
-|------|-------------|
+| Argument | Typical use |
+|----------|-------------|
 | `use_prior_save` | `True` to reload existing `.sdp` instead of reprocessing from raw |
 | `adjust_for_gaps_and_non_wear` | First-pass raw processing |
 | `smooth_and_impute` | First-pass raw processing |
@@ -85,7 +82,7 @@ Common flags when calling `process_and_analyze_data()`:
 | `filter_by_study_dates` | Trim to per-subject study windows |
 | `subids_to_process` | Restrict to specific subject IDs |
 
-When adding a new cohort, copy an existing `{cohort}_settings.py` and a `process/` script from the closest study (LINC for no events, ACE for events).
+When adding a new cohort, copy an existing `{cohort}_settings.py` and a `process/` script from the example files.
 
 ---
 
@@ -93,7 +90,7 @@ When adding a new cohort, copy an existing `{cohort}_settings.py` and a `process
 
 1. **Create a cohort folder** under `App/SDM/Scripts/MyCohort/` with `process/` and `analysis/` as needed.
 2. **Add `{cohort}_settings.py`** — import from `default_settings`, override only what differs.
-3. **Process script** — set paths, import settings, call `process_and_analyze_data()` with the right flags.
+3. **Process script** — set paths, import settings, call `process_and_analyze_data()` with the right arguments.
 4. **Analysis script** — point at `Inputs/Skyn_Data_PROCESSED/MyCohort`, run the appropriate `Analysis` class, write dated output under `Results/MyCohort/`.
 
 **Paths:** Prefer resolving the repo root from the script file (see `default_analysis.py`) so the same script works locally and on the cluster. Many existing scripts use a hardcoded `/users/ndidier/SDM/skyn_data_manager` path; update that to your clone when developing elsewhere.
@@ -121,9 +118,9 @@ conda deactivate
 | Pattern | Example | Purpose |
 |---------|---------|---------|
 | `sdm_test_run.sh` | — | Small smoke test (`Test/default_analysis.py`) |
-| `sdm_run_{cohort}.sh` | `sdm_run_ace.sh`, `sdm_run_linc.sh` | Main cohort job |
-| `sdm_submit_{pipeline}.sh` | `sdm_submit_linc_pipeline.sh` | Chain jobs with dependencies |
-| `sdm_run_{task}.sh` | `sdm_run_linc_xgb.sh` | Follow-on analysis (ML, plots) |
+| `sdm_run_{cohort}.sh` | `sdm_run_mycohort.sh` | Main cohort job |
+| `sdm_submit_{pipeline}.sh` | `sdm_submit_mycohort_pipeline.sh` | Chain jobs with dependencies |
+| `sdm_run_{task}.sh` | `sdm_run_mycohort_xgb.sh` | Follow-on analysis (ML, plots) |
 
 Logs go to `batch_out/{JobName}-{JOB_ID}.out` and `.err`.
 
@@ -134,14 +131,10 @@ Logs go to `batch_out/{JobName}-{JOB_ID}.out` and `.err`.
 sbatch batch_scripts/sdm_test_run.sh
 
 # Cohort job (edit the .sh file to uncomment the python lines you need)
-sbatch batch_scripts/sdm_run_ace.sh
-
-# Chained pipeline (processing → ML), with optional env vars
-bash batch_scripts/sdm_submit_linc_pipeline.sh
-SUBID_MIN=5001 SUBID_MAX=5039 bash batch_scripts/sdm_submit_linc_pipeline.sh
+sbatch batch_scripts/sdm_run_{cohort}.sh
 ```
 
-`sdm_submit_linc_pipeline.sh` uses `sbatch --dependency=afterok:...` so the second job starts only if the first succeeds. Pass variables with `--export=ALL,VAR=value` (see that script for `SUBID_MIN`, `SUBID_MAX`, `FEATURES_CSV`, etc.).
+Pipeline wrappers can use `sbatch --dependency=afterok:...` so a follow-on job starts only if the first succeeds. Pass variables with `--export=ALL,VAR=value` (for example subject-range or input-path overrides defined in the wrapper).
 
 ### Resource defaults (adjust per job)
 
@@ -149,8 +142,6 @@ SUBID_MIN=5001 SUBID_MAX=5039 bash batch_scripts/sdm_submit_linc_pipeline.sh
 |-------------|------|--------|--------|
 | Test | ~1 h | 4G | 1 node |
 | Cohort process/analyze | ~30 h | 60G | Often 4 nodes |
-| ML (e.g. LINC XGB) | ~12 h | 32G | More CPUs |
-| CSDP training | ~10 h | 20G | `bigmem` partition |
 
 Update `#SBATCH` lines and the `python` command(s) in the shell script before submitting. Comment/uncomment steps to match the pipeline stage you are running—batch files often keep earlier steps commented when only re-running analysis.
 
@@ -175,10 +166,9 @@ Per-run processing also writes under `Results/{COHORT}/{MM.DD.YYYY}/` (combined 
 
 | Topic | Location |
 |-------|----------|
-| End-to-end script template | [App/SDM/Scripts/Test/default_analysis.py](App/SDM/Scripts/Test/default_analysis.py) |
-| LINC workflow | [App/SDM/Scripts/LINC/README.md](App/SDM/Scripts/LINC/README.md) |
-| ACE workflow | [App/SDM/Scripts/ACE/README.md](App/SDM/Scripts/ACE/README.md) |
-| ARC event matching notes | [App/SDM/Scripts/ARC/ARC_event_curve_matching_process.md](App/SDM/Scripts/ARC/ARC_event_curve_matching_process.md) |
+| End-to-end script (single file) | [App/SDM/Scripts/Test/default_analysis.py](App/SDM/Scripts/Test/default_analysis.py) |
+| Process / analyze skeleton | [App/SDM/Scripts/CohortExample/](App/SDM/Scripts/CohortExample/) |
+| Cohort settings template | [App/SDM/Scripts/CohortExample/cohort_example_settings.py](App/SDM/Scripts/CohortExample/cohort_example_settings.py) |
 
 ---
 
