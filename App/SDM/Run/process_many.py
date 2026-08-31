@@ -1,4 +1,5 @@
 from App.SDM.Skyn_Processors.skyn_dataset import skynDataset
+from App.SDM.Run.default_settings.default_curve_settings import DEFAULT_RAW_CURVE_ATTRS
 from App.SDM.Configuration.file_management import extract_dataset_identifier, extract_subid
 from App.SDM.Configuration.file_management import save_to_computer, create_save_directories, load, create_individual_plot_folder
 from App.SDM.Documenting.embed_graphs import embed_graphs_into_workbook_tab
@@ -19,10 +20,12 @@ def process_and_analyze_data(
   compute_curve_threshold = False,
   identify_curves = False,
   include_raw_curves = False,
+  refresh_raw_curves_only = False,
   match_events_to_curves = False,
   gaps_and_non_wear_attrs = {},
   smooth_and_impute_attrs = {},
   curve_attrs = {},
+  raw_curve_attrs = {},
   day_attrs = {
     'day_start_hour': 0,
     'make_graphs': True
@@ -48,9 +51,14 @@ def process_and_analyze_data(
   day_datasets = []
   curve_features = []
   raw_curve_features = []
+  curve_features_default_threshold = []
+  raw_curve_features_default_threshold = []
   event_datasets = []
   event_curve_matches = []
   no_skyn_data_found = []
+
+  if include_raw_curves and not raw_curve_attrs:
+    raw_curve_attrs = DEFAULT_RAW_CURVE_ATTRS.copy()
 
   for file in files:
     try:
@@ -82,6 +90,7 @@ def process_and_analyze_data(
           sdm_processor = load(f'{subid}_{dataset_identifier}_skyn_data_processed.sdp', processed_data_out)
           sdm_processor.data_out_folder = data_out
           sdm_processor.plot_folder = create_individual_plot_folder(graphs_out, subid)
+          sdm_processor.processed_data_out_folder = processed_data_out
           prior_processor_loaded = True
           print(f"Successfully loaded prior save for {subid}_{dataset_identifier}")
         except Exception as e:
@@ -126,15 +135,42 @@ def process_and_analyze_data(
         print(f"Auto-computing threshold for {subid}_{dataset_identifier}")
         sdm_processor.compute_curve_threshold(curve_attrs=curve_attrs)
         
-      if identify_curves:
+      if refresh_raw_curves_only:
+        already_refreshed = (
+          getattr(sdm_processor, 'raw_curve_threshold_computed', False)
+          and getattr(sdm_processor, 'raw_curve_features', None) is not None
+          and len(sdm_processor.raw_curve_features) > 0
+          and 'curve_id_imputed_match' in sdm_processor.raw_curve_features.columns
+        )
+        if already_refreshed:
+          print(f"Skipping raw refresh for {subid}_{dataset_identifier} (already refreshed)")
+          raw_curve_features.append(sdm_processor.raw_curve_features)
+          if getattr(sdm_processor, 'raw_curve_features_default_threshold', None) is not None and len(sdm_processor.raw_curve_features_default_threshold):
+            raw_curve_features_default_threshold.append(sdm_processor.raw_curve_features_default_threshold)
+        else:
+          print(f"Refreshing raw curves only for {subid}_{dataset_identifier}")
+          sdm_processor.refresh_raw_curves_only(raw_curve_attrs=raw_curve_attrs)
+          if sdm_processor.raw_curve_features is not None and len(sdm_processor.raw_curve_features):
+            raw_curve_features.append(sdm_processor.raw_curve_features)
+          if getattr(sdm_processor, 'raw_curve_features_default_threshold', None) is not None and len(sdm_processor.raw_curve_features_default_threshold):
+            raw_curve_features_default_threshold.append(sdm_processor.raw_curve_features_default_threshold)
+      elif identify_curves:
         print(f"Identifying curves for {subid}_{dataset_identifier}")
-        sdm_processor.identify_curves(curve_attrs=curve_attrs, include_raw_curves=include_raw_curves)
+        sdm_processor.identify_curves(
+          curve_attrs=curve_attrs,
+          raw_curve_attrs=raw_curve_attrs,
+          include_raw_curves=include_raw_curves,
+        )
         if not match_events_to_curves:
           print(f"Making curve graphs for {subid}_{dataset_identifier}")
           sdm_processor.make_curve_graphs()
           curve_features.append(sdm_processor.curve_features)
           if include_raw_curves:
             raw_curve_features.append(sdm_processor.raw_curve_features)
+          if getattr(sdm_processor, 'curve_features_default_threshold', None) is not None and len(sdm_processor.curve_features_default_threshold):
+            curve_features_default_threshold.append(sdm_processor.curve_features_default_threshold)
+          if getattr(sdm_processor, 'raw_curve_features_default_threshold', None) is not None and len(sdm_processor.raw_curve_features_default_threshold):
+            raw_curve_features_default_threshold.append(sdm_processor.raw_curve_features_default_threshold)
       
       if analyze_days:
         print(f"Running day analysis for {subid}_{dataset_identifier}")
@@ -156,6 +192,10 @@ def process_and_analyze_data(
         event_datasets.append(sdm_processor.events)
         if include_raw_curves:
           raw_curve_features.append(sdm_processor.raw_curve_features)
+        if getattr(sdm_processor, 'curve_features_default_threshold', None) is not None and len(sdm_processor.curve_features_default_threshold):
+          curve_features_default_threshold.append(sdm_processor.curve_features_default_threshold)
+        if getattr(sdm_processor, 'raw_curve_features_default_threshold', None) is not None and len(sdm_processor.raw_curve_features_default_threshold):
+          raw_curve_features_default_threshold.append(sdm_processor.raw_curve_features_default_threshold)
           
     except Exception as e:
       print(f"\nError processing file {file}:")
@@ -186,6 +226,18 @@ def process_and_analyze_data(
       combined_raw_curve_features = pd.concat(raw_curve_features, ignore_index=True)
       combined_raw_curve_features.to_excel(writer, index=None, sheet_name="Features")
       print(f'Combined raw curve features shape: {combined_raw_curve_features.shape}')
+
+  if len(curve_features_default_threshold):
+    print(f'Combining {len(curve_features_default_threshold)} default-threshold curve feature datasets')
+    combined_default = pd.concat(curve_features_default_threshold, ignore_index=True)
+    combined_default.to_excel(f'{results_dir}/curve_features_default_threshold.xlsx', index=None)
+    print(f'Combined default-threshold curve features shape: {combined_default.shape}')
+
+  if len(raw_curve_features_default_threshold):
+    print(f'Combining {len(raw_curve_features_default_threshold)} default-threshold raw curve feature datasets')
+    combined_raw_default = pd.concat(raw_curve_features_default_threshold, ignore_index=True)
+    combined_raw_default.to_excel(f'{results_dir}/raw_curve_features_default_threshold.xlsx', index=None)
+    print(f'Combined default-threshold raw curve features shape: {combined_raw_default.shape}')
 
   if len(event_curve_matches):
     print(f'Combining {len(event_curve_matches)} event curve match datasets')
