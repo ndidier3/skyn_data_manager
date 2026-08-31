@@ -594,12 +594,25 @@ class QualityVisualizer:
                                     
                                     # Get raw data for curves in this bin using stored curve IDs
                                     curve_ids = self.group_bin_curve_ids[group_name][label]
-                                    raw_data = self.raw_curve_features[
-                                        self.raw_curve_features.apply(
-                                            lambda x: (x['subid'], x['curve_id']) in curve_ids,
-                                            axis=1
-                                        )
-                                    ]
+                                    if 'curve_id_imputed_match' in self.raw_curve_features.columns:
+                                        raw_data = self.raw_curve_features[
+                                            self.raw_curve_features.apply(
+                                                lambda x, ids=curve_ids: (
+                                                    x['subid'],
+                                                    x['curve_id_imputed_match']
+                                                    if pd.notna(x.get('curve_id_imputed_match'))
+                                                    else x['curve_id'],
+                                                ) in ids,
+                                                axis=1,
+                                            )
+                                        ]
+                                    else:
+                                        raw_data = self.raw_curve_features[
+                                            self.raw_curve_features.apply(
+                                                lambda x, ids=curve_ids: (x['subid'], x['curve_id']) in ids,
+                                                axis=1,
+                                            )
+                                        ]
                                     
                                     # Calculate statistics based on sample size
                                     if len(raw_data) < 5:
