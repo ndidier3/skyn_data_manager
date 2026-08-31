@@ -4,17 +4,38 @@ import numpy as np
 class DataQualityAnalyzer:
     """Object-oriented analyzer for data quality metrics with caching for improved performance."""
     
-    def __init__(self, df: pd.DataFrame, tac_column: str = 'TAC'):
+    def __init__(self, df: pd.DataFrame, tac_column: str = 'TAC', intended_duration_hours=None):
         """
         Initialize the analyzer with a dataframe.
         
         Args:
             df: DataFrame containing the data
             tac_column: Column name for TAC values (default: 'TAC')
+            intended_duration_hours: Optional expected window length in hours
+                (e.g. periphery buffer). When set, gap/missing metrics treat
+                shortfall vs this duration as missing gap data and use it as
+                the percent denominator.
         """
         self.df = df
         self.tac_column = tac_column
+        self.intended_duration_hours = (
+            float(intended_duration_hours)
+            if intended_duration_hours is not None else None
+        )
         self._cache = {}
+
+    def _buffer_missing_hours(self) -> float:
+        """Hours missing relative to intended_duration_hours (0 if unset)."""
+        if self.intended_duration_hours is None or self.intended_duration_hours <= 0:
+            return 0.0
+        observed = len(self.df) / 60.0
+        return max(0.0, self.intended_duration_hours - observed)
+
+    def _gap_percent_denominator(self) -> float:
+        """Row count, or intended duration in minutes when a buffer is set."""
+        if self.intended_duration_hours is not None and self.intended_duration_hours > 0:
+            return self.intended_duration_hours * 60.0
+        return float(len(self.df))
         
     def _get_cached(self, key, compute_func):
         """Get cached value or compute and cache it."""
@@ -243,13 +264,16 @@ class DataQualityAnalyzer:
 
     def get_unimputed_gap_duration(self):
         """Calculate duration of unimputed gap data in hours."""
-        return (self.gap_mask & (~self.imputed_mask)).sum() / 60
+        # Buffer shortfall is unobserved → count as unimputed gap
+        return (self.gap_mask & (~self.imputed_mask)).sum() / 60 + self._buffer_missing_hours()
 
     def get_unimputed_gap_percent(self):
         """Calculate percentage of unimputed gap data."""
-        if len(self.df) == 0:
+        denom = self._gap_percent_denominator()
+        if denom <= 0:
             return 0.0
-        return (self.gap_mask & (~self.imputed_mask)).sum() / len(self.df)
+        unimp_min = (self.gap_mask & (~self.imputed_mask)).sum() + self._buffer_missing_hours() * 60
+        return unimp_min / denom
 
     def get_imputed_non_wear_duration(self):
         """Calculate duration of imputed non-wear data in hours."""
@@ -300,14 +324,16 @@ class DataQualityAnalyzer:
         return (self.gap_mask & self.imputed_mask).sum() / total_gaps
 
     def get_total_gap_duration(self):
-        """Total gap duration in hours (exclusive)."""
-        return self.gap_mask.sum() / 60
+        """Total gap duration in hours (exclusive), plus buffer shortfall if intended duration set."""
+        return self.gap_mask.sum() / 60 + self._buffer_missing_hours()
 
     def get_total_gap_percent(self):
-        """Total gap percent (exclusive)."""
-        if len(self.df) == 0:
+        """Total gap percent (exclusive); uses intended duration as denom when provided."""
+        denom = self._gap_percent_denominator()
+        if denom <= 0:
             return 0.0
-        return self.gap_mask.sum() / len(self.df)
+        gap_min = self.gap_mask.sum() + self._buffer_missing_hours() * 60
+        return gap_min / denom
 
     def get_total_non_wear_duration(self):
         """Total non-wear duration in hours (exclusive)."""
@@ -357,13 +383,15 @@ class DataQualityAnalyzer:
 
     def get_total_gap_duration_inclusive(self):
         """Total gap duration in hours (inclusive: gap==1, no mutual exclusivity)."""
-        return self._inclusive_mask('gap').sum() / 60
+        return self._inclusive_mask('gap').sum() / 60 + self._buffer_missing_hours()
 
     def get_total_gap_percent_inclusive(self):
         """Total gap percent (inclusive: gap==1)."""
-        if len(self.df) == 0:
+        denom = self._gap_percent_denominator()
+        if denom <= 0:
             return 0.0
-        return self._inclusive_mask('gap').sum() / len(self.df)
+        gap_min = self._inclusive_mask('gap').sum() + self._buffer_missing_hours() * 60
+        return gap_min / denom
 
     def get_total_non_wear_duration_inclusive(self):
         """Total non-wear duration in hours (inclusive: non_wear==1)."""
@@ -502,10 +530,10 @@ class DataQualityAnalyzer:
 
     def get_total_gaps_and_non_wear_percent(self):
         """Calculate the total percentage of data that is either a gap or non-wear period."""
+        if self.intended_duration_hours is not None:
+            return self.get_total_gap_percent() + self.get_total_non_wear_percent()
         if len(self.df) == 0:
             return 0.0
-            
-        # Combine gap and non-wear masks
         total_low_quality = self.gap_mask | self.non_wear_mask
         return total_low_quality.sum() / len(self.df)
 
@@ -518,10 +546,10 @@ class DataQualityAnalyzer:
 
     def get_unimputed_gaps_and_non_wear_percent(self):
         """Calculate the total percentage of data that is either an unimputed gap or unimputed non-wear period."""
+        if self.intended_duration_hours is not None:
+            return self.get_unimputed_gap_percent() + self.get_unimputed_non_wear_percent()
         if len(self.df) == 0:
             return 0.0
-            
-        # Combine unimputed gap and unimputed non-wear masks
         unimputed_gaps_and_non_wear = (self.gap_mask & (~self.imputed_mask)) | (self.non_wear_mask & (~self.imputed_mask))
         return unimputed_gaps_and_non_wear.sum() / len(self.df)
 
