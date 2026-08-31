@@ -21,6 +21,8 @@ class featureFlagger:
       'flag_imputed_rise_curve': {},
       'flag_incomplete_curve_end_curve': {},
       'flag_imputed_fall_curve': {},
+      'flag_low_quality_rise_curve': {},
+      'flag_low_quality_fall_curve': {},
 
       # Periphery Before flags (using only percent)
       'flag_gaps_and_non_wear_periphery_before': {},
@@ -279,6 +281,22 @@ class featureFlagger:
       'FLAG_imputed_fall_curve'
     )
 
+  def flag_low_quality_rise_curve(self, percent_cutoff: float) -> None:
+    """Flag if total low-quality percent on the rise portion exceeds the cutoff."""
+    self.flag_data_above_cutoff(
+      'rise_total_low_quality_percent_CURVE',
+      percent_cutoff,
+      'FLAG_low_quality_rise_curve',
+    )
+
+  def flag_low_quality_fall_curve(self, percent_cutoff: float) -> None:
+    """Flag if total low-quality percent on the fall portion exceeds the cutoff."""
+    self.flag_data_above_cutoff(
+      'fall_total_low_quality_percent_CURVE',
+      percent_cutoff,
+      'FLAG_low_quality_fall_curve',
+    )
+
   # Validation methods
   def validate_periphery(self, new_column: str, flag_columns: List[str]) -> None:
     """Validate periphery based on flag columns"""
@@ -332,6 +350,8 @@ class featureFlagger:
       'flag_imputed_rise_curve': (self.flag_imputed_rise_curve, ['percent_cutoff_rise', 'percent_cutoff_asc']),
       'flag_incomplete_curve_end_curve': (self.flag_incomplete_curve_end_curve, ['duration_cutoff']),
       'flag_imputed_fall_curve': (self.flag_imputed_fall_curve, ['percent_cutoff_fall', 'percent_cutoff_desc']),
+      'flag_low_quality_rise_curve': (self.flag_low_quality_rise_curve, ['percent_cutoff']),
+      'flag_low_quality_fall_curve': (self.flag_low_quality_fall_curve, ['percent_cutoff']),
       
       # Periphery flags using dynamic methods
       'flag_gaps_and_non_wear_periphery_before': (self.flag_gaps_and_non_wear_periphery_dynamic, ['percent_cutoff']),
@@ -353,6 +373,8 @@ class featureFlagger:
       'flag_imputed_rise_curve': ['rise_imputed_percent_CURVE', 'ascending_imputed_percent_CURVE'],
       'flag_incomplete_curve_end_curve': ['fall_duration_CURVE'],
       'flag_imputed_fall_curve': ['fall_imputed_percent_CURVE', 'descending_imputed_percent_CURVE'],
+      'flag_low_quality_rise_curve': ['rise_total_low_quality_percent_CURVE'],
+      'flag_low_quality_fall_curve': ['fall_total_low_quality_percent_CURVE'],
       'flag_gaps_and_non_wear_periphery_before': ['total_gap_percent_PERIPHERY_BEFORE', 'total_non_wear_percent_PERIPHERY_BEFORE'],
       'flag_gaps_and_non_wear_periphery_after': ['total_gap_percent_PERIPHERY_AFTER', 'total_non_wear_percent_PERIPHERY_AFTER'],
       'flag_extreme_negative_periphery_before': ['total_extreme_negative_percent_inclusive_PERIPHERY_BEFORE'],
@@ -637,6 +659,8 @@ class featureFlagger:
       'FLAG_imputed_rise_curve': 'rise_imputed_percent_CURVE',
       'FLAG_incomplete_curve_end_curve': 'fall_duration_CURVE',
       'FLAG_imputed_fall_curve': 'fall_imputed_percent_CURVE',
+      'FLAG_low_quality_rise_curve': 'rise_total_low_quality_percent_CURVE',
+      'FLAG_low_quality_fall_curve': 'fall_total_low_quality_percent_CURVE',
       
       # Periphery Before flags
       'FLAG_gaps_and_non_wear_periphery_before': 'total_gaps_and_non_wear_percent_PERIPHERY_BEFORE',
