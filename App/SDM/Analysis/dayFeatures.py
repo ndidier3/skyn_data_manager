@@ -966,12 +966,68 @@ class dayFeatures():
         dayFeatures.assign_day_of_week_cat_from_begin_day(merged)
         return merged
 
+    @classmethod
+    def _coerce_morning_attach_value(cls, series, col):
+        """Normalize skip tokens; coerce numeric-looking morning fields when possible."""
+        s = series.copy()
+        as_str = s.astype(str).str.strip()
+        skip = as_str.str.upper().isin(
+            {
+                'NAN',
+                'NONE',
+                '',
+                'SKIPPED',
+                'CONDITION_SKIPPED',
+                'NO_ANSWER',
+                'NA',
+                'N/A',
+            }
+        )
+        s = s.where(~skip, np.nan)
+        # Drink counts and 0/1 time bins are numeric in LINC; leave other types as-is.
+        if col == 'mr_numdk' or col.startswith('mr_altim_'):
+            return pd.to_numeric(s, errors='coerce')
+        return s
+
+    @classmethod
+    def _prepare_morning_attach_columns(cls, m_df, extra_cols=None):
+        """
+        Ensure requested attach columns exist on a morning frame (NaN if absent in CSV).
+
+        ``extra_cols`` defaults to empty: only ``morning_self_report_alcohol`` is merged unless
+        a caller (e.g. LINC script) passes cohort-specific fields.
+        """
+        cols = list(extra_cols) if extra_cols else []
+        if not cols:
+            return []
+        missing = []
+        for c in cols:
+            if c in m_df.columns:
+                m_df[c] = cls._coerce_morning_attach_value(m_df[c], c)
+            else:
+                m_df[c] = np.nan
+                missing.append(c)
+        if missing:
+            print(
+                "  Morning attach columns missing from CSV (filled NaN on day rows): "
+                + ", ".join(missing)
+            )
+            if {'mr_alst', 'mr_alfn'} & set(missing):
+                print(
+                    "  Note: protocol mr_alst/mr_alfn time pickers are not in morning.csv; "
+                    "export uses mr_altim_1..7 time-bin checkboxes instead."
+                )
+        return cols
+
     @staticmethod
     def _merge_self_report_by_calendar_day(day_df, key_df):
-        """Left-merge morning alcohol onto TAC days by SubID, Dataset_ID, calendar day (YYYY-MM-DD)."""
-        k = key_df[
-            ['SubID', 'Dataset_ID', 'morning_self_report_alcohol', 'morning_merge_date']
-        ].copy()
+        """Left-merge morning alcohol (+ optional QC fields) onto TAC days by calendar day."""
+        value_cols = [
+            c
+            for c in key_df.columns
+            if c not in ('SubID', 'Dataset_ID', 'morning_merge_date')
+        ]
+        k = key_df[['SubID', 'Dataset_ID', 'morning_merge_date'] + value_cols].copy()
         k['_date_key'] = pd.to_datetime(k['morning_merge_date'], errors='coerce').dt.strftime(
             '%Y-%m-%d'
         )
@@ -1013,6 +1069,49 @@ class dayFeatures():
         out.loc[is_sub & (sr == 1)] = 1.0
         out.loc[is_sub & (sr == 2)] = 0.0
         return out
+
+    @staticmethod
+    def _dedupe_morning_rows_by_priority(
+        mcal,
+        *,
+        subset,
+        response_type_col='Response Type',
+        submission_label='Submission',
+        self_report_col='mr_al_y',
+        sr_coded_col='morning_self_report_alcohol',
+    ):
+        """
+        One row per ``subset`` key with priority:
+          1. Response Type == Submission over Missed / Partial / other
+          2. Drinking yes (coded SR == 1 or raw self-report == 1) over no / missing
+          3. Last row in file order among remaining ties
+        """
+        if mcal is None or len(mcal) == 0:
+            return mcal
+        out = mcal.copy()
+        if response_type_col in out.columns:
+            is_sub = out[response_type_col].astype(str).str.strip() == submission_label
+        else:
+            is_sub = pd.Series(True, index=out.index)
+        out['_prio_submission'] = is_sub.astype(int)
+        drink_yes = pd.Series(False, index=out.index)
+        if sr_coded_col in out.columns:
+            drink_yes |= pd.to_numeric(out[sr_coded_col], errors='coerce') == 1
+        if self_report_col in out.columns:
+            drink_yes |= pd.to_numeric(out[self_report_col], errors='coerce') == 1
+        out['_prio_drink_yes'] = drink_yes.astype(int)
+        if '_file_order' in out.columns:
+            out['_prio_file'] = pd.to_numeric(out['_file_order'], errors='coerce')
+        else:
+            out['_prio_file'] = np.arange(len(out), dtype=float)
+        out['_prio_file'] = out['_prio_file'].fillna(-1)
+        sort_cols = list(subset) + ['_prio_submission', '_prio_drink_yes', '_prio_file']
+        out = out.sort_values(sort_cols, kind='mergesort')
+        out = out.drop_duplicates(subset=list(subset), keep='last')
+        return out.drop(
+            columns=['_prio_submission', '_prio_drink_yes', '_prio_file'],
+            errors='ignore',
+        )
 
     def _morning_export_add_window_qc(self, mcal_export, first_date_adjuster):
         """Add ``morning_implied_in_skyn_window`` from stored skyn metadata (same rule as TAC inside_burst)."""
@@ -1687,6 +1786,7 @@ class dayFeatures():
         first_day_column='first_day',
         last_date_column='last_day',
         first_date_adjuster=-1,
+        extra_attach_cols=None,
     ):
         """
         Load ``morning.csv``, resolve each row's calendar **study_date** (``morning_merge_date``) using
@@ -1694,13 +1794,16 @@ class dayFeatures():
 
         Sets:
             ``self.morning_merge_key_calendar``: ``SubID``, ``Dataset_ID``, ``morning_merge_date``,
-            ``morning_self_report_alcohol`` (preferred join to TAC ``begin_day``).
+            ``morning_self_report_alcohol`` (preferred join to TAC ``begin_day``), plus any
+            cohort-specific QC fields listed in ``extra_attach_cols`` (default: none).
             ``self.morning_merge_key_day_no``: legacy ``day_no`` join when calendar resolution is unavailable.
             ``self.morning_annotated``: long-form morning rows with dates + optional QC column for export.
         """
         self.morning_merge_key_calendar = None
         self.morning_merge_key_day_no = None
         self.morning_annotated = None
+        # Empty by default: cohort scripts pass QC fields via extra_attach_cols.
+        self._morning_extra_attach_cols = list(extra_attach_cols or ())
 
         if not os.path.isfile(morning_csv_path):
             print(f"Warning: Morning report file not found: {morning_csv_path}")
@@ -1747,12 +1850,24 @@ class dayFeatures():
             mcal['morning_self_report_alcohol'] = self._morning_self_report_series(
                 mcal, self_report_col, response_type_col, submission_label
             )
-            mcal = mcal.drop_duplicates(
-                subset=['SubID', 'Dataset_ID', 'morning_merge_date'], keep='last'
+            attach_cols = self._prepare_morning_attach_columns(
+                mcal, self._morning_extra_attach_cols
             )
-            self.morning_merge_key_calendar = mcal[
-                ['SubID', 'Dataset_ID', 'morning_merge_date', 'morning_self_report_alcohol']
-            ].copy()
+            mcal = self._dedupe_morning_rows_by_priority(
+                mcal,
+                subset=['SubID', 'Dataset_ID', 'morning_merge_date'],
+                response_type_col=response_type_col,
+                submission_label=submission_label,
+                self_report_col=self_report_col,
+                sr_coded_col='morning_self_report_alcohol',
+            )
+            keep = [
+                'SubID',
+                'Dataset_ID',
+                'morning_merge_date',
+                'morning_self_report_alcohol',
+            ] + attach_cols
+            self.morning_merge_key_calendar = mcal[keep].copy()
             for c, dtype in (
                 ('SubID', np.int64),
                 ('Dataset_ID', np.int64),
@@ -1764,6 +1879,8 @@ class dayFeatures():
                 self.morning_merge_key_calendar['morning_merge_date'], errors='coerce'
             ).dt.normalize()
             print(f"  {label}")
+            if attach_cols:
+                print(f"  Attach QC morning columns on calendar key: {', '.join(attach_cols)}")
             return True
 
         # --- Path 1: explicit date / study-day column ---
@@ -1956,14 +2073,19 @@ class dayFeatures():
         mleg['morning_self_report_alcohol'] = self._morning_self_report_series(
             mleg, self_report_col, response_type_col, submission_label
         )
+        attach_cols = self._prepare_morning_attach_columns(
+            mleg, self._morning_extra_attach_cols
+        )
         self.morning_merge_key_day_no = mleg[
-            ['SubID', 'Dataset_ID', 'day_no', 'morning_self_report_alcohol']
+            ['SubID', 'Dataset_ID', 'day_no', 'morning_self_report_alcohol'] + attach_cols
         ].copy()
         for c in ('SubID', 'Dataset_ID', 'day_no'):
             self.morning_merge_key_day_no[c] = pd.to_numeric(
                 self.morning_merge_key_day_no[c], errors='coerce'
             ).astype(np.int64)
         print('  Prepared morning day_no merge key (Submissions only, k-th = day_no k).')
+        if attach_cols:
+            print(f"  Attach QC morning columns on day_no key: {', '.join(attach_cols)}")
 
     def add_morning_report_drink_agreement(
         self,
@@ -1981,6 +2103,7 @@ class dayFeatures():
         first_day_column='first_day',
         last_date_column='last_day',
         first_date_adjuster=-1,
+        extra_attach_cols=None,
     ):
         """
         Merge morning self-report onto ``self.day_features`` and add ``self_report_and_tac_comparison``
@@ -1990,11 +2113,17 @@ class dayFeatures():
         ``self.skyn_dates_metadata`` from ``filter_days_by_date_range`` when set (else reads
         ``skyn_dates_csv_path``). Calendar join matches **SubID, Dataset_ID, begin_day date**;
         otherwise uses **day_no**. ``inside_burst`` is unchanged (set only in ``filter_days_by_date_range``).
+
+        Optional ``extra_attach_cols`` are merged as QC-only morning fields (default: none).
+        Cohort scripts (e.g. LINC) should pass their column list explicitly.
         """
+        attach_cols = list(extra_attach_cols or ())
         if not os.path.isfile(morning_csv_path):
             print(f"Warning: Morning report file not found: {morning_csv_path}")
             self.day_features['morning_self_report_alcohol'] = np.nan
             self.day_features['morning_report_matched'] = 0
+            for c in attach_cols:
+                self.day_features[c] = np.nan
             if pred_col in self.day_features.columns:
                 self.day_features['self_report_and_tac_comparison'] = (
                     self._compute_self_report_and_tac_comparison(
@@ -2014,6 +2143,8 @@ class dayFeatures():
             self.day_features['morning_self_report_alcohol'] = np.nan
             self.day_features['morning_report_matched'] = 0
             self.day_features['self_report_and_tac_comparison'] = np.nan
+            for c in attach_cols:
+                self.day_features[c] = np.nan
             return
 
         drop_cols = (
@@ -2021,6 +2152,7 @@ class dayFeatures():
             'morning_report_matched',
             'self_report_and_tac_comparison',
             'morning_merge_date',
+            *attach_cols,
         )
         for col in drop_cols:
             if col in self.day_features.columns:
@@ -2042,6 +2174,7 @@ class dayFeatures():
             first_day_column=first_day_column,
             last_date_column=last_date_column,
             first_date_adjuster=first_date_adjuster,
+            extra_attach_cols=attach_cols,
         )
 
         df = self.day_features.copy()
@@ -2080,6 +2213,8 @@ class dayFeatures():
                 print("Warning: day_features missing 'begin_day'; cannot calendar-merge morning")
                 df['morning_self_report_alcohol'] = np.nan
                 df['morning_merge_date'] = pd.NaT
+                for c in attach_cols:
+                    df[c] = np.nan
             else:
                 df['SubID'] = pd.to_numeric(df['SubID'], errors='coerce').astype(np.int64)
                 df['Dataset_ID'] = pd.to_numeric(df['Dataset_ID'], errors='coerce').astype(np.int64)
@@ -2096,6 +2231,8 @@ class dayFeatures():
                 print(f"Warning: day_features missing {missing} for morning day_no merge")
                 df['morning_self_report_alcohol'] = np.nan
                 df['morning_merge_date'] = pd.NaT
+                for c in attach_cols:
+                    df[c] = np.nan
             else:
                 df['SubID'] = pd.to_numeric(df['SubID'], errors='coerce').astype(np.int64)
                 df['Dataset_ID'] = pd.to_numeric(df['Dataset_ID'], errors='coerce').astype(np.int64)
@@ -2114,6 +2251,12 @@ class dayFeatures():
             )
             df['morning_self_report_alcohol'] = np.nan
             df['morning_merge_date'] = pd.NaT
+            for c in attach_cols:
+                df[c] = np.nan
+
+        for c in attach_cols:
+            if c not in df.columns:
+                df[c] = np.nan
 
         if 'inside_burst' not in df.columns:
             df['inside_burst'] = np.nan
@@ -2154,6 +2297,11 @@ class dayFeatures():
         self.day_features = df
 
         print(f"  Rows with non-missing mr_al_y match: {int(self.day_features['morning_report_matched'].sum())}")
+        if 'mr_numdk' in self.day_features.columns:
+            n_numdk = int(pd.to_numeric(self.day_features['mr_numdk'], errors='coerce').notna().sum())
+            print(f"  Rows with numeric mr_numdk: {n_numdk}")
+        if attach_cols:
+            print(f"  Attached morning QC columns: {', '.join(attach_cols)}")
         vq = self.day_features['self_report_and_tac_comparison'].value_counts()
         print(
             "  Morning vs TAC agreement (self_report_and_tac_comparison):\n"
