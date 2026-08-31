@@ -21,6 +21,9 @@ class ReportGuide:
             'subid': 'Subject identifier',
             'dataset_id': 'Dataset identifier',
             'curve_id': 'Curve identifier',
+            'curve_id_imputed_match': 'Imputed curve_id with highest temporal overlap to this raw curve (independent raw demarcation)',
+            'imputed_match_overlap_percent': 'Fraction of raw curve window overlapped by the matched imputed curve (0-1)',
+            'threshold_source': 'Whether threshold metadata on this row came from raw or imputed k-means clustering',
             'curve_count': 'Number of curves for this subject',
             'curve_threshold': 'Threshold used for curve detection',
             
@@ -31,8 +34,8 @@ class ReportGuide:
             
             # TAC curve features
             'duration': 'Total duration in hours',
-            'auc_total': 'Area under the curve (total) (µg/L/hour)',
-            'auc_relative': 'Area under the curve (relative to baseline) (µg/L/hour)',
+            'auc_total': 'Area under the curve (total) (µg/L·min)',
+            'auc_relative': 'Area under the curve (relative to baseline) (µg/L·min)',
             'peak': 'Maximum TAC value (µg/L)',
             'relative_peak': 'Maximum TAC value relative to baseline (µg/L)',
             'rise_fall_rate_CURVE': 'Ratio of curve duration to relative peak (hours per µg/L) - indicates how much overall rise-to-fall movement occurs across time',
@@ -304,8 +307,8 @@ class ReportGuide:
         self._person_level_feature_descriptions = {
             # Continuous TAC features
             'duration_CURVE': 'Total duration in hours',
-            'auc_total_CURVE': 'Area under the curve (total) (µg/L/hour)',
-            'auc_relative_CURVE': 'Area under the curve (relative to baseline) (µg/L/hour)',
+            'auc_total_CURVE': 'Area under the curve (total) (µg/L·min)',
+            'auc_relative_CURVE': 'Area under the curve (relative to baseline) (µg/L·min)',
             'peak_CURVE': 'Maximum TAC value (µg/L)',
             'relative_peak_CURVE': 'Maximum TAC value relative to baseline (µg/L)',
             'rise_fall_rate_CURVE': 'Ratio of curve duration to relative peak (hours per µg/L) - indicates how much overall rise-to-fall movement occurs across time',
@@ -708,7 +711,7 @@ class ReportGuide:
             'tac_q1_mean': 'Mean TAC (µg/L) across minute rows in Q1 (hours 0–6 of social day); NaN if no valid TAC data',
             'tac_q1_max': 'Maximum TAC (µg/L) among minute rows in Q1; NaN if no valid TAC data',
             'tac_q1_above_threshold_percent': 'Fraction of minute rows in Q1 where TAC ≥ curve_threshold (0–1); NaN if no data',
-            'tac_q1_auc': 'Area under the TAC curve in Q1 (trapezoidal rule, dx=0.1); NaN if no valid TAC data',
+            'tac_q1_auc': 'Area under the TAC curve in Q1 (trapezoidal rule, dx=1 minute → µg/L·min); NaN if no valid TAC data',
             'tac_q1_rise_rate_point_to_point': 'Mean ascending point-to-point TAC rate within Q1; 0 if no ascending steps; NaN if no data',
             'tac_q1_fall_rate_point_to_point': 'Mean descending point-to-point TAC rate within Q1; 0 if no descending steps; NaN if no data',
             'tac_q1_ascending_duration': 'Total duration (hours) of ascending TAC steps within Q1; 0 if none; NaN if no data',
@@ -717,7 +720,7 @@ class ReportGuide:
             'tac_q2_q4_mean': 'Mean TAC (µg/L) across minute rows in Q2–Q4 (hours 6–24 of social day); NaN if no valid TAC data',
             'tac_q2_q4_max': 'Maximum TAC (µg/L) among minute rows in Q2–Q4; NaN if no valid TAC data',
             'tac_q2_q4_above_threshold_percent': 'Fraction of minute rows in Q2–Q4 where TAC ≥ curve_threshold (0–1); NaN if no data',
-            'tac_q2_q4_auc': 'Area under the TAC curve in Q2–Q4 (trapezoidal rule, dx=0.1); NaN if no valid TAC data',
+            'tac_q2_q4_auc': 'Area under the TAC curve in Q2–Q4 (trapezoidal rule, dx=1 minute → µg/L·min); NaN if no valid TAC data',
             'tac_q2_q4_rise_rate_point_to_point': 'Mean ascending point-to-point TAC rate within Q2–Q4; 0 if no ascending steps; NaN if no data',
             'tac_q2_q4_fall_rate_point_to_point': 'Mean descending point-to-point TAC rate within Q2–Q4; 0 if no descending steps; NaN if no data',
             'tac_q2_q4_ascending_duration': 'Total duration (hours) of ascending TAC steps within Q2–Q4; 0 if none; NaN if no data',
@@ -928,13 +931,48 @@ class ReportGuide:
             # Morning EMA merge and TAC agreement (day rows)
             'morning_self_report_alcohol': (
                 'Merged morning self-report of alcohol use for this day (0/1 when a response exists; '
-                'missing if no morning item matched this day row)'
+                'missing if no morning item matched this day row). Source column is morning.csv '
+                'mr_al_y (protocol name mr_alc: Did you use alcohol yesterday?; 1=yes, 2=no). '
+                'Not an ML training feature/label.'
             ),
             'morning_report_matched': (
                 '1 if a morning alcohol response was linked to this day row; 0 if no match'
             ),
             'morning_merge_date': (
                 'Calendar date used when joining morning EMA to this TAC day (calendar merge path)'
+            ),
+            'mr_numdk': (
+                'Morning self-report: total standard drinks yesterday (numeric). Attached for QC only; '
+                'not used as an ML feature. CONDITION_SKIPPED coerced to missing.'
+            ),
+            'mr_alst': (
+                'Protocol: time of first sip yesterday. Not present in current LINC morning.csv '
+                '(column kept as missing on day rows when absent).'
+            ),
+            'mr_alfn': (
+                'Protocol: time of last sip yesterday. Not present in current LINC morning.csv '
+                '(column kept as missing on day rows when absent).'
+            ),
+            'mr_altim_1': (
+                'Morning alcohol time-bin checkbox 1 (0/1). Export stand-in for protocol mr_alst/mr_alfn. QC only.'
+            ),
+            'mr_altim_2': (
+                'Morning alcohol time-bin checkbox 2 (0/1). QC only; not an ML feature.'
+            ),
+            'mr_altim_3': (
+                'Morning alcohol time-bin checkbox 3 (0/1). QC only; not an ML feature.'
+            ),
+            'mr_altim_4': (
+                'Morning alcohol time-bin checkbox 4 (0/1). QC only; not an ML feature.'
+            ),
+            'mr_altim_5': (
+                'Morning alcohol time-bin checkbox 5 (0/1). QC only; not an ML feature.'
+            ),
+            'mr_altim_6': (
+                'Morning alcohol time-bin checkbox 6 (0/1). QC only; not an ML feature.'
+            ),
+            'mr_altim_7': (
+                'Morning alcohol time-bin checkbox 7 (0/1). QC only; not an ML feature.'
             ),
             'inside_burst': (
                 '1 if this day’s calendar date falls inside the skyn wear / study window for that burst; '
@@ -1422,7 +1460,7 @@ class ReportGuide:
         return dfs
 
     @classmethod
-    def get_run_settings_dataframe(cls, smooth_and_impute_attrs=None, curve_attrs=None, event_attrs=None, day_attrs=None):
+    def get_run_settings_dataframe(cls, smooth_and_impute_attrs=None, curve_attrs=None, raw_curve_attrs=None, event_attrs=None, day_attrs=None):
         """Get a DataFrame of run settings in the correct format for export."""
         run_settings = []
         
@@ -1451,6 +1489,11 @@ class ReportGuide:
                             add_setting(f'Curve - {key}', subkey, subvalue)
                 else:
                     add_setting('Curve', key, value)
+
+        # Add Raw Curve settings
+        if raw_curve_attrs:
+            for key, value in raw_curve_attrs.items():
+                add_setting('Raw Curve', key, value)
 
         # Add Event settings
         if event_attrs:
