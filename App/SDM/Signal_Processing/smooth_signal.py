@@ -1,23 +1,23 @@
 from scipy.signal import savgol_filter
 
-def smooth_savgol(df, window_length = 15, polyorder = 2, tac_variable = 'TAC'):
+def smooth_savgol(df, window_length = 15, polyorder = 2, tac_variable = 'TAC', skip_imputed = True):
     """
-    Apply Savgol filter to non-imputed TAC data, smoothing each contiguous segment separately.
+    Apply Savgol filter to TAC data, smoothing each contiguous segment separately.
     This prevents smoothing from:
     1. Reaching across null gaps (device off, gaps, etc.)
-    2. Modifying imputed values (which should remain as the imputation model generated them)
+    2. Modifying imputed values when skip_imputed is True (default; post-imputation TAC)
     """
     import numpy as np
     
     # Create masks for data that should be smoothed
     non_null_mask = df[tac_variable].notnull()
     
-    # Only smooth non-imputed data (if 'imputed' column exists)
-    if 'imputed' in df.columns:
+    # Only skip imputed minutes when requested and the column exists
+    if skip_imputed and 'imputed' in df.columns:
         non_imputed_mask = (df['imputed'] == 0)
         smoothable_mask = non_null_mask & non_imputed_mask
     else:
-        # Backward compatibility: if no 'imputed' column, smooth all non-null data
+        # Smooth all non-null minutes (including minutes later marked imputed)
         smoothable_mask = non_null_mask
     
     # Find contiguous segments of smoothable data
