@@ -25,7 +25,7 @@ class TACAnalyzer:
         return self._cache[key]
 
     def get_auc(self):
-        """Calculate area under the curve using trapezoidal rule."""
+        """Area under TAC (µg/L·min) via trapezoid on 1-minute rows (dx=1)."""
         def compute():
             if len(self.df) == 0:
                 return None
@@ -33,7 +33,7 @@ class TACAnalyzer:
                 tac = self.df[self.tac_column].dropna().astype(float)
                 if len(tac) == 0:
                     return None
-                total_auc = np.trapz(tac, dx=0.1)
+                total_auc = np.trapz(tac, dx=1.0)
                 return total_auc
             except Exception as e:
                 print(f"Error calculating AUC: {e}")
@@ -572,7 +572,7 @@ class TACAnalyzer:
                     return None
                 relative_tac = np.maximum(tac - curve_threshold, 0)  # Ensure values below threshold become 0
                 relative_tac = np.clip(relative_tac, 0, None)
-                relative_auc = np.trapz(relative_tac, dx=0.1)
+                relative_auc = np.trapz(relative_tac, dx=1.0)
                 return relative_auc
             except Exception as e:
                 print(f"Error calculating relative AUC: {e}")
