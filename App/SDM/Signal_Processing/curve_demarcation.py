@@ -12,6 +12,79 @@ MIN_DATA_POINTS = 240  # 4 hours at 1-minute intervals
 MIN_THRESHOLD = 1.0    # Minimum allowed threshold value (μg/L)
 SD_MULTIPLIER = 2.5    # Standard deviation multiplier for threshold calculation
 SAFETY_THRESHOLD = 10.0  # TAC threshold (μg/L) for safety rule activation
+FEATURE_COLUMNS = ['mean_TAC', 'std_TAC', 'slope', 'd1', 'range']
+
+
+def _json_safe(value):
+    """Convert numpy scalars/containers to plain Python for pickle and Excel."""
+    if value is None:
+        return None
+    if isinstance(value, (np.floating, float)):
+        return None if pd.isna(value) else float(value)
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.bool_,)):
+        return bool(value)
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return value
+
+
+def empty_curve_threshold_results(**overrides) -> Dict:
+    """Dataset-level threshold record. Scalar keys are safe to copy onto curve rows."""
+    results = {
+        'curve_threshold': None,
+        'unadjusted_threshold': None,
+        'baseline_mean': None,
+        'baseline_sd': None,
+        'next_cluster_mean': None,
+        'threshold_method': None,
+        'threshold_calculation_method': None,
+        'threshold_rule_applied': None,
+        'fallback_threshold': None,
+        'beta_value': None,
+        'threshold_capped': False,
+        'capped_reason': None,
+        'optimal_k': None,
+        'k_values_tested': None,
+        'window_size': None,
+        'feature_columns': None,
+        'n_minutes_clustered': None,
+        'n_minutes_baseline': None,
+        'baseline_cluster_id': None,
+        'selection_method': None,
+        'use_safety_rule': None,
+        'n_clusters_mean_tac_gt_10': None,
+        'cluster_stats': None,
+        'baseline_scores': None,
+        'quality_metrics_by_k': None,
+        'clustering_quality_silhouette': None,
+        'clustering_quality_calinski_harabasz': None,
+        'clustering_quality_davies_bouldin': None,
+        'clustering_quality_inertia': None,
+    }
+    results.update(overrides)
+    return results
+
+
+def _metrics_for_k(quality_metrics: Dict, k) -> Dict:
+    if not quality_metrics:
+        return {}
+    if k in quality_metrics:
+        return quality_metrics[k] or {}
+    return quality_metrics.get(str(k), {}) or {}
+
+
+def _store_threshold_details(df: pd.DataFrame, attrs_key: str = 'curve_threshold_details', **fields) -> None:
+    """Write dataset-level threshold details onto the minute-level frame (pickled with .sdp)."""
+    existing = getattr(df, 'attrs', {}).get(attrs_key, {}) or {}
+    existing.update(fields)
+    df.attrs[attrs_key] = existing
+    if attrs_key == 'curve_threshold_details':
+        df.attrs['quality_metrics'] = existing.get('quality_metrics_by_k')
+        df.attrs['optimal_k'] = existing.get('optimal_k')
 
 # Legacy functions - commented out as they are not used in the current implementation
 # def get_distortions(data, features, k_max=10):
@@ -164,7 +237,7 @@ def evaluate_clustering_quality(data: pd.DataFrame, features: list, k_values: li
     
     return results
 
-def identify_baseline_cluster(data: pd.DataFrame, features: list, k: int = 2) -> Tuple[int, pd.DataFrame]:
+def identify_baseline_cluster(data: pd.DataFrame, features: list, k: int = 2, tac_column: str = 'TAC') -> Tuple[int, pd.DataFrame, Dict]:
     """
     Identify the baseline cluster using k-means clustering with Z-score normalized criteria.
     
@@ -174,7 +247,7 @@ def identify_baseline_cluster(data: pd.DataFrame, features: list, k: int = 2) ->
         k (int): Number of clusters to use
         
     Returns:
-        Tuple[int, pd.DataFrame]: Baseline cluster ID and DataFrame with cluster labels
+        Tuple[int, pd.DataFrame, Dict]: Baseline cluster ID, labeled data, and selection details
     """
     # Prepare data
     scaler = StandardScaler()
@@ -191,7 +264,7 @@ def identify_baseline_cluster(data: pd.DataFrame, features: list, k: int = 2) ->
         cluster_data = data[data['Cluster'] == cluster_id]
         
         # Calculate cluster characteristics
-        mean_tac = cluster_data['TAC'].mean()
+        mean_tac = cluster_data[tac_column].mean()
         std_tac = cluster_data['std_TAC'].mean()
         mean_slope = cluster_data['slope'].mean()
         
@@ -309,10 +382,21 @@ def identify_baseline_cluster(data: pd.DataFrame, features: list, k: int = 2) ->
             print(f"      STD_ZScore={score_info['std_zscore']:.4f} (raw={score_info['raw_std_tac']:.4f})")
             print(f"      Slope_ZScore={score_info['slope_zscore']:.4f} (raw={score_info['raw_mean_slope']:.4f})")
     
-    return baseline_cluster_id, data
+    details = {
+        'baseline_cluster_id': int(baseline_cluster_id),
+        'selection_method': baseline_scores[0]['selection_method'],
+        'use_safety_rule': bool(use_safety_rule),
+        'n_clusters_mean_tac_gt_10': int(len(high_tac_clusters)),
+        'cluster_stats': _json_safe(cluster_stats),
+        'baseline_scores': _json_safe(baseline_scores),
+    }
+    return baseline_cluster_id, data, details
 
 def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 8.0, 
-                                k_values: list = [3, 4, 5, 6], window_size: int = 15) -> Tuple[float, float, Union[float, None], Union[float, None]]:
+                                k_values: list = [3, 4, 5, 6], window_size: int = 15,
+                                TAC_column: str = 'TAC',
+                                details_attrs_key: str = 'curve_threshold_details',
+                                label_main_dataframe: bool = True) -> Tuple[float, float, Union[float, None], Union[float, None]]:
     """
     Determine the curve threshold using k-means clustering with time-series features.
     
@@ -333,13 +417,15 @@ def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 8.0,
         data = df.copy()
         
         # Validate input data
-        if 'TAC' not in data.columns:
-            print("WARNING: Curve threshold identification failed - No 'TAC' column found in data")
+        if TAC_column not in data.columns:
+            print(f"WARNING: Curve threshold identification failed - No '{TAC_column}' column found in data")
+            _store_threshold_details(df, attrs_key=details_attrs_key, failure_reason='no_tac_column')
             return default_threshold, default_threshold, None, None
             
         # Check for minimum data requirement (4 hours)
-        if (data['TAC'].count() / 60) < 4:
+        if (data[TAC_column].count() / 60) < 4:
             print("WARNING: Curve threshold identification failed - Less than 4 hours of TAC data available")
+            _store_threshold_details(df, attrs_key=details_attrs_key, failure_reason='insufficient_tac_hours')
             return default_threshold, default_threshold, None, None
             
         # Clean and prepare data
@@ -347,21 +433,22 @@ def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 8.0,
         data = data[data['device_worn_model'] == 1].copy()
         
         # Calculate time-series features for all rows (including negative TAC values)
-        data = calculate_time_series_features(data, 'TAC', window_size)
+        data = calculate_time_series_features(data, TAC_column, window_size)
         
         # Store original data for labeling
         original_data = data.copy()
         
         # Drop rows with TAC < -10 before clustering
-        clustering_data = data[data['TAC'] >= -10].copy()
+        clustering_data = data[data[TAC_column] >= -10].copy()
         
         # Drop any remaining NaN values
-        feature_columns = ['mean_TAC', 'std_TAC', 'slope', 'd1', 'range']  # Removed 'TAC' as feature
+        feature_columns = list(FEATURE_COLUMNS)
         clustering_data = clustering_data.dropna(subset=feature_columns).copy()
         
         # Verify we still have enough data after cleaning
         if len(clustering_data) < MIN_DATA_POINTS:  # Less than 4 hours of data
             print("WARNING: Curve threshold identification failed - Insufficient data after cleaning")
+            _store_threshold_details(df, attrs_key=details_attrs_key, failure_reason='insufficient_data_after_cleaning')
             return default_threshold, default_threshold, None, None
 
         # Evaluate clustering quality for different k values
@@ -393,55 +480,81 @@ def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 8.0,
         
         # Store clustering quality metrics for the selected k
         selected_k_metrics = quality_metrics.get(optimal_k, {})
-        
-        # Store quality metrics in clustering_data for later access
-        clustering_data.attrs['quality_metrics'] = quality_metrics
-        clustering_data.attrs['optimal_k'] = optimal_k
+        quality_metrics_by_k = _json_safe(quality_metrics)
         
         # Perform clustering and identify baseline cluster
-        baseline_cluster_id, clustering_data = identify_baseline_cluster(clustering_data, feature_columns, optimal_k)
+        baseline_cluster_id, clustering_data, baseline_details = identify_baseline_cluster(
+            clustering_data, feature_columns, optimal_k, tac_column=TAC_column
+        )
         
         # Calculate baseline cluster statistics
         baseline_data = clustering_data[clustering_data['Cluster'] == baseline_cluster_id]
-        baseline_mean = baseline_data['TAC'].mean()
-        baseline_std = baseline_data['TAC'].std()
+        baseline_mean = baseline_data[TAC_column].mean()
+        baseline_std = baseline_data[TAC_column].std()
         
         # Calculate threshold using baseline + SD_MULTIPLIER*SD approach
         threshold = baseline_mean + (SD_MULTIPLIER * baseline_std)
         print(f"  Baseline Standard Deviation: {baseline_std:.2f}")
         print(f"  Threshold (Mean + {SD_MULTIPLIER}SD): {threshold:.2f}")
 
-        # Label the main dataframe with cluster information
-        original_data = label_main_dataframe_with_clusters(original_data, clustering_data, baseline_cluster_id)
-        
-        # Store the labeled data back to the main dataframe
-        df.attrs['labeled_cluster_data'] = original_data
+        # Label the main dataframe with cluster information (imputed pipeline only)
+        if label_main_dataframe:
+            original_data = label_main_dataframe_with_clusters(original_data, clustering_data, baseline_cluster_id)
+            df.attrs['labeled_cluster_data'] = original_data
 
         # Log the results
         print(f"Curve Threshold Identification Results:")
         print(f"  Optimal K: {optimal_k}")
         print(f"  Baseline Cluster ID: {baseline_cluster_id}")
         print(f"  Baseline Mean TAC: {baseline_mean:.2f}")
-        print(f"  Baseline Standard Deviation: {baseline_data['TAC'].std():.2f}")
+        print(f"  Baseline Standard Deviation: {baseline_data[TAC_column].std():.2f}")
         print(f"  Curve Threshold (Mean + {SD_MULTIPLIER}SD): {threshold:.2f}")
 
         # Progressive fallback approach for threshold capping
+        fallback_threshold = baseline_mean + 6.0
         if threshold < default_threshold:
             # Use the calculated 2.5SD threshold
             capped_threshold = max(MIN_THRESHOLD, threshold)
+            if threshold < MIN_THRESHOLD:
+                threshold_rule_applied = 'below_minimum'
+            else:
+                threshold_rule_applied = 'mean_plus_2.5sd'
             print(f"  Using calculated threshold: {capped_threshold:.2f}")
         else:
-            # Try simpler fallback: baseline + 6
-            fallback_threshold = baseline_mean + 6.0
-            print(f"  Calculated threshold exceeds default. Trying fallback (baseline + 8): {fallback_threshold:.2f}")
+            print(f"  Calculated threshold exceeds default. Trying fallback (baseline + 6): {fallback_threshold:.2f}")
             
             if fallback_threshold < default_threshold:
                 capped_threshold = fallback_threshold
+                threshold_rule_applied = 'baseline_plus_6'
                 print(f"  Using fallback threshold: {capped_threshold:.2f}")
             else:
-                # Last resort: use default threshold
                 capped_threshold = default_threshold
+                threshold_rule_applied = 'default_cap'
                 print(f"  Fallback also exceeds default. Using default threshold: {capped_threshold:.2f}")
+
+        _store_threshold_details(
+            df,
+            attrs_key=details_attrs_key,
+            tac_column=TAC_column,
+            window_size=window_size,
+            feature_columns=list(feature_columns),
+            n_minutes_clustered=int(len(clustering_data)),
+            n_minutes_baseline=int(len(baseline_data)),
+            optimal_k=int(optimal_k),
+            k_values_tested=list(k_values),
+            quality_metrics_by_k=quality_metrics_by_k,
+            clustering_quality_silhouette=_json_safe(selected_k_metrics.get('silhouette')),
+            clustering_quality_calinski_harabasz=_json_safe(selected_k_metrics.get('calinski_harabasz')),
+            clustering_quality_davies_bouldin=_json_safe(selected_k_metrics.get('davies_bouldin')),
+            clustering_quality_inertia=_json_safe(selected_k_metrics.get('inertia')),
+            baseline_mean=_json_safe(baseline_mean),
+            baseline_sd=_json_safe(baseline_std),
+            unadjusted_threshold=_json_safe(threshold),
+            curve_threshold=_json_safe(capped_threshold),
+            fallback_threshold=_json_safe(fallback_threshold),
+            threshold_rule_applied=threshold_rule_applied,
+            **baseline_details,
+        )
         
         return capped_threshold, threshold, baseline_mean, baseline_std
         
@@ -449,6 +562,10 @@ def determine_curve_threshold(df: pd.DataFrame, default_threshold: float = 8.0,
         print(f"ERROR: Curve threshold identification failed - {str(e)}")
         print("Full traceback:")
         print(traceback.format_exc())
+        try:
+            _store_threshold_details(df, attrs_key=details_attrs_key, failure_reason=str(e))
+        except Exception:
+            pass
         return default_threshold, default_threshold, None, None
   
 def get_start_and_end_of_discrete_curves(df, curve_threshold, TAC_column = 'TAC'):
@@ -556,7 +673,11 @@ def merge_nearby_curves(approved_curve_start_and_end_indices, max_curve_separati
   return filtered_merged_curves 
 
 def get_curve_threshold_from_method(df: pd.DataFrame, curve_threshold_method: Union[str, float, int], default_threshold: float = 8.0, 
-                                  k_values: list = [3, 4, 5, 6], window_size: int = 15) -> Tuple[float, Dict]:
+                                  k_values: list = [3, 4, 5, 6], window_size: int = 15,
+                                  TAC_column: str = 'TAC',
+                                  details_attrs_key: str = 'curve_threshold_details',
+                                  results_attrs_key: str = 'curve_threshold_results',
+                                  label_main_dataframe: bool = True) -> Tuple[float, Dict]:
     """
     Determine the curve threshold based on the specified method.
     
@@ -576,96 +697,97 @@ def get_curve_threshold_from_method(df: pd.DataFrame, curve_threshold_method: Un
     """
     try:
         if curve_threshold_method == 'auto':
-            result = determine_curve_threshold(df, default_threshold, k_values, window_size)
+            result = determine_curve_threshold(
+                df, default_threshold, k_values, window_size,
+                TAC_column=TAC_column,
+                details_attrs_key=details_attrs_key,
+                label_main_dataframe=label_main_dataframe,
+            )
             if result is None or result[0] is None or result[1] is None or result[2] is None:
                 raise ValueError("Failed to automatically determine curve threshold")
             
-            # Unpack the result
             capped_threshold, unadjusted_threshold, baseline_mean, baseline_sd = result
+            details = getattr(df, 'attrs', {}).get(details_attrs_key, {}) or {}
+            quality_metrics = details.get('quality_metrics_by_k') or getattr(df, 'attrs', {}).get('quality_metrics', {}) or {}
+            optimal_k = details.get('optimal_k', getattr(df, 'attrs', {}).get('optimal_k', k_values[0]))
+            selected_k_metrics = _metrics_for_k(quality_metrics, optimal_k)
+
+            results_dict = empty_curve_threshold_results(
+                curve_threshold=capped_threshold,
+                unadjusted_threshold=unadjusted_threshold,
+                baseline_mean=baseline_mean,
+                baseline_sd=baseline_sd,
+                next_cluster_mean=None,
+                threshold_method=curve_threshold_method,
+                threshold_calculation_method='baseline_2.5sd',
+                threshold_rule_applied=details.get('threshold_rule_applied'),
+                fallback_threshold=details.get('fallback_threshold'),
+                beta_value=None,
+                threshold_capped=capped_threshold != unadjusted_threshold,
+                capped_reason=None,
+                optimal_k=optimal_k,
+                k_values_tested=details.get('k_values_tested', k_values),
+                window_size=details.get('window_size', window_size),
+                feature_columns=details.get('feature_columns', list(FEATURE_COLUMNS)),
+                n_minutes_clustered=details.get('n_minutes_clustered'),
+                n_minutes_baseline=details.get('n_minutes_baseline'),
+                baseline_cluster_id=details.get('baseline_cluster_id'),
+                selection_method=details.get('selection_method'),
+                use_safety_rule=details.get('use_safety_rule'),
+                n_clusters_mean_tac_gt_10=details.get('n_clusters_mean_tac_gt_10'),
+                cluster_stats=details.get('cluster_stats'),
+                baseline_scores=details.get('baseline_scores'),
+                quality_metrics_by_k=quality_metrics,
+                clustering_quality_silhouette=selected_k_metrics.get(
+                    'silhouette', details.get('clustering_quality_silhouette', np.nan)
+                ),
+                clustering_quality_calinski_harabasz=selected_k_metrics.get(
+                    'calinski_harabasz', details.get('clustering_quality_calinski_harabasz', np.nan)
+                ),
+                clustering_quality_davies_bouldin=selected_k_metrics.get(
+                    'davies_bouldin', details.get('clustering_quality_davies_bouldin', np.nan)
+                ),
+                clustering_quality_inertia=selected_k_metrics.get(
+                    'inertia', details.get('clustering_quality_inertia', np.nan)
+                ),
+            )
             
-            # Get clustering metrics from the data attributes
-            quality_metrics = getattr(df, 'attrs', {}).get('quality_metrics', {})
-            optimal_k = getattr(df, 'attrs', {}).get('optimal_k', k_values[0])
-            selected_k_metrics = quality_metrics.get(optimal_k, {})
-            
-            # Create comprehensive results dictionary
-            results_dict = {
-                'curve_threshold': capped_threshold,
-                'unadjusted_threshold': unadjusted_threshold,
-                'baseline_mean': baseline_mean,
-                'baseline_sd': baseline_sd,
-                'next_cluster_mean': None,  # No longer used with 2.5SD approach
-                'threshold_method': curve_threshold_method,
-                'threshold_calculation_method': 'baseline_2.5sd',
-                'beta_value': None,  # No longer used
-                'threshold_capped': capped_threshold != unadjusted_threshold,
-                'capped_reason': None,
-                'optimal_k': optimal_k,
-                'k_values_tested': k_values,
-                'clustering_quality_silhouette': selected_k_metrics.get('silhouette', np.nan),
-                'clustering_quality_calinski_harabasz': selected_k_metrics.get('calinski_harabasz', np.nan),
-                'clustering_quality_davies_bouldin': selected_k_metrics.get('davies_bouldin', np.nan),
-                'clustering_quality_inertia': selected_k_metrics.get('inertia', np.nan)
-            }
-            
-            # Determine why threshold was capped
             if capped_threshold != unadjusted_threshold:
                 if unadjusted_threshold < MIN_THRESHOLD:
                     results_dict['capped_reason'] = f'below_minimum_{MIN_THRESHOLD}'
                 elif unadjusted_threshold > default_threshold:
                     results_dict['capped_reason'] = f'above_maximum_{default_threshold}'
             
+            df.attrs[results_attrs_key] = results_dict
             return capped_threshold, results_dict
             
         elif isinstance(curve_threshold_method, (int, float)):
             threshold = float(curve_threshold_method)
-            
-            # Create results dictionary for manual threshold
-            results_dict = {
-                'curve_threshold': threshold,
-                'unadjusted_threshold': threshold,
-                'baseline_mean': None,
-                'baseline_sd': None,
-                'next_cluster_mean': None,
-                'threshold_method': curve_threshold_method,
-                'threshold_calculation_method': 'manual',
-                'beta_value': None,
-                'threshold_capped': False,
-                'capped_reason': None,
-                'optimal_k': None,
-                'k_values_tested': None,
-                'clustering_quality_silhouette': None,
-                'clustering_quality_calinski_harabasz': None,
-                'clustering_quality_davies_bouldin': None,
-                'clustering_quality_inertia': None
-            }
-            
+            results_dict = empty_curve_threshold_results(
+                curve_threshold=threshold,
+                unadjusted_threshold=threshold,
+                threshold_method=curve_threshold_method,
+                threshold_calculation_method='manual',
+                threshold_rule_applied='manual',
+                threshold_capped=False,
+            )
+            df.attrs[results_attrs_key] = results_dict
             return threshold, results_dict
         else:
             raise ValueError(f"Invalid curve_threshold value: {curve_threshold_method}")
     except Exception as e:
         print(f"Error determining curve threshold: {str(e)}")
-        
-        # Create fallback results dictionary
-        fallback_dict = {
-            'curve_threshold': default_threshold,
-            'unadjusted_threshold': default_threshold,
-            'baseline_mean': None,
-            'baseline_sd': None,
-            'next_cluster_mean': None,
-            'threshold_method': 'fallback',
-            'threshold_calculation_method': 'error_fallback',
-            'beta_value': None,
-            'threshold_capped': False,
-            'capped_reason': None,
-            'optimal_k': None,
-            'k_values_tested': None,
-            'clustering_quality_silhouette': None,
-            'clustering_quality_calinski_harabasz': None,
-            'clustering_quality_davies_bouldin': None,
-            'clustering_quality_inertia': None
-        }
-        
+        fallback_dict = empty_curve_threshold_results(
+            curve_threshold=default_threshold,
+            unadjusted_threshold=default_threshold,
+            threshold_method='fallback',
+            threshold_calculation_method='error_fallback',
+            threshold_rule_applied='error_fallback',
+        )
+        try:
+            df.attrs[results_attrs_key] = fallback_dict
+        except Exception:
+            pass
         return default_threshold, fallback_dict
 
 def label_main_dataframe_with_clusters(original_data: pd.DataFrame, clustering_data: pd.DataFrame, baseline_cluster_id: int) -> pd.DataFrame:
@@ -711,7 +833,7 @@ def label_main_dataframe_with_clusters(original_data: pd.DataFrame, clustering_d
     labeled_data.loc[tac_excluded_mask, 'exclusion_reason'] = 'TAC < -10'
     
     # Mark rows excluded due to missing features (NaN values)
-    feature_columns = ['mean_TAC', 'std_TAC', 'slope', 'd1', 'range']
+    feature_columns = list(FEATURE_COLUMNS)
     nan_excluded_mask = labeled_data[feature_columns].isna().any(axis=1)
     labeled_data.loc[nan_excluded_mask, 'exclusion_reason'] = 'missing_features'
     
@@ -731,9 +853,9 @@ def adjust_curve_demarcation_for_raw_tac(
     curve_start_and_end_indices, 
     curve_threshold,
     max_curve_separation_minutes,
+    TAC_column='TAC_pre_imputation',
 ):
     adjusted_indices = []
-    TAC_column = 'TAC_pre_imputation'
     
     for curve_start, curve_end, curve_count in curve_start_and_end_indices:
         # Find the peak TAC within the original segment
@@ -809,5 +931,62 @@ def adjust_curve_demarcation_for_raw_tac(
         adjusted_indices.append([new_start, new_end, new_curve_count])
     
     return adjusted_indices
+
+
+def _curve_window_seconds(begin, end) -> float:
+    """Duration in seconds for a curve window (inclusive minute endpoints)."""
+    if pd.isna(begin) or pd.isna(end):
+        return 0.0
+    return max(0.0, (pd.Timestamp(end) - pd.Timestamp(begin)).total_seconds())
+
+
+def attach_imputed_curve_matches(raw_features: pd.DataFrame, imputed_features: pd.DataFrame) -> pd.DataFrame:
+    """
+    For each raw curve, set curve_id_imputed_match to the imputed curve_id with the
+    highest fraction of the raw window overlapped by time (overlap / raw duration).
+    """
+    if raw_features is None or raw_features.empty:
+        return raw_features
+    raw_out = raw_features.copy()
+    if imputed_features is None or imputed_features.empty:
+        raw_out['curve_id_imputed_match'] = np.nan
+        raw_out['imputed_match_overlap_percent'] = np.nan
+        return raw_out
+    if 'begin_CURVE' not in raw_out.columns or 'end_CURVE' not in imputed_features.columns:
+        raise ValueError('begin_CURVE/end_CURVE required for overlap matching')
+
+    match_ids = []
+    match_pcts = []
+    for _, raw_row in raw_out.iterrows():
+        raw_start = raw_row['begin_CURVE']
+        raw_end = raw_row['end_CURVE']
+        raw_dur = _curve_window_seconds(raw_start, raw_end)
+        if raw_dur <= 0:
+            match_ids.append(np.nan)
+            match_pcts.append(np.nan)
+            continue
+        best_id = np.nan
+        best_pct = -1.0
+        for _, imp_row in imputed_features.iterrows():
+            overlap_start = max(pd.Timestamp(raw_start), pd.Timestamp(imp_row['begin_CURVE']))
+            overlap_end = min(pd.Timestamp(raw_end), pd.Timestamp(imp_row['end_CURVE']))
+            overlap = max(0.0, (overlap_end - overlap_start).total_seconds())
+            if overlap <= 0:
+                continue
+            pct = overlap / raw_dur
+            imp_id = imp_row['curve_id']
+            if pct > best_pct or (pct == best_pct and not pd.isna(imp_id) and (pd.isna(best_id) or imp_id < best_id)):
+                best_pct = pct
+                best_id = imp_id
+        if best_pct < 0:
+            match_ids.append(np.nan)
+            match_pcts.append(np.nan)
+        else:
+            match_ids.append(best_id)
+            match_pcts.append(best_pct)
+
+    raw_out['curve_id_imputed_match'] = match_ids
+    raw_out['imputed_match_overlap_percent'] = match_pcts
+    return raw_out
 
     
