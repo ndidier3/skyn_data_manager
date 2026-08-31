@@ -75,13 +75,29 @@ class curveFeatures():
       self.raw_curve_features = pd.concat(raw_dfs, ignore_index=True)
     else:
       self.raw_curve_features = pd.DataFrame()
+
+    default_dfs = []
+    raw_default_dfs = []
+    for processor in self.processors:
+      default_df = getattr(processor, 'curve_features_default_threshold', None)
+      if default_df is not None and len(default_df):
+        default_dfs.append(default_df.copy())
+      raw_default_df = getattr(processor, 'raw_curve_features_default_threshold', None)
+      if raw_default_df is not None and len(raw_default_df):
+        raw_default_dfs.append(raw_default_df.copy())
+    self.curve_features_default_threshold = (
+      pd.concat(default_dfs, ignore_index=True) if default_dfs else pd.DataFrame()
+    )
+    self.raw_curve_features_default_threshold = (
+      pd.concat(raw_default_dfs, ignore_index=True) if raw_default_dfs else pd.DataFrame()
+    )
     
     # Convert subid and curve_id to int
     self.curve_features[['subid', 'curve_id']] = self.curve_features[['subid', 'curve_id']].astype(int)
 
     # Build a de-duplication key that supports multi-burst designs.
     # For single-burst studies, subid+curve_id is still sufficient, but for
-    # designs like LINC that have multiple bursts per participant, dataset-
+    # designs that have multiple bursts per participant, dataset-
     # level identifiers ensure curve_ids are unique per burst rather than
     # globally.
     dedup_keys = ['subid', 'curve_id']
@@ -831,6 +847,12 @@ class curveFeatures():
     self.curve_features.to_excel(f'{output_dir}/curve_features.xlsx', index=False)
     if self.raw_curve_features is not None:
         self.raw_curve_features.to_excel(f'{output_dir}/raw_curve_features.xlsx', index=False)
+    default_features = getattr(self, 'curve_features_default_threshold', None)
+    if default_features is not None and len(default_features):
+        default_features.to_excel(f'{output_dir}/curve_features_default_threshold.xlsx', index=False)
+    raw_default_features = getattr(self, 'raw_curve_features_default_threshold', None)
+    if raw_default_features is not None and len(raw_default_features):
+        raw_default_features.to_excel(f'{output_dir}/raw_curve_features_default_threshold.xlsx', index=False)
     # Print summary
     total_curves = len(self.curve_features)
     perfect_curves = perfect_mask.sum()
